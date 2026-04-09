@@ -1,0 +1,33 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcarchive
+build/
+
+# CocoaPods (no usamos, pero por si acaso)
+Pods/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Secrets — NUNCA subir al repo
+**/Resources/Debug.xcconfig
+**/Resources/Release.xcconfig
+GoogleService-Info.plist
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode workspace user data
+*.xcworkspace/xcuserdata/
