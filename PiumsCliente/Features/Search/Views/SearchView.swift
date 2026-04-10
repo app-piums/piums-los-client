@@ -1,6 +1,34 @@
 // SearchView.swift
 import SwiftUI
 
+// MARK: - Categorías del cliente (simples, igual que la web)
+
+private struct ClientCategory: Identifiable {
+    let id: String
+    let label: String
+    let icon: String
+    let searchQuery: String
+}
+
+private let CLIENT_CATEGORIES: [ClientCategory] = [
+    ClientCategory(id: "musica",      label: "Música",        icon: "music.note",          searchQuery: "musica"),
+    ClientCategory(id: "dj",          label: "DJ",            icon: "headphones",           searchQuery: "DJ"),
+    ClientCategory(id: "fotografia",  label: "Fotografía",    icon: "camera.fill",          searchQuery: "fotografia"),
+    ClientCategory(id: "baile",       label: "Baile",         icon: "figure.dance",         searchQuery: "baile"),
+    ClientCategory(id: "maquillaje",  label: "Maquillaje",    icon: "paintbrush.fill",      searchQuery: "maquillaje"),
+    ClientCategory(id: "tatuajes",    label: "Tatuajes",      icon: "pencil.tip",           searchQuery: "tatuajes"),
+    ClientCategory(id: "iluminacion", label: "Iluminación",   icon: "lightbulb.fill",       searchQuery: "iluminacion"),
+    ClientCategory(id: "bodas",       label: "Bodas",         icon: "heart.fill",           searchQuery: "bodas"),
+    ClientCategory(id: "quinces",     label: "Quinceañeras",  icon: "sparkles",             searchQuery: "quinceañeras"),
+    ClientCategory(id: "corporativo", label: "Corporativo",   icon: "briefcase.fill",       searchQuery: "corporativo"),
+    ClientCategory(id: "barberia",    label: "Barbería",      icon: "scissors",             searchQuery: "barberia"),
+    ClientCategory(id: "magia",       label: "Shows",         icon: "party.popper.fill",    searchQuery: "shows animacion"),
+]
+
+private let POPULAR_SEARCHES = ["banda", "fotografía bodas", "DJ boda", "música en vivo", "maquillaje novia"]
+
+// MARK: - SearchView
+
 struct SearchView: View {
     @State private var viewModel = SearchViewModel()
     @State private var selectedArtist: Artist?
@@ -14,10 +42,17 @@ struct SearchView: View {
                     LoadingView().frame(maxWidth: .infinity, minHeight: 300)
 
                 } else if !viewModel.hasSearched {
-                    TalentPickerView(
-                        selectedTalentId: $viewModel.selectedTalentId,
-                        onSelect: { talent in searchFocused = false; viewModel.selectTalent(talent) },
-                        onClear: { viewModel.clearTalent() }
+                    // ── Estado inicial: categorías de cliente ─
+                    ClientExploreInitialView(
+                        onCategory: { cat in
+                            viewModel.query = cat.searchQuery
+                            viewModel.selectedSpecialty = nil
+                            Task { await viewModel.search() }
+                        },
+                        onPopular: { term in
+                            viewModel.query = term
+                            Task { await viewModel.search() }
+                        }
                     )
                     .padding(.top, 8)
 
@@ -31,11 +66,12 @@ struct SearchView: View {
                     .padding(.top, 40)
 
                 } else {
-                    // Header
+                    // ── Header resultados ─────────────────────
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("\(viewModel.results.count) resultado(s)")
-                                .font(.caption).foregroundStyle(.secondary)
+                            Text("\(viewModel.results.count) artista(s) encontrado(s)")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.secondary)
                             Spacer()
                             if viewModel.isSmartSearch {
                                 Label("SmartSearch", systemImage: "sparkles")
@@ -46,6 +82,7 @@ struct SearchView: View {
                                     .font(.caption).foregroundStyle(Color.piumsOrange)
                             }
                         }
+                        // ExpandedTerms chips
                         if !viewModel.expandedTerms.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
@@ -65,7 +102,7 @@ struct SearchView: View {
                     }
                     .padding(.horizontal)
 
-                    // Grid 2 columnas — igual que la web
+                    // ── Grid 2 columnas ───────────────────────
                     LazyVGrid(
                         columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)],
                         spacing: 14
@@ -108,17 +145,30 @@ struct SearchView: View {
         }
     }
 
+    // MARK: - Search bar
+
     private var searchBar: some View {
         HStack(spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Buscar artistas...", text: $viewModel.query)
+                TextField("¿Qué estás buscando?", text: $viewModel.query)
                     .submitLabel(.search)
                     .focused($searchFocused)
                     .onSubmit { Task { await viewModel.search() } }
-                    .onChange(of: viewModel.query) { _, v in if v.isEmpty { viewModel.clearTalent() } }
+                    .onChange(of: viewModel.query) { _, v in
+                        if v.isEmpty {
+                            viewModel.results = []
+                            viewModel.smartResults = []
+                            viewModel.expandedTerms = []
+                            viewModel.hasSearched = false
+                            viewModel.selectedTalentId = nil
+                        }
+                    }
                 if !viewModel.query.isEmpty {
-                    Button { viewModel.clearTalent(); searchFocused = false } label: {
+                    Button {
+                        viewModel.clearTalent()
+                        searchFocused = false
+                    } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }
                 }
@@ -131,10 +181,13 @@ struct SearchView: View {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "slider.horizontal.3")
                         .font(.title3).padding(12)
-                        .background(viewModel.hasActiveFilters ? Color.piumsOrange.opacity(0.15) : Color(.secondarySystemBackground))
+                        .background(viewModel.hasActiveFilters
+                                    ? Color.piumsOrange.opacity(0.15)
+                                    : Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     if viewModel.hasActiveFilters {
-                        Circle().fill(Color.piumsOrange).frame(width: 10, height: 10).offset(x: 2, y: -2)
+                        Circle().fill(Color.piumsOrange)
+                            .frame(width: 10, height: 10).offset(x: 2, y: -2)
                     }
                 }
             }
@@ -142,37 +195,133 @@ struct SearchView: View {
         }
     }
 
+    // MARK: - Active filters bar
+
     private var activeFiltersBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 if let sp = viewModel.selectedSpecialty {
-                    FilterChip(label: sp.rawValue) { viewModel.selectedSpecialty = nil; Task { await viewModel.search() } }
+                    FilterChip(label: sp.rawValue) {
+                        viewModel.selectedSpecialty = nil; Task { await viewModel.search() }
+                    }
                 }
                 if viewModel.minRating > 0 {
-                    FilterChip(label: "★ \(String(format: "%.1f", viewModel.minRating))+") { viewModel.minRating = 0; Task { await viewModel.search() } }
+                    FilterChip(label: "★ \(String(format: "%.1f", viewModel.minRating))+") {
+                        viewModel.minRating = 0; Task { await viewModel.search() }
+                    }
                 }
                 if viewModel.minPrice > 0 {
-                    FilterChip(label: "Desde Q\(Int(viewModel.minPrice))") { viewModel.minPrice = 0; Task { await viewModel.search() } }
+                    FilterChip(label: "Desde Q\(Int(viewModel.minPrice))") {
+                        viewModel.minPrice = 0; Task { await viewModel.search() }
+                    }
                 }
                 if viewModel.maxPrice < 50000 {
-                    FilterChip(label: "Hasta Q\(Int(viewModel.maxPrice))") { viewModel.maxPrice = 50000; Task { await viewModel.search() } }
+                    FilterChip(label: "Hasta Q\(Int(viewModel.maxPrice))") {
+                        viewModel.maxPrice = 50000; Task { await viewModel.search() }
+                    }
                 }
                 if let city = viewModel.selectedCity {
-                    FilterChip(label: city) { viewModel.selectedCity = nil; Task { await viewModel.search() } }
+                    FilterChip(label: city) {
+                        viewModel.selectedCity = nil; Task { await viewModel.search() }
+                    }
                 }
                 if viewModel.isVerified {
-                    FilterChip(label: "✓ Verificados") { viewModel.isVerified = false; Task { await viewModel.search() } }
+                    FilterChip(label: "✓ Verificados") {
+                        viewModel.isVerified = false; Task { await viewModel.search() }
+                    }
                 }
                 if viewModel.sortOption != .relevance {
-                    FilterChip(label: viewModel.sortOption.displayName) { viewModel.sortOption = .relevance; Task { await viewModel.search() } }
+                    FilterChip(label: viewModel.sortOption.displayName) {
+                        viewModel.sortOption = .relevance; Task { await viewModel.search() }
+                    }
                 }
-                Button("Limpiar todo") { viewModel.clearFilters(); Task { await viewModel.search() } }
-                    .font(.caption).foregroundStyle(Color.piumsOrange)
+                Button("Limpiar todo") {
+                    viewModel.clearFilters(); Task { await viewModel.search() }
+                }
+                .font(.caption).foregroundStyle(Color.piumsOrange)
             }
             .padding(.horizontal)
         }
     }
 }
+
+// MARK: - ClientExploreInitialView — lo que ve el cliente antes de buscar
+
+private struct ClientExploreInitialView: View {
+    let onCategory: (ClientCategory) -> Void
+    let onPopular: (String) -> Void
+
+    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+
+            // ── Categorías ────────────────────────────────
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Todas las categorías")
+                    .font(.headline)
+                    .padding(.horizontal)
+
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(CLIENT_CATEGORIES) { cat in
+                        Button { onCategory(cat) } label: {
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(Color.piumsOrange.opacity(0.10))
+                                        .frame(height: 56)
+                                    Image(systemName: cat.icon)
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(Color.piumsOrange)
+                                }
+                                Text(cat.label)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.8)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+
+            // ── Búsquedas populares ───────────────────────
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Populares")
+                    .font(.headline)
+                    .padding(.horizontal)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(POPULAR_SEARCHES, id: \.self) { term in
+                            Button { onPopular(term) } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(term)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.primary)
+                                }
+                                .padding(.horizontal, 14).padding(.vertical, 9)
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+        .padding(.bottom, 20)
+    }
+}
+
+// MARK: - FilterChip
 
 private struct FilterChip: View {
     let label: String; let onRemove: () -> Void
@@ -187,6 +336,8 @@ private struct FilterChip: View {
         .clipShape(Capsule())
     }
 }
+
+// MARK: - SearchFiltersSheet
 
 struct SearchFiltersSheet: View {
     @Bindable var viewModel: SearchViewModel
@@ -208,7 +359,9 @@ struct SearchFiltersSheet: View {
                                         Text(sp.rawValue).font(.caption2).lineLimit(1)
                                     }
                                     .frame(maxWidth: .infinity).padding(.vertical, 10)
-                                    .background(viewModel.selectedSpecialty == sp ? Color.piumsOrange : Color(.tertiarySystemBackground))
+                                    .background(viewModel.selectedSpecialty == sp
+                                                ? Color.piumsOrange
+                                                : Color(.tertiarySystemBackground))
                                     .foregroundStyle(viewModel.selectedSpecialty == sp ? .white : .primary)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
@@ -220,9 +373,11 @@ struct SearchFiltersSheet: View {
                     filterSection(title: "Rango de precio (Q)") {
                         VStack(spacing: 12) {
                             HStack {
-                                Text("Mínimo: Q\(Int(viewModel.minPrice))").font(.subheadline).foregroundStyle(.secondary)
+                                Text("Mínimo: Q\(Int(viewModel.minPrice))")
+                                    .font(.subheadline).foregroundStyle(.secondary)
                                 Spacer()
-                                Text("Máximo: Q\(viewModel.maxPrice >= 50000 ? "Sin límite" : String(Int(viewModel.maxPrice)))").font(.subheadline).foregroundStyle(.secondary)
+                                Text("Máximo: Q\(viewModel.maxPrice >= 50000 ? "Sin límite" : String(Int(viewModel.maxPrice)))")
+                                    .font(.subheadline).foregroundStyle(.secondary)
                             }
                             Slider(value: $viewModel.minPrice, in: 0...49000, step: 100).tint(.piumsOrange)
                             Slider(value: $viewModel.maxPrice, in: 1000...50000, step: 100).tint(.piumsOrange)
@@ -238,7 +393,9 @@ struct SearchFiltersSheet: View {
                                     Text(r == 0 ? "Todos" : "\(String(format: "%.1f", r))★")
                                         .font(.subheadline.weight(.medium))
                                         .padding(.horizontal, 10).padding(.vertical, 7)
-                                        .background(viewModel.minRating == r ? Color.piumsOrange : Color(.tertiarySystemBackground))
+                                        .background(viewModel.minRating == r
+                                                    ? Color.piumsOrange
+                                                    : Color(.tertiarySystemBackground))
                                         .foregroundStyle(viewModel.minRating == r ? .white : .primary)
                                         .clipShape(Capsule())
                                 }
@@ -255,7 +412,9 @@ struct SearchFiltersSheet: View {
                                 } label: {
                                     Text(city).font(.subheadline).lineLimit(1)
                                         .frame(maxWidth: .infinity).padding(.vertical, 9)
-                                        .background(viewModel.selectedCity == city ? Color.piumsOrange : Color(.tertiarySystemBackground))
+                                        .background(viewModel.selectedCity == city
+                                                    ? Color.piumsOrange
+                                                    : Color(.tertiarySystemBackground))
                                         .foregroundStyle(viewModel.selectedCity == city ? .white : .primary)
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
@@ -267,9 +426,7 @@ struct SearchFiltersSheet: View {
                     filterSection(title: "Ordenar por") {
                         VStack(spacing: 0) {
                             ForEach(SearchSortOption.allCases, id: \.self) { opt in
-                                Button {
-                                    viewModel.sortOption = opt
-                                } label: {
+                                Button { viewModel.sortOption = opt } label: {
                                     HStack {
                                         Text(opt.displayName).font(.subheadline)
                                         Spacer()
@@ -286,7 +443,8 @@ struct SearchFiltersSheet: View {
                     }
                     Divider()
                     filterSection(title: "Solo verificados") {
-                        Toggle("Mostrar solo artistas verificados", isOn: $viewModel.isVerified).tint(.piumsOrange)
+                        Toggle("Mostrar solo artistas verificados", isOn: $viewModel.isVerified)
+                            .tint(.piumsOrange)
                     }
                     Button(role: .destructive) { viewModel.clearFilters() } label: {
                         Text("Limpiar todos los filtros")
