@@ -65,6 +65,14 @@ final class SearchViewModel {
     var isVerified: Bool = false
     var sortOption: SearchSortOption = .relevance
 
+    // MARK: - TalentPicker
+    var selectedTalentId: String? = nil
+
+    // MARK: - SmartSearch results
+    var smartResults: [SmartArtist] = []
+    var expandedTerms: [String] = []
+    var isSmartSearch: Bool = false
+
     // MARK: - Estado
     var results: [Artist] = []
     var isLoading = false
@@ -72,6 +80,7 @@ final class SearchViewModel {
     var hasSearched = false
     var hasMore = true
     private var currentPage = 1
+    private var debounceTask: Task<Void, Never>? = nil
 
     // Ciudades reales extraídas del backend
     var cities = ["Guatemala", "Ciudad de Guatemala", "Antigua Guatemala",
@@ -83,13 +92,46 @@ final class SearchViewModel {
     func search() async {
         currentPage = 1
         results = []
+        smartResults = []
+        expandedTerms = []
         hasMore = true
         hasSearched = true
-        await loadNext()
+        isSmartSearch = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        if isSmartSearch {
+            await loadSmart()
+        } else {
+            await loadNext()
+        }
+    }
+
+    /// Debounced search — triggers after 400ms, used by TalentPicker
+    func searchDebounced() {
+        debounceTask?.cancel()
+        debounceTask = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            await search()
+        }
+    }
+
+    func selectTalent(_ talent: Talent) {
+        selectedTalentId = talent.id
+        query = talent.label
+        searchDebounced()
+    }
+
+    func clearTalent() {
+        selectedTalentId = nil
+        query = ""
+        results = []
+        smartResults = []
+        expandedTerms = []
+        hasSearched = false
+        isSmartSearch = false
     }
 
     func loadNextIfNeeded(currentItem: Artist) async {
-        guard let last = results.last, last.id == currentItem.id, hasMore, !isLoading else { return }
+        guard let last = results.last, last.id == currentItem.id, hasMore, !isLoading, !isSmartSearch else { return }
         await loadNext()
     }
 
@@ -109,6 +151,26 @@ final class SearchViewModel {
     }
 
     // MARK: - Private
+
+    private func loadSmart() async {
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let res: SmartSearchResponse = try await APIClient.request(
+                .smartSearch(q: query.trimmingCharacters(in: .whitespaces),
+                             city: selectedCity,
+                             limit: 40)
+            )
+            smartResults = res.artists
+            expandedTerms = res.expandedTerms ?? []
+            // Mirror to results for cards
+            results = res.artists.map { $0.toArtist() }
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+    }
 
     private func loadNext() async {
         guard !isLoading else { return }

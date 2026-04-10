@@ -19,6 +19,7 @@ enum APIEndpoint {
     case searchArtists(q: String?, page: Int, limit: Int, specialty: String?, city: String?,
                        minPrice: Int?, maxPrice: Int?, minRating: Double?,
                        isVerified: Bool?, sortBy: String?, sortOrder: String?)
+    case smartSearch(q: String, city: String?, limit: Int)
 
     // ── Catalog ───────────────────────────────────────────
     case listServices(artistId: String)
@@ -157,7 +158,7 @@ extension APIEndpoint {
     var requiresAuth: Bool {
         switch self {
         case .login, .registerClient, .firebaseAuth, .forgotPassword,
-             .searchArtists, .getArtist, .listReviews, .getArtistPortfolio:
+             .searchArtists, .smartSearch, .getArtist, .listReviews, .getArtistPortfolio:
             return false
         default:
             return true
@@ -179,7 +180,6 @@ extension APIEndpoint {
         case .getArtist(let id):               return "/api/artists/\(id)"
         case .getArtistPortfolio(let id):      return "/api/artists/\(id)/portfolio"
 
-        // Search
         case .searchArtists(let q, let pg, let lm, let specialty, let city,
                             let minPrice, let maxPrice, let minRating,
                             let isVerified, let sortBy, let sortOrder):
@@ -193,6 +193,11 @@ extension APIEndpoint {
             if let isVerified = isVerified, isVerified { p += "&isVerified=true" }
             if let sortBy = sortBy, !sortBy.isEmpty { p += "&sortBy=\(sortBy)" }
             if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
+            return p
+
+        case .smartSearch(let q, let city, let limit):
+            var p = "/api/search/smart?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)&limit=\(limit)"
+            if let city = city, !city.isEmpty { p += "&city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)" }
             return p
 
         // Catalog

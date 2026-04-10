@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ArtistCardView: View {
     let artist: Artist
+    var matchedService: MatchedService? = nil   // SmartSearch: servicio exacto que coincidió
 
     var body: some View {
         HStack(spacing: 14) {
@@ -60,17 +61,34 @@ struct ArtistCardView: View {
                             .lineLimit(1)
                     }
                 }
+
+                // SmartSearch: matched service badge
+                if let svc = matchedService {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.caption2)
+                        Text(svc.name)
+                            .font(.caption2.weight(.medium))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Color.piumsOrange.opacity(0.10))
+                    .foregroundStyle(Color.piumsOrange)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.piumsOrange.opacity(0.2), lineWidth: 1))
+                }
             }
 
             Spacer()
 
-            // Precio
+            // Precio — SmartSearch > artist.basePrice
             VStack(alignment: .trailing, spacing: 2) {
-                if let price = artist.basePrice {
-                    Text("Desde")
+                let price = matchedService?.price ?? artist.basePrice
+                if let p = price {
+                    Text(matchedService != nil ? "Servicio" : "Desde")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Text(price.piumsFormatted)
+                    Text(p.piumsFormatted)
                         .font(.subheadline.bold())
                         .foregroundStyle(Color.piumsOrange)
                 }

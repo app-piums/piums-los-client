@@ -72,6 +72,61 @@ struct SearchPagination: Codable {
     var hasMore: Bool { page < totalPages }
 }
 
+// MARK: - SmartSearch Response  (shape: /api/search/smart)
+
+struct MatchedService: Codable {
+    let id: String
+    let name: String
+    let price: Int
+    let currency: String
+    let pricingType: String?
+    let isExactMatch: Bool?
+}
+
+struct SmartArtist: Codable, Identifiable {
+    let id: String
+    let name: String
+    let bio: String?
+    let city: String?
+    let state: String?
+    let country: String?
+    let averageRating: Double?
+    let totalReviews: Int
+    let totalBookings: Int
+    let hourlyRateMin: Int?
+    let hourlyRateMax: Int?
+    let mainServicePrice: Int?
+    let mainServiceName: String?
+    let isVerified: Bool
+    let isActive: Bool
+    let isAvailable: Bool
+    let servicesCount: Int
+    let serviceIds: [String]?
+    let serviceTitles: [String]?
+    let specialties: [String]?
+    let matchedService: MatchedService?
+    let score: Double?
+    let createdAt: String?
+
+    /// Convierte a Artist para reutilizar las vistas existentes
+    func toArtist() -> Artist {
+        Artist(id: id, name: name, bio: bio, city: city, state: state, country: country,
+               averageRating: averageRating, totalReviews: totalReviews, totalBookings: totalBookings,
+               hourlyRateMin: hourlyRateMin, hourlyRateMax: hourlyRateMax,
+               mainServicePrice: matchedService?.price ?? mainServicePrice,
+               mainServiceName: matchedService?.name ?? mainServiceName,
+               isVerified: isVerified, isActive: isActive, isAvailable: isAvailable,
+               servicesCount: servicesCount, serviceIds: serviceIds, serviceTitles: serviceTitles,
+               specialties: specialties, createdAt: createdAt)
+    }
+}
+
+struct SmartSearchResponse: Codable {
+    let artists: [SmartArtist]
+    let expandedTerms: [String]?
+    let totalFound: Int?
+}
+
 // MARK: - ArtistCategory (categorías locales para filtros UI — no vienen del backend en search)
 
 enum ArtistCategory: String, Codable, CaseIterable {
