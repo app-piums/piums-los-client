@@ -1,4 +1,4 @@
-// MainTabView.swift — 4 tabs (Home · Explore · Bookings · Events) + FAB
+// MainTabView.swift — 5 tabs (Home · Explore · My Space · Inbox · Perfil) + FAB
 import SwiftUI
 
 struct MainTabView: View {
@@ -19,14 +19,17 @@ struct MainTabView: View {
                     .tabItem { Label("Explore",  systemImage: "magnifyingglass") }
                     .tag(1)
 
-                NavigationStack(path: $bookingsPath) { MyBookingsView() }
-                    .tabItem { Label("Bookings", systemImage: "calendar") }
+                NavigationStack(path: $bookingsPath) { MySpaceView() }
+                    .tabItem { Label("My Space", systemImage: "square.grid.2x2.fill") }
                     .tag(2)
 
-                // Events — placeholder hasta implementar
-                NavigationStack { EventsPlaceholderView() }
-                    .tabItem { Label("Events",   systemImage: "ticket.fill") }
+                NavigationStack { InboxView() }
+                    .tabItem { Label("Inbox",    systemImage: "message.fill") }
                     .tag(3)
+
+                NavigationStack { ProfileView() }
+                    .tabItem { Label("Perfil",   systemImage: "person.fill") }
+                    .tag(4)
             }
             .tint(Color.piumsOrange)
             .toolbarBackground(.ultraThinMaterial, for: .tabBar)
@@ -73,21 +76,6 @@ private struct FABButton: View {
                     .animation(.spring(response: 0.3), value: isExpanded)
             }
         }
-    }
-}
-
-// ══════════════════════════════════════════════════════════════
-// MARK: - Events Placeholder
-// ══════════════════════════════════════════════════════════════
-
-private struct EventsPlaceholderView: View {
-    var body: some View {
-        EmptyStateView(
-            systemImage: "ticket.fill",
-            title: "Events",
-            description: "Próximamente podrás crear y gestionar eventos con múltiples artistas."
-        )
-        .navigationTitle("Events")
     }
 }
 

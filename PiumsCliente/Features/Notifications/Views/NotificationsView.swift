@@ -132,3 +132,64 @@ struct NotificationRowView: View {
 #Preview {
     NavigationStack { NotificationsView() }
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// MARK: - InboxView — Mensajes · Quejas en un solo tab
+// ══════════════════════════════════════════════════════════════════════
+
+enum InboxTab: String, CaseIterable {
+    case messages = "Mensajes"
+    case quejas   = "Quejas"
+    
+    var systemImage: String {
+        switch self {
+        case .messages: return "message.fill"
+        case .quejas:   return "exclamationmark.bubble.fill"
+        }
+    }
+}
+
+struct InboxView: View {
+    @State private var selected: InboxTab = .messages
+    @State private var unreadCount: Int = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PiumsSegmentedPicker(
+                tabs: InboxTab.allCases,
+                selected: $selected,
+                label: \.rawValue,
+                icon: \.systemImage,
+                badge: { tab in
+                    tab == .messages ? unreadCount : 0
+                }
+            )
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(.bar)
+            Divider()
+
+            Group {
+                switch selected {
+                case .messages: MessagesPlaceholderView()
+                case .quejas:   QuejasView()
+                }
+            }
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: selected)
+        }
+        .navigationTitle("Inbox")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+    }
+}
+
+private struct MessagesPlaceholderView: View {
+    var body: some View {
+        EmptyStateView(
+            systemImage: "message.fill",
+            title: "Mensajes",
+            description: "El chat en tiempo real con artistas estará disponible próximamente."
+        )
+    }
+}

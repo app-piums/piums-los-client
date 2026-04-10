@@ -322,3 +322,118 @@ private struct DetailRow: View {
 #Preview {
     NavigationStack { MyBookingsView() }
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// MARK: - MySpaceView — Reservas · Eventos · Favoritos en un solo tab
+// ══════════════════════════════════════════════════════════════════════
+
+enum MySpaceTab: String, CaseIterable {
+    case bookings  = "Reservas"
+    case events    = "Eventos"
+    case favorites = "Favoritos"
+
+    var systemImage: String {
+        switch self {
+        case .bookings:  return "calendar"
+        case .events:    return "ticket.fill"
+        case .favorites: return "heart.fill"
+        }
+    }
+}
+
+struct MySpaceView: View {
+    @State private var selected: MySpaceTab = .bookings
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PiumsSegmentedPicker(tabs: MySpaceTab.allCases,
+                                 selected: $selected,
+                                 label: \.rawValue,
+                                 icon: \.systemImage)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(.bar)
+            Divider()
+
+            Group {
+                switch selected {
+                case .bookings:  MyBookingsView()
+                case .events:    EventsContentView()
+                case .favorites: FavoritesContentView()
+                }
+            }
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: selected)
+        }
+        .navigationTitle("My Space")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+    }
+}
+
+// Picker genérico reutilizable para MySpace e Inbox
+struct PiumsSegmentedPicker<T: Hashable & CaseIterable>: View {
+    let tabs: [T]
+    @Binding var selected: T
+    let label: (T) -> String
+    let icon: (T) -> String
+    var badge: ((T) -> Int)? = nil
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(tabs.enumerated()), id: \.offset) { _, tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { selected = tab }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: icon(tab)).font(.system(size: 12))
+                        Text(label(tab)).font(.subheadline.weight(.medium))
+                        if let b = badge?(tab), b > 0 {
+                            Text("\(b)")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                .background(
+                                    Capsule().fill(
+                                        selected == tab
+                                        ? Color.white.opacity(0.35)
+                                        : Color.piumsOrange
+                                    )
+                                )
+                        }
+                    }
+                    .foregroundStyle(selected == tab ? .white : .primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(selected == tab ? Color.piumsOrange : Color.clear)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .animation(.easeInOut(duration: 0.2), value: selected)
+            }
+        }
+        .padding(4)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(Capsule())
+    }
+}
+
+struct EventsContentView: View {
+    var body: some View {
+        EmptyStateView(
+            systemImage: "ticket.fill",
+            title: "Eventos",
+            description: "Próximamente podrás crear eventos y agrupar múltiples artistas para una misma ocasión."
+        )
+    }
+}
+
+struct FavoritesContentView: View {
+    var body: some View {
+        EmptyStateView(
+            systemImage: "heart.fill",
+            title: "Favoritos",
+            description: "Guarda artistas con el botón de corazón en su perfil para encontrarlos rápido aquí."
+        )
+    }
+}
