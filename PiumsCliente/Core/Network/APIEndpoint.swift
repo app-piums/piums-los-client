@@ -49,6 +49,12 @@ enum APIEndpoint {
     case updateMyProfile(payload: [String: Any])         // PATCH /api/auth/profile
     case changePassword(current: String, new: String)    // POST /api/auth/change-password
 
+    // ── Favorites ────────────────────────────────────────
+    case listFavorites(page: Int, entityType: String)
+    case addFavorite(entityType: String, entityId: String, notes: String?)
+    case deleteFavorite(id: String)
+    case checkFavorite(entityType: String, entityId: String)
+
     // ── Payments ──────────────────────────────────────────
     case createPaymentIntent(bookingId: String)
     case listPayments(page: Int)
@@ -88,7 +94,7 @@ extension APIEndpoint {
              .createBooking, .createReview, .createDispute, .addDisputeMessage,
              .markNotificationsRead, .registerPushToken, .forgotPassword,
              .logout, .createPaymentIntent,
-             .createEvent, .sendMessage:
+             .createEvent, .sendMessage, .addFavorite:
             return "POST"
         case .cancelBooking:
             return "POST"
@@ -96,7 +102,7 @@ extension APIEndpoint {
             return "PATCH"
         case .changePassword:
             return "POST"
-        case .deleteEvent:
+        case .deleteEvent, .deleteFavorite:
             return "DELETE"
         default:
             return "GET"
@@ -137,6 +143,10 @@ extension APIEndpoint {
                 "content": content,
                 "type": "text"
             ])
+        case .addFavorite(let entityType, let entityId, let notes):
+            var payload: [String: Any] = ["entityType": entityType, "entityId": entityId]
+            if let notes { payload["notes"] = notes }
+            return try? JSONSerialization.data(withJSONObject: payload)
         default:
             return nil
         }
@@ -208,6 +218,16 @@ extension APIEndpoint {
         case .getMyProfile:                    return "/api/auth/me"
         case .updateMyProfile:                 return "/api/auth/profile"
         case .changePassword:                  return "/api/auth/change-password"
+
+        // Favorites
+        case .listFavorites(let pg, let type):
+            return "/api/users/me/favorites?page=\(pg)&limit=50&entityType=\(type)"
+        case .addFavorite:
+            return "/api/users/me/favorites"
+        case .deleteFavorite(let id):
+            return "/api/users/me/favorites/\(id)"
+        case .checkFavorite(let type, let entityId):
+            return "/api/users/me/favorites/check?entityType=\(type)&entityId=\(entityId)"
 
         // Payments
         case .createPaymentIntent:             return "/api/payments/intent"

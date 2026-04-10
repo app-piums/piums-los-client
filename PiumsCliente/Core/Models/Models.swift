@@ -570,3 +570,29 @@ extension PiumsNotification {
         ]
     }
 }
+
+// MARK: - Favorites (users-service)
+
+struct FavoriteRecord: Codable, Identifiable, Hashable {
+    let id: String
+    let entityType: String
+    let entityId: String
+    let notes: String?
+    let createdAt: String
+    let deletedAt: String?
+
+    static func == (lhs: FavoriteRecord, rhs: FavoriteRecord) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct FavoritesResponse: Codable {
+    let data: [FavoriteRecord]
+    let total: Int
+    let page: Int
+    let totalPages: Int
+}
+
+struct FavoriteCheckResponse: Codable {
+    let isFavorite: Bool
+    let favoriteId: String?
+}

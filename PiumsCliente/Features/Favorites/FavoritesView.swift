@@ -7,7 +7,9 @@ struct FavoritesView: View {
 
     var body: some View {
         Group {
-            if store.favorites.isEmpty {
+            if store.isLoading && store.favoriteArtists.isEmpty {
+                LoadingView()
+            } else if store.favoriteArtists.isEmpty {
                 EmptyStateView(
                     systemImage: "heart.fill",
                     title: "Favoritos",
@@ -15,48 +17,32 @@ struct FavoritesView: View {
                 )
             } else {
                 List {
-                    ForEach(store.favorites) { fav in
-                        FavoriteRow(favorite: fav)
+                    ForEach(store.favoriteArtists) { artist in
+                        FavoriteArtistRow(artist: artist)
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
-                            .onTapGesture {
-                                // Cargar detalle con stub mínimo
-                                selectedArtist = Artist(
-                                    id: fav.id,
-                                    name: fav.name,
-                                    bio: nil,
-                                    city: fav.city,
-                                    state: nil,
-                                    country: nil,
-                                    averageRating: fav.rating,
-                                    totalReviews: 0,
-                                    totalBookings: 0,
-                                    hourlyRateMin: nil,
-                                    hourlyRateMax: nil,
-                                    mainServicePrice: nil,
-                                    mainServiceName: nil,
-                                    isVerified: false,
-                                    isActive: true,
-                                    isAvailable: true,
-                                    servicesCount: 0,
-                                    serviceIds: nil,
-                                    serviceTitles: nil,
-                                    specialties: fav.category.map { [$0] },
-                                    createdAt: nil
-                                )
+                            .onTapGesture { selectedArtist = artist }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    Task { await store.toggle(artist: artist) }
+                                } label: {
+                                    Label("Quitar", systemImage: "heart.slash")
+                                }
                             }
                     }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .refreshable { await store.loadFavorites() }
             }
         }
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
+        .task { await store.loadFavorites() }
     }
 }
 
-private struct FavoriteRow: View {
-    let favorite: FavoriteArtist
+private struct FavoriteArtistRow: View {
+    let artist: Artist
 
     var body: some View {
         HStack(spacing: 12) {
@@ -66,14 +52,14 @@ private struct FavoriteRow: View {
                 .overlay(Image(systemName: "heart.fill").foregroundStyle(Color.piumsOrange))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(favorite.name)
+                Text(artist.artistName)
                     .font(.subheadline.bold())
-                Text("\(favorite.category ?? "Artista") · \(favorite.city ?? "")")
+                Text("\(artist.specialties?.first ?? "Artista") · \(artist.city ?? "")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if let rating = favorite.rating {
+            if let rating = artist.rating {
                 HStack(spacing: 3) {
                     Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
                     Text(String(format: "%.1f", rating)).font(.caption.bold())

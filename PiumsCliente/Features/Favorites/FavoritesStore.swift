@@ -1,69 +1,73 @@
-// FavoritesStore.swift — favoritos en local (no hay endpoint backend visible)
+// FavoritesStore.swift — favoritos desde backend
 import Foundation
-
-struct FavoriteArtist: Codable, Identifiable, Hashable {
-    let id: String
-    let name: String
-    let category: String?
-    let city: String?
-    let avatar: String?
-    let rating: Double?
-    let savedAt: String
-
-    var avatarUrl: String? { avatar }
-
-    static func == (lhs: FavoriteArtist, rhs: FavoriteArtist) -> Bool { lhs.id == rhs.id }
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
 
 @Observable
 @MainActor
 final class FavoritesStore {
     static let shared = FavoritesStore()
-    private init() { load() }
+    private init() {}
 
-    // Nota: no hay endpoint backend visible; usamos UserDefaults por ahora.
-    private let maxFavorites = 100
-    private var storageKey: String {
-        if let id = AuthManager.shared.currentUser?.id { return "piums:favorites:\(id)" }
-        return "piums:favorites:guest"
+    var favorites: [FavoriteRecord] = []
+    var artistsById: [String: Artist] = [:]
+    var isLoading = false
+    var errorMessage: String?
+
+    var favoriteArtists: [Artist] {
+        favorites.compactMap { artistsById[$0.entityId] }
     }
 
-    var favorites: [FavoriteArtist] = []
-
-    func isFavorite(_ id: String) -> Bool {
-        favorites.contains { $0.id == id }
-    }
-
-    func toggle(artist: Artist) {
-        if let idx = favorites.firstIndex(where: { $0.id == artist.id }) {
-            favorites.remove(at: idx)
-        } else {
-            let fav = FavoriteArtist(
-                id: artist.id,
-                name: artist.artistName,
-                category: artist.specialties?.first,
-                city: artist.city,
-                avatar: artist.avatarUrl,
-                rating: artist.rating,
-                savedAt: ISO8601DateFormatter().string(from: Date())
-            )
-            favorites.insert(fav, at: 0)
-            favorites = Array(favorites.prefix(maxFavorites))
+    func loadFavorites() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let res: FavoritesResponse = try await APIClient.request(.listFavorites(page: 1, entityType: "ARTIST"))
+            favorites = res.data
+            await loadArtistsForFavorites()
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
         }
-        save()
     }
 
-    private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([FavoriteArtist].self, from: data)
-        else { return }
-        favorites = decoded
+    func isFavorite(_ artistId: String) -> Bool {
+        favorites.contains { $0.entityId == artistId }
     }
 
-    private func save() {
-        if let data = try? JSONEncoder().encode(favorites) {
-            UserDefaults.standard.set(data, forKey: storageKey)
+    func toggle(artist: Artist) async {
+        do {
+            let check: FavoriteCheckResponse = try await APIClient.request(
+                .checkFavorite(entityType: "ARTIST", entityId: artist.id)
+            )
+            if check.isFavorite, let favId = check.favoriteId {
+                let _: VoidResponse = try await APIClient.request(.deleteFavorite(id: favId))
+                favorites.removeAll { $0.id == favId }
+                artistsById.removeValue(forKey: artist.id)
+            } else {
+                let rec: FavoriteRecord = try await APIClient.request(
+                    .addFavorite(entityType: "ARTIST", entityId: artist.id, notes: nil)
+                )
+                favorites.insert(rec, at: 0)
+                artistsById[artist.id] = artist
+            }
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+    }
+
+    private func loadArtistsForFavorites() async {
+        let ids = favorites.map { $0.entityId }
+        await withTaskGroup(of: (String, Artist?).self) { group in
+            for id in ids {
+                group.addTask {
+                    do {
+                        let artist: Artist = try await APIClient.request(.getArtist(id: id))
+                        return (id, artist)
+                    } catch { return (id, nil) }
+                }
+            }
+            for await (id, artist) in group {
+                if let artist { artistsById[id] = artist }
+            }
         }
     }
 }

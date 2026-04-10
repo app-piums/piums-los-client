@@ -140,7 +140,7 @@ struct ArtistProfileView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    favorites.toggle(artist: artist)
+                    Task { await favorites.toggle(artist: artist) }
                 } label: {
                     Image(systemName: favorites.isFavorite(artist.id) ? "heart.fill" : "heart")
                         .foregroundStyle(Color.piumsOrange)
