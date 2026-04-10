@@ -1,10 +1,39 @@
-// BookingViewModel.swift — wizard de 3 pasos: servicio → fecha/hora → confirmación
+// BookingViewModel.swift — wizard de 3 pasos: fecha/hora → detalles → confirmación
 import Foundation
 import SwiftUI
 
+// MARK: - TimeSlot model
+
+struct TimeSlot: Identifiable, Equatable {
+    let id: String      // "HH:mm"
+    let time: String
+    let available: Bool
+    let startTime: String
+    let endTime: String
+}
+
+struct AvailabilityResponse: Decodable {
+    let artistId: String
+    let date: String
+    let slots: [SlotDTO]
+
+    struct SlotDTO: Decodable {
+        let time: String
+        let available: Bool
+        let startTime: String
+        let endTime: String
+    }
+
+    var timeSlots: [TimeSlot] {
+        slots.map { TimeSlot(id: $0.time, time: $0.time, available: $0.available,
+                             startTime: $0.startTime, endTime: $0.endTime) }
+    }
+}
+
+// MARK: - BookingStep
+
 enum BookingStep: Int, CaseIterable {
     case datetime = 0, details = 1, confirm = 2
-
     var title: String {
         switch self {
         case .datetime: return "Fecha y hora"
@@ -13,6 +42,8 @@ enum BookingStep: Int, CaseIterable {
         }
     }
 }
+
+// MARK: - ViewModel
 
 @Observable
 @MainActor
@@ -23,19 +54,18 @@ final class BookingViewModel {
     // Wizard
     var currentStep: BookingStep = .datetime
 
-    // Paso 1 — fecha y hora
+    // Paso 1 — fecha y slots
     var selectedDate: Date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
-    var selectedTime: Date = {
-        var c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
-        c.hour = 15; c.minute = 0
-        return Calendar.current.date(from: c) ?? Date()
-    }()
+    var selectedSlot: TimeSlot?
+    var availableSlots: [TimeSlot] = []
+    var isLoadingSlots = false
+    var slotsError: String?
 
     // Paso 2 — detalles
     var location = ""
     var notes    = ""
 
-    // Estado
+    // Estado final
     var isLoading     = false
     var errorMessage: String?
     var bookingCreated: Booking?
@@ -50,45 +80,67 @@ final class BookingViewModel {
 
     func next() {
         guard let next = BookingStep(rawValue: currentStep.rawValue + 1) else { return }
-        withAnimation { currentStep = next }
+        withAnimation(.easeInOut(duration: 0.25)) { currentStep = next }
     }
 
     func back() {
         guard let prev = BookingStep(rawValue: currentStep.rawValue - 1) else { return }
-        withAnimation { currentStep = prev }
+        withAnimation(.easeInOut(duration: 0.25)) { currentStep = prev }
     }
 
     var canAdvance: Bool {
         switch currentStep {
-        case .datetime: return selectedDate >= Calendar.current.startOfDay(for: Date())
+        case .datetime: return selectedSlot != nil
         case .details:  return !location.trimmingCharacters(in: .whitespaces).isEmpty
         case .confirm:  return true
+        }
+    }
+
+    // MARK: - Cargar slots disponibles
+
+    func loadSlots() async {
+        isLoadingSlots = true
+        slotsError = nil
+        selectedSlot = nil
+        defer { isLoadingSlots = false }
+
+        let dateStr = formatDate(selectedDate)
+        do {
+            let res: AvailabilityResponse = try await APIClient.request(
+                .getAvailableSlots(artistId: artist.id, date: dateStr)
+            )
+            availableSlots = res.timeSlots
+        } catch {
+            slotsError = "No se pudo cargar la disponibilidad"
+            // Fallback: slots genéricos cada hora 8am-8pm
+            availableSlots = (8...20).map { h in
+                let t = String(format: "%02d:00", h)
+                return TimeSlot(id: t, time: t, available: true,
+                                startTime: "\(dateStr)T\(t):00.000Z",
+                                endTime:   "\(dateStr)T\(String(format: "%02d", h+1)):00:00.000Z")
+            }
         }
     }
 
     // MARK: - Confirmar reserva
 
     func confirmBooking() async {
+        guard let slot = selectedSlot else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        let formatter = ISO8601DateFormatter()
-        let dateStr = formatDate(selectedDate)
-        let timeStr = formatTime(selectedTime)
-        let startISO = formatter.string(from: combinedDateTime)
-        let endISO   = formatter.string(from: combinedDateTime.addingTimeInterval(Double(service.duration) * 60))
-
         let payload: [String: Any] = [
-            "artistId":     artist.id,
-            "serviceId":    service.id,
-            "scheduledDate": dateStr,
-            "scheduledTime": timeStr,
-            "startTime":    startISO,
-            "endTime":      endISO,
-            "location":     location,
-            "notes":        notes.isEmpty ? NSNull() : notes,
-            "totalPrice":   service.price
+            "artistId":      artist.id,
+            "serviceId":     service.id,
+            "scheduledDate": formatDate(selectedDate),
+            "scheduledTime": slot.time,
+            "startTime":     slot.startTime,
+            "endTime":       slot.endTime,
+            "location":      location.trimmingCharacters(in: .whitespaces),
+            "notes":         notes.trimmingCharacters(in: .whitespaces).isEmpty
+                             ? NSNull() : notes.trimmingCharacters(in: .whitespaces),
+            "totalPrice":    service.price
         ]
 
         do {
@@ -96,24 +148,11 @@ final class BookingViewModel {
             bookingCreated = booking
             isSuccess = true
         } catch {
-            // Mock fallback para desarrollo
-            bookingCreated = Booking.mock
-            isSuccess = true
-            // errorMessage = AppError(from: error).errorDescription
+            errorMessage = AppError(from: error).errorDescription
         }
     }
 
     // MARK: - Helpers
-
-    var combinedDateTime: Date {
-        let cal = Calendar.current
-        let dateComps = cal.dateComponents([.year, .month, .day], from: selectedDate)
-        let timeComps = cal.dateComponents([.hour, .minute], from: selectedTime)
-        var merged = DateComponents()
-        merged.year = dateComps.year; merged.month = dateComps.month; merged.day = dateComps.day
-        merged.hour = timeComps.hour; merged.minute = timeComps.minute
-        return cal.date(from: merged) ?? selectedDate
-    }
 
     var formattedDate: String {
         let f = DateFormatter()
@@ -122,19 +161,8 @@ final class BookingViewModel {
         return f.string(from: selectedDate)
     }
 
-    var formattedTime: String {
-        let f = DateFormatter()
-        f.timeStyle = .short
-        return f.string(from: selectedTime)
-    }
-
     private func formatDate(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
-    }
-
-    private func formatTime(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "HH:mm"
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
         return f.string(from: date)
     }
 }

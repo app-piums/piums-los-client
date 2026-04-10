@@ -61,8 +61,11 @@ struct ProfileView: View {
                 }
             }
 
-            // Ayuda
+            // Ayuda y soporte
             Section("Ayuda y soporte") {
+                NavigationLink(destination: QuejasView()) {
+                    Label("Mis quejas", systemImage: "exclamationmark.bubble")
+                }
                 Label("Términos y condiciones", systemImage: "doc.text")
                 Label("Política de privacidad", systemImage: "hand.raised")
                 Label("Contactar soporte", systemImage: "message")

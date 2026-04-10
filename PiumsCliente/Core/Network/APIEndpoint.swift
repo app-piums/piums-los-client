@@ -37,6 +37,12 @@ enum APIEndpoint {
     case markNotificationRead(id: String)
     case registerPushToken(token: String, platform: String)
 
+    // ── Disputes / Quejas ─────────────────────────────────
+    case listMyDisputes(page: Int)
+    case createDispute(payload: [String: Any])
+    case getDispute(id: String)
+    case addDisputeMessage(id: String, message: String)
+
     // ── Users ─────────────────────────────────────────────
     case getMyProfile
     case updateMyProfile(payload: [String: Any])
@@ -55,7 +61,7 @@ extension APIEndpoint {
     var method: String {
         switch self {
         case .login, .registerClient, .firebaseAuth,
-             .createBooking, .createReview,
+             .createBooking, .createReview, .createDispute, .addDisputeMessage,
              .registerPushToken, .forgotPassword:
             return "POST"
         case .updateMyProfile:
@@ -81,8 +87,10 @@ extension APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: ["refreshToken": t])
         case .forgotPassword(let e):
             return try? JSONSerialization.data(withJSONObject: ["email": e])
-        case .createBooking(let p), .createReview(let p):
+        case .createBooking(let p), .createReview(let p), .createDispute(let p):
             return try? JSONSerialization.data(withJSONObject: p)
+        case .addDisputeMessage(_, let msg):
+            return try? JSONSerialization.data(withJSONObject: ["message": msg])
         case .updateMyProfile(let p):
             return try? JSONSerialization.data(withJSONObject: p)
         case .registerPushToken(let t, let pl):
@@ -103,7 +111,6 @@ extension APIEndpoint {
             return true
         }
     }
-
     private var path: String {
         switch self {
         // Auth
@@ -151,6 +158,12 @@ extension APIEndpoint {
         case .listNotifications(let pg):       return "/api/notifications?page=\(pg)&limit=20"
         case .markNotificationRead(let id):    return "/api/notifications/\(id)/read"
         case .registerPushToken:               return "/api/notifications/push-token"
+
+        // Disputes
+        case .listMyDisputes(let pg):          return "/api/disputes/me?page=\(pg)&limit=20"
+        case .createDispute:                   return "/api/disputes"
+        case .getDispute(let id):              return "/api/disputes/\(id)"
+        case .addDisputeMessage(let id, _):    return "/api/disputes/\(id)/messages"
 
         // Users
         case .getMyProfile:                    return "/api/users/me"

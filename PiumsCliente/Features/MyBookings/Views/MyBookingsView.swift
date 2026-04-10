@@ -195,33 +195,113 @@ private struct StatusFilterChip: View {
 
 struct BookingDetailView: View {
     let booking: Booking
+    @State private var showReview = false
+    @State private var showQueja  = false
 
     var body: some View {
         List {
+            // Estado visual
             Section {
-                DetailRow(label: "Código",    value: booking.code ?? "—")
-                DetailRow(label: "Estado",    value: booking.status.displayName)
+                HStack {
+                    Circle()
+                        .fill(statusColor.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                        .overlay(Image(systemName: statusIcon).foregroundStyle(statusColor))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(booking.status.displayName)
+                            .font(.headline)
+                        if let code = booking.code {
+                            Text(code).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            Section("Detalles") {
                 DetailRow(label: "Fecha",     value: booking.scheduledDate)
                 DetailRow(label: "Hora",      value: booking.scheduledTime ?? "—")
                 if let dur = booking.duration {
                     DetailRow(label: "Duración", value: "\(dur) min")
                 }
                 DetailRow(label: "Ubicación", value: booking.location ?? "—")
-            } header: { Text("Detalles") }
+            }
 
-            Section {
-                DetailRow(label: "Total",     value: booking.totalPrice.piumsFormatted)
-                DetailRow(label: "Pago",      value: booking.paymentStatus.rawValue.capitalized)
-            } header: { Text("Pago") }
+            Section("Pago") {
+                DetailRow(label: "Total",  value: booking.totalPrice.piumsFormatted)
+                DetailRow(label: "Estado", value: booking.paymentStatus.rawValue.capitalized)
+            }
 
             if let notes = booking.notes, !notes.isEmpty {
                 Section("Notas") {
                     Text(notes).font(.subheadline).foregroundStyle(.secondary)
                 }
             }
+
+            // ── Acciones según estado ──────────────────────────
+            if booking.status == .completed {
+                Section {
+                    Button {
+                        showReview = true
+                    } label: {
+                        Label("Dejar reseña", systemImage: "star.bubble")
+                            .foregroundStyle(Color.piumsOrange)
+                    }
+                }
+            }
+
+            if canOpenQueja {
+                Section {
+                    Button {
+                        showQueja = true
+                    } label: {
+                        Label("Abrir queja", systemImage: "exclamationmark.bubble")
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
         }
         .navigationTitle(booking.code ?? "Detalle")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showReview) {
+            ReviewView(booking: booking)
+        }
+        .sheet(isPresented: $showQueja) {
+            CreateQuejaView(booking: booking)
+        }
+    }
+
+    private var canOpenQueja: Bool {
+        switch booking.status {
+        case .completed, .cancelledArtist, .noShow, .rejected: return true
+        default: return false
+        }
+    }
+
+    private var statusColor: Color {
+        switch booking.status {
+        case .pending:          return .orange
+        case .confirmed:        return .blue
+        case .paymentPending, .paymentCompleted: return .teal
+        case .inProgress:       return Color.piumsOrange
+        case .completed:        return .green
+        case .cancelledClient, .cancelledArtist, .rejected, .noShow: return .red
+        case .rescheduled:      return .purple
+        }
+    }
+
+    private var statusIcon: String {
+        switch booking.status {
+        case .pending:          return "clock"
+        case .confirmed:        return "checkmark.circle"
+        case .paymentPending, .paymentCompleted: return "creditcard"
+        case .inProgress:       return "play.circle"
+        case .completed:        return "checkmark.seal"
+        case .cancelledClient, .cancelledArtist: return "xmark.circle"
+        case .rejected:         return "hand.raised"
+        case .noShow:           return "person.slash"
+        case .rescheduled:      return "arrow.trianglehead.2.clockwise.rotate.90"
+        }
     }
 }
 

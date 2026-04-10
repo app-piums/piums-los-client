@@ -119,7 +119,7 @@ private struct StepIndicator: View {
     }
 }
 
-// MARK: - Paso 1: Fecha y Hora
+// MARK: - Paso 1: Fecha y Slots
 
 private struct BookingDateTimeStep: View {
     @Bindable var viewModel: BookingViewModel
@@ -149,29 +149,98 @@ private struct BookingDateTimeStep: View {
                     DatePicker(
                         "Fecha",
                         selection: $viewModel.selectedDate,
-                        in: Date()...,
+                        in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...,
                         displayedComponents: .date
                     )
                     .datePickerStyle(.graphical)
                     .tint(.piumsOrange)
+                    .onChange(of: viewModel.selectedDate) { _, _ in
+                        Task { await viewModel.loadSlots() }
+                    }
                 }
 
-                // Selector de hora
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Hora de inicio", systemImage: "clock")
+                // Slots disponibles
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Horarios disponibles", systemImage: "clock")
                         .font(.headline)
-                    DatePicker(
-                        "Hora",
-                        selection: $viewModel.selectedTime,
-                        displayedComponents: .hourAndMinute
-                    )
-                    .datePickerStyle(.wheel)
-                    .frame(maxWidth: .infinity)
-                    .tint(.piumsOrange)
+
+                    if viewModel.isLoadingSlots {
+                        HStack { Spacer(); ProgressView(); Spacer() }.padding()
+                    } else if viewModel.availableSlots.isEmpty {
+                        Text("Sin horarios disponibles para esta fecha")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 8)
+                    } else {
+                        if let err = viewModel.slotsError {
+                            Text(err)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                        LazyVGrid(
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
+                            spacing: 10
+                        ) {
+                            ForEach(viewModel.availableSlots) { slot in
+                                SlotButton(
+                                    slot: slot,
+                                    isSelected: viewModel.selectedSlot == slot
+                                ) {
+                                    if slot.available {
+                                        viewModel.selectedSlot = slot
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .padding()
         }
+        .task { await viewModel.loadSlots() }
+    }
+}
+
+// MARK: - SlotButton
+
+private struct SlotButton: View {
+    let slot: TimeSlot
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(slot.time)
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(background)
+                .foregroundStyle(foregroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(borderColor, lineWidth: 1.5)
+                )
+        }
+        .disabled(!slot.available)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
+    }
+
+    private var background: Color {
+        if isSelected { return .piumsOrange }
+        if !slot.available { return Color(.tertiarySystemBackground) }
+        return Color(.secondarySystemBackground)
+    }
+
+    private var foregroundColor: Color {
+        if isSelected { return .white }
+        if !slot.available { return .secondary.opacity(0.4) }
+        return .primary
+    }
+
+    private var borderColor: Color {
+        if isSelected { return .piumsOrange }
+        return .clear
     }
 }
 
@@ -242,7 +311,7 @@ private struct BookingConfirmStep: View {
                     ConfirmRow(icon: "person.fill",      label: "Artista",    value: viewModel.artist.artistName)
                     ConfirmRow(icon: "music.note",       label: "Servicio",   value: viewModel.service.name)
                     ConfirmRow(icon: "calendar",         label: "Fecha",      value: viewModel.formattedDate)
-                    ConfirmRow(icon: "clock",            label: "Hora",       value: viewModel.formattedTime)
+                    ConfirmRow(icon: "clock",            label: "Hora",       value: viewModel.selectedSlot?.time ?? "—")
                     ConfirmRow(icon: "hourglass",        label: "Duración",   value: "\(viewModel.service.duration) min")
                     ConfirmRow(icon: "mappin.circle",    label: "Ubicación",  value: viewModel.location)
                     if !viewModel.notes.isEmpty {

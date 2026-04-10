@@ -9,10 +9,24 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        requestPushPermission(application)
         return true
     }
 
-    // MARK: - Push Notifications
+    // MARK: - Push permission
+
+    private func requestPushPermission(_ application: UIApplication) {
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]
+        ) { granted, error in
+            guard granted else { return }
+            DispatchQueue.main.async {
+                application.registerForRemoteNotifications()
+            }
+        }
+    }
+
+    // MARK: - Token registration
 
     func application(
         _ application: UIApplication,
@@ -33,6 +47,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         print("[APNs] Failed to register: \(error.localizedDescription)")
     }
 
+    // MARK: - Foreground notifications (mostrar banner aunque la app esté abierta)
+
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -40,4 +56,30 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     ) {
         completionHandler([.banner, .sound, .badge])
     }
+
+    // MARK: - Deep link desde notificación
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+
+        // Navegar a reserva si viene bookingId
+        if let bookingId = userInfo["bookingId"] as? String {
+            NotificationCenter.default.post(
+                name: .navigateToBooking,
+                object: nil,
+                userInfo: ["bookingId": bookingId]
+            )
+        }
+        completionHandler()
+    }
+}
+
+// MARK: - Notification names
+
+extension Notification.Name {
+    static let navigateToBooking = Notification.Name("navigateToBooking")
 }
