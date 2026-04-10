@@ -5,124 +5,158 @@ struct SearchView: View {
     @State private var viewModel = SearchViewModel()
     @State private var selectedArtist: Artist?
     @State private var showFilters = false
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Barra de búsqueda + filtros
-                HStack(spacing: 10) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.secondary)
-                        TextField("Buscar artistas...", text: $viewModel.query)
-                            .submitLabel(.search)
-                            .onSubmit { Task { await viewModel.search() } }
-                        if !viewModel.query.isEmpty {
-                            Button {
-                                viewModel.query = ""
-                                viewModel.results = []
-                                viewModel.hasSearched = false
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .padding(12)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                    // Filtros
-                    Button {
-                        showFilters = true
-                    } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.title3)
-                                .padding(12)
-                                .background(Color(.secondarySystemBackground))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            if viewModel.hasActiveFilters {
-                                Circle()
-                                    .fill(Color.piumsOrange)
-                                    .frame(width: 10, height: 10)
-                                    .offset(x: 2, y: -2)
-                            }
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                }
+        VStack(spacing: 0) {
+            // ── Barra de búsqueda — FUERA del ScrollView para que no se mueva ──
+            searchBar
                 .padding(.horizontal)
+                .padding(.vertical, 10)
+                .background(.bar)  // blur material igual que toolbar
 
-                // Chips de filtros activos
-                if viewModel.hasActiveFilters {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            if let cat = viewModel.selectedCategory {
-                                FilterChip(label: cat.displayName) { viewModel.selectedCategory = nil }
-                            }
-                            if viewModel.minRating > 0 {
-                                FilterChip(label: "★ \(String(format: "%.1f", viewModel.minRating))+") {
-                                    viewModel.minRating = 0
-                                }
-                            }
-                            if viewModel.maxPrice < 5000 {
-                                FilterChip(label: "Hasta Q\(Int(viewModel.maxPrice))") { viewModel.maxPrice = 5000 }
-                            }
-                            if let city = viewModel.selectedCity {
-                                FilterChip(label: city) { viewModel.selectedCity = nil }
-                            }
-                            Button("Limpiar todo") { viewModel.clearFilters() }
-                                .font(.caption)
-                                .foregroundStyle(Color.piumsOrange)
+            // Chips de filtros activos
+            if viewModel.hasActiveFilters {
+                activeFiltersBar
+                    .padding(.bottom, 6)
+                    .background(.bar)
+            }
+
+            Divider()
+
+            // ── Contenido scrollable ──
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if viewModel.isLoading && viewModel.results.isEmpty {
+                        LoadingView().frame(height: 300)
+                    } else if !viewModel.hasSearched {
+                        SearchSuggestionsView { suggestion in
+                            viewModel.query = suggestion
+                            Task { await viewModel.search() }
                         }
-                        .padding(.horizontal)
-                    }
-                }
-
-                // Contenido
-                if viewModel.isLoading && viewModel.results.isEmpty {
-                    LoadingView().frame(height: 300)
-                } else if !viewModel.hasSearched {
-                    SearchSuggestionsView { suggestion in
-                        viewModel.query = suggestion
-                        Task { await viewModel.search() }
-                    }
-                } else if viewModel.results.isEmpty {
-                    EmptyStateView(
-                        systemImage: "magnifyingglass",
-                        title: "Sin resultados",
-                        description: "No encontramos artistas con ese nombre. Intenta con otro término."
-                    )
-                    .frame(height: 300)
-                } else {
-                    LazyVStack(spacing: 12) {
+                        .padding(.top, 8)
+                    } else if viewModel.results.isEmpty {
+                        EmptyStateView(
+                            systemImage: "magnifyingglass",
+                            title: "Sin resultados",
+                            description: "No encontramos artistas con ese término."
+                        )
+                        .frame(height: 300)
+                    } else {
                         Text("\(viewModel.results.count) resultado(s)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal)
+                            .padding(.top, 8)
 
                         ForEach(viewModel.results) { artist in
                             ArtistCardView(artist: artist)
                                 .padding(.horizontal)
+                                .contentShape(Rectangle())
                                 .onTapGesture { selectedArtist = artist }
                                 .task { await viewModel.loadNextIfNeeded(currentItem: artist) }
                         }
+
                         if viewModel.isLoading {
-                            ProgressView().frame(maxWidth: .infinity).padding()
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
                         }
+
+                        Color.clear.frame(height: 12)
                     }
                 }
             }
-            .padding(.vertical)
+            .scrollDismissesKeyboard(.immediately)
+            .scrollIndicators(.hidden)
         }
         .navigationTitle("Buscar")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
         .sheet(isPresented: $showFilters) {
             SearchFiltersSheet(viewModel: viewModel) {
                 Task { await viewModel.search() }
             }
+        }
+    }
+
+    // MARK: - Search bar
+
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Buscar artistas...", text: $viewModel.query)
+                    .submitLabel(.search)
+                    .focused($searchFocused)
+                    .onSubmit { Task { await viewModel.search() } }
+                if !viewModel.query.isEmpty {
+                    Button {
+                        viewModel.query = ""
+                        viewModel.results = []
+                        viewModel.hasSearched = false
+                        searchFocused = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Button {
+                searchFocused = false
+                showFilters = true
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.title3)
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    if viewModel.hasActiveFilters {
+                        Circle()
+                            .fill(Color.piumsOrange)
+                            .frame(width: 10, height: 10)
+                            .offset(x: 2, y: -2)
+                    }
+                }
+            }
+            .foregroundStyle(.primary)
+        }
+    }
+
+    // MARK: - Active filters bar
+
+    private var activeFiltersBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if let cat = viewModel.selectedCategory {
+                    FilterChip(label: cat.displayName) { viewModel.selectedCategory = nil }
+                }
+                if viewModel.minRating > 0 {
+                    FilterChip(label: "★ \(String(format: "%.1f", viewModel.minRating))+") {
+                        viewModel.minRating = 0
+                    }
+                }
+                if viewModel.maxPrice < 5000 {
+                    FilterChip(label: "Hasta Q\(Int(viewModel.maxPrice))") {
+                        viewModel.maxPrice = 5000
+                    }
+                }
+                if let city = viewModel.selectedCity {
+                    FilterChip(label: city) { viewModel.selectedCity = nil }
+                }
+                Button("Limpiar todo") { viewModel.clearFilters() }
+                    .font(.caption)
+                    .foregroundStyle(Color.piumsOrange)
+            }
+            .padding(.horizontal)
         }
     }
 }
@@ -184,8 +218,10 @@ private struct FlowLayout: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let result = layout(proposal: ProposedViewSize(bounds.size), subviews: subviews)
         for (index, frame) in result.frames.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
-                                  proposal: ProposedViewSize(frame.size))
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(frame.size)
+            )
         }
     }
 
@@ -228,24 +264,20 @@ struct SearchFiltersSheet: View {
                         .padding(.vertical, 4)
                     }
                 }
-
                 Section("Precio máximo: Q\(Int(viewModel.maxPrice))") {
                     Slider(value: $viewModel.maxPrice, in: 100...5000, step: 100)
                         .tint(.piumsOrange)
                 }
-
                 Section("Rating mínimo: \(String(format: "%.1f", viewModel.minRating)) ★") {
                     Slider(value: $viewModel.minRating, in: 0...5, step: 0.5)
                         .tint(.piumsOrange)
                 }
-
                 Section("Ciudad") {
                     Picker("Ciudad", selection: $viewModel.selectedCity) {
                         Text("Todas").tag(String?.none)
                         ForEach(viewModel.cities, id: \.self) { Text($0).tag(String?.some($0)) }
                     }
                 }
-
                 Section {
                     Button("Limpiar filtros", role: .destructive) { viewModel.clearFilters() }
                 }

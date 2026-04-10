@@ -8,7 +8,6 @@ struct MyBookingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Filtro de estado
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(viewModel.statusFilters, id: \.self) { status in
@@ -28,45 +27,53 @@ struct MyBookingsView: View {
             // Contenido
             if viewModel.isLoading && viewModel.bookings.isEmpty {
                 LoadingView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.bookings.isEmpty {
                 EmptyStateView(
                     systemImage: "calendar.badge.minus",
                     title: "Sin reservas",
                     description: "Aún no tienes reservas. ¡Encuentra un artista y haz tu primera reserva!"
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    if let msg = viewModel.errorMessage {
-                        ErrorBannerView(message: msg)
-                            .listRowSeparator(.hidden)
-                    }
-                    ForEach(viewModel.bookings) { booking in
-                        BookingRowView(booking: booking)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .onTapGesture { selectedBooking = booking }
-                            .task { await viewModel.loadNextIfNeeded(item: booking) }
-                            .swipeActions(edge: .trailing) {
-                                if booking.status == .pending || booking.status == .confirmed {
-                                    Button(role: .destructive) {
-                                        bookingToCancel = booking
-                                    } label: {
-                                        Label("Cancelar", systemImage: "xmark.circle")
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if let msg = viewModel.errorMessage {
+                            ErrorBannerView(message: msg)
+                                .padding(.horizontal)
+                        }
+                        ForEach(viewModel.bookings) { booking in
+                            BookingRowView(booking: booking)
+                                .padding(.horizontal)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedBooking = booking }
+                                .task { await viewModel.loadNextIfNeeded(item: booking) }
+                                .swipeActions(edge: .trailing) {
+                                    if booking.status == .pending || booking.status == .confirmed {
+                                        Button(role: .destructive) {
+                                            bookingToCancel = booking
+                                        } label: {
+                                            Label("Cancelar", systemImage: "xmark.circle")
+                                        }
                                     }
                                 }
-                            }
+                        }
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                        }
+                        Color.clear.frame(height: 12)
                     }
-                    if viewModel.isLoading {
-                        ProgressView().frame(maxWidth: .infinity).listRowSeparator(.hidden)
-                    }
+                    .padding(.vertical, 8)
                 }
-                .listStyle(.plain)
+                .scrollIndicators(.hidden)
+                .refreshable { await viewModel.loadInitial() }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Mis Reservas")
         .task { await viewModel.loadInitial() }
-        .refreshable { await viewModel.loadInitial() }
         .navigationDestination(item: $selectedBooking) { BookingDetailView(booking: $0) }
         .confirmationDialog(
             "¿Cancelar esta reserva?",

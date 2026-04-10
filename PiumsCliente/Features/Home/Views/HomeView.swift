@@ -4,85 +4,131 @@ import SwiftUI
 struct HomeView: View {
     @State private var viewModel = HomeViewModel()
     @State private var selectedArtist: Artist?
+    @State private var scrollOffset: CGFloat = 0
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Saludo
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Hola 👋")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("Descubre artistas")
-                        .font(.title.bold())
-                }
-                .padding(.horizontal)
+            // Tracking de scroll offset
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: ScrollOffsetKey.self,
+                                value: geo.frame(in: .named("homeScroll")).minY)
+            }
+            .frame(height: 0)
 
-                // Categorías
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        CategoryChip(
-                            title: "Todos",
-                            systemImage: "square.grid.2x2",
-                            isSelected: viewModel.selectedCategory == nil
-                        ) {
-                            Task { await viewModel.selectCategory(nil) }
-                        }
-                        ForEach(viewModel.categories, id: \.self) { cat in
-                            CategoryChip(
-                                title: cat.displayName,
-                                systemImage: cat.systemImage,
-                                isSelected: viewModel.selectedCategory == cat
-                            ) {
-                                Task { await viewModel.selectCategory(cat) }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
+            VStack(alignment: .leading, spacing: 0) {
+                // Header — se encoge al hacer scroll
+                headerSection
+                    .padding(.bottom, 12)
 
-                // Error banner
+                // Categorías — sticky bajo el header
+                categoryBar
+                    .padding(.bottom, 12)
+
+                // Error
                 if let msg = viewModel.errorMessage {
                     ErrorBannerView(message: msg)
                         .padding(.horizontal)
+                        .padding(.bottom, 8)
                 }
 
-                // Lista de artistas
-                if viewModel.isLoading && viewModel.artists.isEmpty {
-                    LoadingView()
-                        .frame(height: 300)
-                } else if viewModel.artists.isEmpty {
-                    EmptyStateView(
-                        systemImage: "person.2.slash",
-                        title: "Sin artistas",
-                        description: "No encontramos artistas en esta categoría."
-                    )
-                    .frame(height: 300)
-                } else {
-                    LazyVStack(spacing: 16) {
-                        ForEach(viewModel.artists) { artist in
-                            ArtistCardView(artist: artist)
-                                .padding(.horizontal)
-                                .onTapGesture { selectedArtist = artist }
-                                .task { await viewModel.loadNextIfNeeded(currentItem: artist) }
-                        }
-                        if viewModel.isLoading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                        }
-                    }
+                // Lista
+                artistList
+            }
+        }
+        .coordinateSpace(name: "homeScroll")
+        .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
+        .scrollIndicators(.hidden)
+        .refreshable { await viewModel.loadInitial() }
+        .task { await viewModel.loadInitial() }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Piums")
+                    .font(.headline.bold())
+                    .opacity(scrollOffset < -60 ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.2), value: scrollOffset)
+            }
+        }
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
+    }
+
+    // MARK: - Subviews
+
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Hola 👋")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("Descubre artistas")
+                .font(.title.bold())
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .opacity(scrollOffset < -60 ? max(0, 1 + (scrollOffset + 60) / 40) : 1)
+    }
+
+    private var categoryBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                CategoryChip(
+                    title: "Todos",
+                    systemImage: "square.grid.2x2",
+                    isSelected: viewModel.selectedCategory == nil
+                ) { Task { await viewModel.selectCategory(nil) } }
+
+                ForEach(viewModel.categories, id: \.self) { cat in
+                    CategoryChip(
+                        title: cat.displayName,
+                        systemImage: cat.systemImage,
+                        isSelected: viewModel.selectedCategory == cat
+                    ) { Task { await viewModel.selectCategory(cat) } }
                 }
             }
-            .padding(.vertical)
+            .padding(.horizontal)
         }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await viewModel.loadInitial() }
-        .refreshable { await viewModel.loadInitial() }
-        .navigationDestination(item: $selectedArtist) { artist in
-            ArtistProfileView(artist: artist)
+    }
+
+    @ViewBuilder
+    private var artistList: some View {
+        if viewModel.isLoading && viewModel.artists.isEmpty {
+            LoadingView()
+                .frame(height: 300)
+        } else if viewModel.artists.isEmpty {
+            EmptyStateView(
+                systemImage: "person.2.slash",
+                title: "Sin artistas",
+                description: "No encontramos artistas en esta categoría."
+            )
+            .frame(height: 300)
+        } else {
+            LazyVStack(spacing: 14) {
+                ForEach(viewModel.artists) { artist in
+                    ArtistCardView(artist: artist)
+                        .padding(.horizontal)
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedArtist = artist }
+                        .task { await viewModel.loadNextIfNeeded(currentItem: artist) }
+                }
+                if viewModel.isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                }
+                // Espacio para tab bar
+                Color.clear.frame(height: 12)
+            }
         }
+    }
+}
+
+// MARK: - ScrollOffsetKey
+
+private struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
@@ -97,10 +143,8 @@ private struct CategoryChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.caption)
-                Text(title)
-                    .font(.subheadline.weight(.medium))
+                Image(systemName: systemImage).font(.caption)
+                Text(title).font(.subheadline.weight(.medium))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
