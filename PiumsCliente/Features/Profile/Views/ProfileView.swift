@@ -70,7 +70,7 @@ struct ProfileView: View {
                 HStack(spacing: 0) {
                     ForEach(ColorSchemePreference.allCases, id: \.self) { scheme in
                         Button {
-                            appearance.colorScheme = scheme
+                            appearance.preference = scheme
                         } label: {
                             VStack(spacing: 6) {
                                 Image(systemName: scheme.systemImage)
@@ -81,15 +81,15 @@ struct ProfileView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .background(
-                                appearance.colorScheme == scheme
+                                appearance.preference == scheme
                                 ? Color.piumsOrange
                                 : Color(.secondarySystemBackground)
                             )
                             .foregroundStyle(
-                                appearance.colorScheme == scheme ? .white : .primary
+                                appearance.preference == scheme ? .white : .primary
                             )
                         }
-                        .animation(.easeInOut(duration: 0.2), value: appearance.colorScheme)
+                        .animation(.easeInOut(duration: 0.2), value: appearance.preference)
                         if scheme != .dark { Divider() }
                     }
                 }

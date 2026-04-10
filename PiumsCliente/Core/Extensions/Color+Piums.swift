@@ -27,26 +27,27 @@ extension Color {
 
 /// Gestiona la preferencia de apariencia del usuario (light / dark / system)
 @Observable
+@MainActor
 final class AppearanceManager {
     static let shared = AppearanceManager()
-    private init() {}
+    private init() {
+        let raw = UserDefaults.standard.string(forKey: key) ?? ColorSchemePreference.system.rawValue
+        preference = ColorSchemePreference(rawValue: raw) ?? .system
+    }
 
     @ObservationIgnored
     private let key = "piums.colorScheme"
 
-    var colorScheme: ColorSchemePreference {
-        get {
-            let raw = UserDefaults.standard.string(forKey: key) ?? "system"
-            return ColorSchemePreference(rawValue: raw) ?? .system
-        }
-        set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: key)
-            apply(newValue)
+    /// Preferencia observable para que SwiftUI re-renderice
+    var preference: ColorSchemePreference {
+        didSet {
+            UserDefaults.standard.set(preference.rawValue, forKey: key)
+            apply(preference)
         }
     }
 
     var swiftUIScheme: ColorScheme? {
-        switch colorScheme {
+        switch preference {
         case .light:  return .light
         case .dark:   return .dark
         case .system: return nil
@@ -66,7 +67,7 @@ final class AppearanceManager {
             .forEach { $0.overrideUserInterfaceStyle = style }
     }
 
-    func applyOnLaunch() { apply(colorScheme) }
+    func applyOnLaunch() { apply(preference) }
 }
 
 enum ColorSchemePreference: String, CaseIterable {
