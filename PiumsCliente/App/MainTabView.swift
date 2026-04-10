@@ -6,6 +6,8 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var bookingsPath = NavigationPath()
     @State private var showFABMenu = false
+    @State private var chatStore = ChatRealtimeStore.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -25,6 +27,7 @@ struct MainTabView: View {
 
                 NavigationStack { InboxView() }
                     .tabItem { Label("Inbox",    systemImage: "message.fill") }
+                    .badge(chatStore.unreadCount)
                     .tag(3)
 
                 NavigationStack { ProfileView() }
@@ -48,6 +51,10 @@ struct MainTabView: View {
                 deepLinkBookingId = nil
             }
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            chatStore.setActive(newPhase == .active)
+        }
+        .task { chatStore.startIfNeeded() }
     }
 }
 

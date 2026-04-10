@@ -22,7 +22,11 @@ struct ChatInboxView: View {
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
                             .onTapGesture { selectedConversation = conv }
-                            .task { await viewModel.loadNextConversations() }
+                            .task {
+                                if conv.id == viewModel.conversations.last?.id {
+                                    await viewModel.loadNextConversations()
+                                }
+                            }
                     }
                     if viewModel.isLoading {
                         ProgressView().frame(maxWidth: .infinity).listRowSeparator(.hidden)
@@ -34,7 +38,7 @@ struct ChatInboxView: View {
             }
         }
         .navigationDestination(item: $selectedConversation) {
-            ChatDetailView(conversation: $0)
+            ChatDetailView(conversation: $0, viewModel: viewModel)
         }
         .task { await viewModel.loadConversations() }
     }

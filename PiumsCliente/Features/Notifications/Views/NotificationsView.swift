@@ -151,7 +151,7 @@ enum InboxTab: String, CaseIterable {
 
 struct InboxView: View {
     @State private var selected: InboxTab = .messages
-    @State private var unreadCount: Int = 0
+    @State private var unreadStore = ChatRealtimeStore.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -161,7 +161,7 @@ struct InboxView: View {
                 label: \.rawValue,
                 icon: \.systemImage,
                 badge: { tab in
-                    tab == .messages ? unreadCount : 0
+                    tab == .messages ? unreadStore.unreadCount : 0
                 }
             )
             .padding(.horizontal, 20)
@@ -181,9 +181,9 @@ struct InboxView: View {
         .navigationTitle("Inbox")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .task {
-            let vm = ChatViewModel()
-            unreadCount = await vm.unreadCount()
+        .task { unreadStore.startIfNeeded() }
+        .onReceive(NotificationCenter.default.publisher(for: .chatUnreadNeedsRefresh)) { _ in
+            Task { await unreadStore.refreshUnread() }
         }
     }
 }

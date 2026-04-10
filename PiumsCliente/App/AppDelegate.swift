@@ -46,7 +46,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         Task {
             try? await APIClient.request(
                 .registerPushToken(token: token, platform: "ios")
-            ) as EmptyResponse
+            ) as VoidResponse
         }
     }
 
@@ -64,6 +64,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        handlePushUserInfo(notification.request.content.userInfo)
         completionHandler([.banner, .sound, .badge])
     }
 
@@ -75,6 +76,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
+        handlePushUserInfo(userInfo)
 
         // Navegar a reserva si viene bookingId
         if let bookingId = userInfo["bookingId"] as? String {
@@ -85,6 +87,18 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             )
         }
         completionHandler()
+    }
+
+    private func handlePushUserInfo(_ userInfo: [AnyHashable: Any]) {
+        if let badge = userInfo["badge"] as? Int {
+            UIApplication.shared.applicationIconBadgeNumber = badge
+        }
+        if let type = userInfo["type"] as? String, type == "NEW_MESSAGE" {
+            NotificationCenter.default.post(name: .chatUnreadNeedsRefresh, object: nil)
+        }
+        if userInfo["conversationId"] != nil {
+            NotificationCenter.default.post(name: .chatUnreadNeedsRefresh, object: nil)
+        }
     }
 }
 

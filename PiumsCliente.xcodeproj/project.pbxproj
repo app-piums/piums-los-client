@@ -11,6 +11,7 @@
 		7975A8AC2F895F48003ECD57 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000001C /* GoogleSignInSwift */; };
 		7975A8AD2F895F48003ECD57 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000001B /* GoogleSignIn */; };
 		7975A8AE2F895F48003ECD57 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000001C /* GoogleSignInSwift */; };
+		7975A8AF2F895F48003ECD57 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = AA000002000000000000002B /* SocketIO */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +64,7 @@
 				7975A8AD2F895F48003ECD57 /* GoogleSignIn in Frameworks */,
 				7975A8AC2F895F48003ECD57 /* GoogleSignInSwift in Frameworks */,
 				7975A8AB2F895F48003ECD57 /* GoogleSignIn in Frameworks */,
+				7975A8AF2F895F48003ECD57 /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +129,7 @@
 				AA000001000000000000001C /* GoogleSignInSwift */,
 				AA000001000000000000001B /* GoogleSignIn */,
 				AA000001000000000000001C /* GoogleSignInSwift */,
+				AA000002000000000000002B /* SocketIO */,
 			);
 			productName = PiumsCliente;
 			productReference = 79514C102F88588F00CB7190 /* PiumsCliente.app */;
@@ -212,6 +215,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AA000001000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				AA000002000000000000002A /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 79514C112F88588F00CB7190 /* Products */;
@@ -604,6 +608,14 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		AA000002000000000000002A /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -616,6 +628,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AA000001000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		AA000002000000000000002B /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA000002000000000000002A /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

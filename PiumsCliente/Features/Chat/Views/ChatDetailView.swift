@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ChatDetailView: View {
     let conversation: Conversation
-    @State private var viewModel = ChatViewModel()
+    @Bindable var viewModel: ChatViewModel
     @State private var newMessage = ""
 
     var body: some View {
@@ -41,7 +41,13 @@ struct ChatDetailView: View {
         }
         .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await viewModel.loadMessages(conversationId: conversation.id) }
+        .task {
+            ChatSocketManager.shared.joinConversation(conversation.id)
+            await viewModel.loadMessages(conversationId: conversation.id)
+        }
+        .onDisappear {
+            ChatSocketManager.shared.leaveConversation(conversation.id)
+        }
     }
 }
 
@@ -64,5 +70,10 @@ private struct MessageBubble: View {
 }
 
 #Preview {
-    NavigationStack { ChatDetailView(conversation: Conversation(id: "1", userId: "u1", artistId: "a1", bookingId: nil, status: "ACTIVE", lastMessageAt: nil, createdAt: "", updatedAt: "", unreadCount: 0, messages: [])) }
+    NavigationStack {
+        ChatDetailView(
+            conversation: Conversation(id: "1", userId: "u1", artistId: "a1", bookingId: nil, status: "ACTIVE", lastMessageAt: nil, createdAt: "", updatedAt: "", unreadCount: 0, messages: []),
+            viewModel: ChatViewModel()
+        )
+    }
 }
