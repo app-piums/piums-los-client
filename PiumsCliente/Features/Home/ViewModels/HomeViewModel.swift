@@ -49,7 +49,10 @@ final class HomeViewModel {
         defer { isLoading = false }
         do {
             let res: SearchArtistsResponse = try await APIClient.request(
-                .searchArtists(q: nil, page: currentPage, limit: 20, category: nil, cityId: nil)
+                .searchArtists(q: nil, page: currentPage, limit: 20,
+                               specialty: nil, city: nil,
+                               minPrice: nil, maxPrice: nil, minRating: nil,
+                               isVerified: nil, sortBy: nil, sortOrder: nil)
             )
             artists.append(contentsOf: res.artists)
             hasMore = res.pagination.hasMore
