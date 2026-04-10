@@ -94,6 +94,16 @@ extension APIEndpoint {
         }
     }
 
+    var requiresAuth: Bool {
+        switch self {
+        case .login, .registerClient, .firebaseAuth, .forgotPassword,
+             .searchArtists, .getArtist, .listReviews:
+            return false
+        default:
+            return true
+        }
+    }
+
     private var path: String {
         switch self {
         // Auth

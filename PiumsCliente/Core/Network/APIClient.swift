@@ -34,22 +34,31 @@ struct APIClient {
             throw AppError.unknown(URLError(.badServerResponse))
         }
 
+        // Leer mensaje real del backend para cualquier error
+        let backendMessage = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
+
         switch http.statusCode {
         case 200..<300:
             return data
-        case 401 where retryOnUnauthorized:
+        case 401 where retryOnUnauthorized && endpoint.requiresAuth:
+            // Solo intentar refresh si es una ruta protegida (no login/register)
             try await AuthManager.shared.refreshIfNeeded()
             return try await rawRequest(endpoint, retryOnUnauthorized: false)
-        case 401:
+        case 401 where endpoint.requiresAuth:
+            // Ruta protegida y refresh falló → cerrar sesión
             await AuthManager.shared.logout()
             throw AppError.unauthorized
+        case 401:
+            // Login/register con credenciales incorrectas → mostrar mensaje del backend
+            let msg = backendMessage ?? "Credenciales incorrectas"
+            throw AppError.http(statusCode: 401, message: msg)
         case 404:
             throw AppError.notFound
         case 500..<600:
+            let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             throw AppError.serverError
         default:
-            let msg = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
-                      ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
+            let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             throw AppError.http(statusCode: http.statusCode, message: msg)
         }
     }
