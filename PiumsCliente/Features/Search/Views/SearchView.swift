@@ -28,7 +28,8 @@ struct SearchView: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     if viewModel.isLoading && viewModel.results.isEmpty {
-                        LoadingView().frame(height: 300)
+                        LoadingView()
+                            .frame(maxWidth: .infinity, minHeight: 300)
                     } else if !viewModel.hasSearched {
                         SearchSuggestionsView { suggestion in
                             viewModel.query = suggestion
@@ -41,7 +42,8 @@ struct SearchView: View {
                             title: "Sin resultados",
                             description: "No encontramos artistas con ese término."
                         )
-                        .frame(height: 300)
+                        .frame(maxWidth: .infinity, minHeight: 300)
+                        .padding(.top, 40)
                     } else {
                         Text("\(viewModel.results.count) resultado(s)")
                             .font(.caption)

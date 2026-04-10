@@ -271,6 +271,7 @@ struct BookingDetailView: View {
         }
         .navigationTitle(booking.code ?? "Detalle")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
         .sheet(isPresented: $showReview) {
             ReviewView(booking: booking)
         }

@@ -69,19 +69,26 @@ struct CreateQuejaView: View {
                         ErrorBannerView(message: msg)
                     }
 
-                    // Botón
-                    PiumsButton(
-                        title: "Enviar queja",
-                        isLoading: viewModel.isLoading
-                    ) {
-                        Task { await viewModel.submit() }
-                    }
-                    .disabled(!viewModel.canSubmit)
-                    .opacity(viewModel.canSubmit ? 1 : 0.5)
+                    // Espacio para el botón flotante
+                    Color.clear.frame(height: 80)
                 }
                 .padding()
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
+            .safeAreaInset(edge: .bottom) {
+                PiumsButton(
+                    title: "Enviar queja",
+                    isLoading: viewModel.isLoading
+                ) {
+                    Task { await viewModel.submit() }
+                }
+                .disabled(!viewModel.canSubmit)
+                .opacity(viewModel.canSubmit ? 1 : 0.5)
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(.bar)
+            }
             .navigationTitle("Nueva queja")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

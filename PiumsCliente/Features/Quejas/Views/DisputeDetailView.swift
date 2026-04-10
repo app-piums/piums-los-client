@@ -41,16 +41,17 @@ struct DisputeDetailView: View {
                     // Mensajes
                     messagesSection
 
-                    Color.clear.frame(height: 80)
+                    Color.clear.frame(height: 20)
                 }
             }
             .scrollDismissesKeyboard(.immediately)
             .scrollIndicators(.hidden)
             .refreshable { await viewModel.refresh() }
-
-            // Input de mensaje (solo si está abierta o en revisión)
-            if canSendMessage {
-                messageInput
+            .safeAreaInset(edge: .bottom) {
+                // El input ocupa el safeAreaInset para que el scroll llegue justo hasta él
+                if canSendMessage {
+                    messageInput
+                }
             }
         }
         .navigationTitle("Queja")

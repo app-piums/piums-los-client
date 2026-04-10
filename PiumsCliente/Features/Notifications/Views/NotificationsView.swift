@@ -40,6 +40,8 @@ struct NotificationsView: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .refreshable { await viewModel.loadInitial() }
             }
         }
         .navigationTitle("Notificaciones")

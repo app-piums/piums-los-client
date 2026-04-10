@@ -94,14 +94,15 @@ struct HomeView: View {
     private var artistList: some View {
         if viewModel.isLoading && viewModel.artists.isEmpty {
             LoadingView()
-                .frame(height: 300)
+                .frame(maxWidth: .infinity, minHeight: 300)
         } else if viewModel.artists.isEmpty {
             EmptyStateView(
                 systemImage: "person.2.slash",
                 title: "Sin artistas",
                 description: "No encontramos artistas en esta categoría."
             )
-            .frame(height: 300)
+            .frame(maxWidth: .infinity, minHeight: 300)
+            .padding(.top, 40)
         } else {
             LazyVStack(spacing: 14) {
                 ForEach(viewModel.artists) { artist in

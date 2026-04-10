@@ -68,13 +68,22 @@ struct ReviewView: View {
                         ErrorBannerView(message: msg)
                     }
 
-                    PiumsButton(title: "Publicar reseña", isLoading: viewModel.isLoading) {
-                        Task { await viewModel.submitReview() }
-                    }
+                    // Espacio para el botón flotante
+                    Color.clear.frame(height: 80)
                 }
                 .padding(24)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
+            // Botón fuera del scroll — nunca queda tapado por teclado
+            .safeAreaInset(edge: .bottom) {
+                PiumsButton(title: "Publicar reseña", isLoading: viewModel.isLoading) {
+                    Task { await viewModel.submitReview() }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(.bar)
+            }
             .navigationTitle("Dejar reseña")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
