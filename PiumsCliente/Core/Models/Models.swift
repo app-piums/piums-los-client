@@ -1,6 +1,11 @@
 // Models.swift — modelos de dominio mapeados al shape REAL del backend Piums
 import Foundation
 
+// MARK: - Helpers
+
+/// Respuesta vacía o irrelevante del backend
+struct VoidResponse: Codable {}
+
 // MARK: - Auth
 
 struct AuthUser: Codable, Identifiable {

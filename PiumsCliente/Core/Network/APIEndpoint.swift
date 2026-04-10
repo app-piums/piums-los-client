@@ -53,6 +53,9 @@ enum APIEndpoint {
     case createPaymentIntent(bookingId: String)
     case listPayments(page: Int)
     case getPayment(id: String)
+
+    // ── Onboarding ────────────────────────────────────────
+    case completeOnboarding
 }
 
 extension APIEndpoint {
@@ -73,7 +76,7 @@ extension APIEndpoint {
             return "POST"
         case .cancelBooking:
             return "POST"
-        case .updateMyProfile:
+        case .updateMyProfile, .completeOnboarding:
             return "PATCH"
         case .changePassword:
             return "POST"
@@ -184,6 +187,9 @@ extension APIEndpoint {
         case .createPaymentIntent:             return "/api/payments/intent"
         case .listPayments(let pg):            return "/api/payments?page=\(pg)&limit=20"
         case .getPayment(let id):              return "/api/payments/\(id)"
+
+        // Onboarding
+        case .completeOnboarding:              return "/api/auth/complete-onboarding"
         }
     }
 
