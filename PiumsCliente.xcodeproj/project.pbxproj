@@ -415,7 +415,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "$(REVERSED_CLIENT_ID)";
+				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -447,7 +447,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "$(REVERSED_CLIENT_ID)";
+				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -477,7 +477,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "$(REVERSED_CLIENT_ID)";
+				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = PIUMS.PiumsClienteTests;
@@ -499,7 +499,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "$(REVERSED_CLIENT_ID)";
+				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = PIUMS.PiumsClienteTests;
@@ -520,7 +520,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "$(REVERSED_CLIENT_ID)";
+				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = PIUMS.PiumsClienteUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -540,7 +540,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = "$(REVERSED_CLIENT_ID)";
+				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = PIUMS.PiumsClienteUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
