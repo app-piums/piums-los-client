@@ -49,19 +49,37 @@ private struct ConversationRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(Color.piumsOrange.opacity(0.15))
-                .frame(width: 44, height: 44)
-                .overlay(Image(systemName: "person.fill").foregroundStyle(Color.piumsOrange))
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.15))
+                    .frame(width: 48, height: 48)
+                Image(systemName: "person.fill")
+                    .foregroundStyle(statusColor)
+                    .font(.system(size: 20))
+            }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Conversación")
-                    .font(.subheadline.bold())
-                Text(conversation.lastMessageAt?.prefix(10) ?? "")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("Artista")
+                        .font(.subheadline.bold())
+                    Spacer()
+                    Text(relativeDate)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let bookingId = conversation.bookingId {
+                    Text("Reserva: \(bookingId.prefix(8))...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(conversation.status.capitalized)
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .background(statusColor.opacity(0.12))
+                    .foregroundStyle(statusColor)
+                    .clipShape(Capsule())
             }
-            Spacer()
+
             if let unread = conversation.unreadCount, unread > 0 {
                 Text("\(unread)")
                     .font(.caption.bold())
@@ -70,9 +88,26 @@ private struct ConversationRow: View {
                     .background(Capsule().fill(Color.piumsOrange))
             }
         }
-        .padding(12)
+        .padding(14)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var statusColor: Color {
+        switch conversation.status.uppercased() {
+        case "ACTIVE":  return Color.piumsOrange
+        case "PENDING": return .blue
+        case "CLOSED":  return .secondary
+        default:        return .secondary
+        }
+    }
+
+    private var relativeDate: String {
+        guard let dateStr = conversation.lastMessageAt,
+              let date = ISO8601DateFormatter().date(from: dateStr) else { return "" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 

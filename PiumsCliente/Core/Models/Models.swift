@@ -481,8 +481,9 @@ struct ChatMessage: Codable, Identifiable, Hashable {
     let content: String
     let type: String
     let read: Bool
+    let readAt: String?          // backend usa readAt, no always present
     let createdAt: String
-    let updatedAt: String
+    let updatedAt: String?       // optional — backend may omit it
 
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

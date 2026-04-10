@@ -25,7 +25,7 @@ final class ChatViewModel {
             guard let id = note.object as? String else { return }
             self?.messages = self?.messages.map {
                 $0.id == id
-                ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, senderType: $0.senderType, content: $0.content, type: $0.type, read: true, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
+                ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, senderType: $0.senderType, content: $0.content, type: $0.type, read: true, readAt: $0.readAt, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
                 : $0
             } ?? []
         }

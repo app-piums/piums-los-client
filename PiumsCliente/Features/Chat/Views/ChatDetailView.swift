@@ -5,34 +5,45 @@ struct ChatDetailView: View {
     let conversation: Conversation
     @Bindable var viewModel: ChatViewModel
     @State private var newMessage = ""
+    @State private var scrollProxy: ScrollViewProxy? = nil
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(viewModel.messages) { msg in
-                        MessageBubble(message: msg, isOwn: msg.senderType == "user")
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 4) {
+                        ForEach(viewModel.messages) { msg in
+                            MessageBubble(message: msg, isOwn: msg.senderType == "user")
+                                .id(msg.id)
+                        }
+                        Color.clear.frame(height: 8).id("bottom")
                     }
-                    Color.clear.frame(height: 8)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .scrollIndicators(.hidden)
+                .onAppear { scrollProxy = proxy }
+                .onChange(of: viewModel.messages.count) { _, _ in
+                    withAnimation { proxy.scrollTo("bottom") }
+                }
             }
-            .scrollIndicators(.hidden)
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 12) {
-                    TextField("Escribe un mensaje...", text: $newMessage)
+                    TextField("Escribe un mensaje...", text: $newMessage, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
+                        .lineLimit(1...4)
                     Button {
                         Task {
-                            let text = newMessage
+                            let text = newMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !text.isEmpty else { return }
                             newMessage = ""
                             await viewModel.sendMessage(conversationId: conversation.id, content: text)
                         }
                     } label: {
                         Image(systemName: "paperplane.fill")
-                            .foregroundStyle(Color.piumsOrange)
+                            .foregroundStyle(newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.piumsOrange)
                     }
+                    .disabled(newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -56,16 +67,31 @@ private struct MessageBubble: View {
     let isOwn: Bool
 
     var body: some View {
-        HStack {
-            if isOwn { Spacer(minLength: 60) }
-            Text(message.content)
-                .font(.subheadline)
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(isOwn ? Color.piumsOrange : Color(.secondarySystemBackground))
-                .foregroundStyle(isOwn ? .white : .primary)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-            if !isOwn { Spacer(minLength: 60) }
+        VStack(alignment: isOwn ? .trailing : .leading, spacing: 2) {
+            HStack {
+                if isOwn { Spacer(minLength: 60) }
+                Text(message.content)
+                    .font(.subheadline)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(isOwn ? Color.piumsOrange : Color(.secondarySystemBackground))
+                    .foregroundStyle(isOwn ? .white : .primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                if !isOwn { Spacer(minLength: 60) }
+            }
+            Text(formattedTime)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
         }
+    }
+
+    private var formattedTime: String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = formatter.date(from: message.createdAt) else { return "" }
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm"
+        return df.string(from: date)
     }
 }
 
