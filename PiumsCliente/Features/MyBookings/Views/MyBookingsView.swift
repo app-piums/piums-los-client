@@ -358,8 +358,8 @@ struct MySpaceView: View {
             Group {
                 switch selected {
                 case .bookings:  MyBookingsView()
-                case .events:    EventsContentView()
-                case .favorites: FavoritesContentView()
+                case .events:    EventsView()
+                case .favorites: FavoritesView()
                 }
             }
             .transition(.opacity)

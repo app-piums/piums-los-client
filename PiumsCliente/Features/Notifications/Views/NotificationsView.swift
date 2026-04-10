@@ -171,7 +171,7 @@ struct InboxView: View {
 
             Group {
                 switch selected {
-                case .messages: MessagesPlaceholderView()
+                case .messages: ChatInboxView()
                 case .quejas:   QuejasView()
                 }
             }
@@ -181,6 +181,10 @@ struct InboxView: View {
         .navigationTitle("Inbox")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .task {
+            let vm = ChatViewModel()
+            unreadCount = await vm.unreadCount()
+        }
     }
 }
 

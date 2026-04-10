@@ -405,6 +405,115 @@ struct DisputesResponse: Codable {
     }
 }
 
+// MARK: - Events (booking-service)
+
+struct EventSummary: Codable, Identifiable, Hashable {
+    let id: String
+    let code: String
+    let clientId: String
+    let name: String
+    let description: String?
+    let location: String?
+    let notes: String?
+    let eventDate: String?
+    let status: EventStatus
+    let createdAt: String
+    let updatedAt: String?
+    let bookings: [EventBooking]?
+
+    static func == (lhs: EventSummary, rhs: EventSummary) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct EventBooking: Codable, Identifiable, Hashable {
+    let id: String
+    let code: String?
+    let artistId: String
+    let serviceId: String
+    let scheduledDate: String
+    let status: BookingStatus
+    let totalPrice: Int
+    let currency: String?
+
+    static func == (lhs: EventBooking, rhs: EventBooking) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+enum EventStatus: String, Codable {
+    case draft = "DRAFT"
+    case active = "ACTIVE"
+    case cancelled = "CANCELLED"
+}
+
+struct EventsResponse: Codable {
+    let success: Bool
+    let data: [EventSummary]
+}
+
+struct EventResponse: Codable {
+    let success: Bool
+    let data: EventSummary
+}
+
+// MARK: - Chat (chat-service)
+
+struct Conversation: Codable, Identifiable, Hashable {
+    let id: String
+    let userId: String
+    let artistId: String
+    let bookingId: String?
+    let status: String
+    let lastMessageAt: String?
+    let createdAt: String
+    let updatedAt: String
+    let unreadCount: Int?
+    let messages: [ChatMessage]?
+
+    static func == (lhs: Conversation, rhs: Conversation) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct ChatMessage: Codable, Identifiable, Hashable {
+    let id: String
+    let conversationId: String
+    let senderId: String
+    let senderType: String
+    let content: String
+    let type: String
+    let read: Bool
+    let createdAt: String
+    let updatedAt: String
+
+    static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct ConversationsResponse: Codable {
+    let conversations: [Conversation]
+    let total: Int
+    let page: Int
+    let totalPages: Int
+}
+
+struct MessagesResponse: Codable {
+    let messages: [ChatMessage]
+    let total: Int
+    let page: Int
+    let totalPages: Int
+}
+
+struct ConversationWrapper: Codable {
+    let conversation: Conversation
+}
+
+struct MessageWrapper: Codable {
+    let message: ChatMessage
+}
+
+struct UnreadCountResponse: Codable {
+    let unreadCount: Int
+}
+
 // MARK: - Mock helpers
 
 extension Artist {

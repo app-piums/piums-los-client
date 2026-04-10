@@ -6,6 +6,7 @@ struct ArtistProfileView: View {
     @State private var viewModel: ArtistProfileViewModel
     @State private var selectedService: ArtistService?
     @State private var showBooking = false
+    @State private var favorites = FavoritesStore.shared
 
     init(artist: Artist) {
         self.artist = artist
@@ -136,6 +137,16 @@ struct ArtistProfileView: View {
         }
         .navigationTitle(artist.artistName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    favorites.toggle(artist: artist)
+                } label: {
+                    Image(systemName: favorites.isFavorite(artist.id) ? "heart.fill" : "heart")
+                        .foregroundStyle(Color.piumsOrange)
+                }
+            }
+        }
         .task { await viewModel.loadAll() }
         // Botón flotante Contratar
         .overlay(alignment: .bottom) {

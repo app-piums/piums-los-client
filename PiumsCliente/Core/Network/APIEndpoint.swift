@@ -54,6 +54,21 @@ enum APIEndpoint {
     case listPayments(page: Int)
     case getPayment(id: String)
 
+    // ── Events ────────────────────────────────────────────
+    case listEvents
+    case createEvent(payload: [String: Any])
+    case getEvent(id: String)
+    case updateEvent(id: String, payload: [String: Any])
+    case deleteEvent(id: String)
+
+    // ── Chat ──────────────────────────────────────────────
+    case listConversations(page: Int)
+    case getConversation(id: String)
+    case markConversationRead(id: String)
+    case listMessages(conversationId: String, page: Int)
+    case sendMessage(conversationId: String, content: String)
+    case unreadCount
+
     // ── Onboarding ────────────────────────────────────────
     case completeOnboarding
 }
@@ -72,14 +87,17 @@ extension APIEndpoint {
         case .login, .registerClient, .firebaseAuth,
              .createBooking, .createReview, .createDispute, .addDisputeMessage,
              .markNotificationsRead, .registerPushToken, .forgotPassword,
-             .logout, .createPaymentIntent:
+             .logout, .createPaymentIntent,
+             .createEvent, .sendMessage:
             return "POST"
         case .cancelBooking:
             return "POST"
-        case .updateMyProfile, .completeOnboarding:
+        case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead:
             return "PATCH"
         case .changePassword:
             return "POST"
+        case .deleteEvent:
+            return "DELETE"
         default:
             return "GET"
         }
@@ -111,6 +129,14 @@ extension APIEndpoint {
             return encode(["currentPassword": cur, "newPassword": new])
         case .createPaymentIntent(let bId):
             return encode(["bookingId": bId])
+        case .createEvent(let p), .updateEvent(_, let p):
+            return try? JSONSerialization.data(withJSONObject: p)
+        case .sendMessage(let conversationId, let content):
+            return try? JSONSerialization.data(withJSONObject: [
+                "conversationId": conversationId,
+                "content": content,
+                "type": "text"
+            ])
         default:
             return nil
         }
@@ -187,6 +213,21 @@ extension APIEndpoint {
         case .createPaymentIntent:             return "/api/payments/intent"
         case .listPayments(let pg):            return "/api/payments?page=\(pg)&limit=20"
         case .getPayment(let id):              return "/api/payments/\(id)"
+
+        // Events
+        case .listEvents:                      return "/api/events"
+        case .createEvent:                     return "/api/events"
+        case .getEvent(let id):                return "/api/events/\(id)"
+        case .updateEvent(let id, _):          return "/api/events/\(id)"
+        case .deleteEvent(let id):             return "/api/events/\(id)"
+
+        // Chat
+        case .listConversations(let pg):       return "/api/chat/conversations?page=\(pg)&limit=20"
+        case .getConversation(let id):         return "/api/chat/conversations/\(id)"
+        case .markConversationRead(let id):    return "/api/chat/conversations/\(id)/read"
+        case .listMessages(let cid, let pg):   return "/api/chat/messages/\(cid)?page=\(pg)&limit=50"
+        case .sendMessage:                     return "/api/chat/messages"
+        case .unreadCount:                     return "/api/chat/messages/unread-count"
 
         // Onboarding
         case .completeOnboarding:              return "/api/auth/complete-onboarding"
