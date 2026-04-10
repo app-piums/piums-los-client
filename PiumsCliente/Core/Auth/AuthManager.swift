@@ -1,5 +1,6 @@
 // AuthManager.swift
 import Foundation
+import GoogleSignIn
 
 @Observable
 @MainActor
@@ -24,11 +25,22 @@ final class AuthManager {
         store(response)
     }
 
+    /// Google Sign-In → Firebase idToken → POST /api/auth/firebase → Piums JWT
+    func loginWithGoogle(presenting viewController: UIViewController) async throws {
+        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: viewController)
+        guard let idToken = result.user.idToken?.tokenString else {
+            throw AppError.http(statusCode: 401, message: "No se obtuvo el token de Google")
+        }
+        let response: AuthResponse = try await APIClient.request(.firebaseAuth(token: idToken))
+        store(response)
+    }
+
     func forgotPassword(email: String) async throws {
         let _: EmptyResponse = try await APIClient.request(.forgotPassword(email: email))
     }
 
     func logout() async {
+        GIDSignIn.sharedInstance.signOut()
         try? await Task<Void, Error> {
             let _: EmptyResponse = try await APIClient.request(.logout)
         }.value
@@ -42,7 +54,7 @@ final class AuthManager {
         store(response)
     }
 
-    // MARK: - Private helpers
+    // MARK: - Private
 
     private func loadFromStorage() async {
         guard TokenStorage.shared.accessToken != nil else { return }
@@ -67,7 +79,6 @@ final class AuthManager {
 
 // MARK: - Response types
 
-/// Shape real del backend: { token, refreshToken, redirectUrl, user }
 struct AuthResponse: Decodable {
     let token: String
     let refreshToken: String
@@ -75,7 +86,6 @@ struct AuthResponse: Decodable {
     let user: AuthUser
 }
 
-/// Shape de GET /api/auth/me: { user: AuthUser }
 struct MeResponse: Decodable {
     let user: AuthUser
 }

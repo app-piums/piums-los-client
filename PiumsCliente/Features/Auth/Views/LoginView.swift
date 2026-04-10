@@ -117,10 +117,14 @@ struct LoginView: View {
                             }
 
                             // Botones sociales
-                            HStack(spacing: 20) {
-                                SocialButton(systemImage: nil, label: "G") { /* Google Sign-In */ }
-                                SocialButton(systemImage: "applelogo", label: nil) { /* Apple */ }
-                                SocialButton(systemImage: nil, label: "♪") { /* TikTok */ }
+                            HStack(spacing: 12) {
+                                // Google
+                                GoogleSignInButton {
+                                    Task { await viewModel.loginWithGoogle() }
+                                }
+                                .disabled(viewModel.isLoading)
+
+                                SocialButton(systemImage: "applelogo", label: nil) { /* Apple — próximamente */ }
                             }
 
                             // Registro
@@ -188,6 +192,46 @@ struct LoginView: View {
             .padding(.leading, 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+// MARK: - GoogleSignInButton
+
+private struct GoogleSignInButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                // Logo Google (colores oficiales con SF Symbols como fallback)
+                ZStack {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 28, height: 28)
+                    Text("G")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(hex: "#4285F4"), Color(hex: "#34A853"),
+                                         Color(hex: "#FBBC05"), Color(hex: "#EA4335")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                Text("Continuar con Google")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(Color(.systemGray5))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            )
+        }
     }
 }
 

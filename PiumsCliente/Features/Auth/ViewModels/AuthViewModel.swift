@@ -1,5 +1,6 @@
 // AuthViewModel.swift
 import Foundation
+import UIKit
 
 enum AuthScreen {
     case login, register, forgotPassword
@@ -52,6 +53,25 @@ final class AuthViewModel {
             errorMessage = e.errorDescription
         } catch {
             errorMessage = AppError(from: error).errorDescription
+        }
+    }
+
+    func loginWithGoogle() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        // Obtener el rootViewController para presentar el flujo de Google
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = scene.windows.first?.rootViewController else {
+            errorMessage = "No se pudo iniciar sesión con Google"
+            return
+        }
+        do {
+            try await AuthManager.shared.loginWithGoogle(presenting: root)
+        } catch let e as AppError {
+            errorMessage = e.errorDescription
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

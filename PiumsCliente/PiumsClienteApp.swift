@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GoogleSignIn
 
 @main
 struct PiumsClienteApp: App {
@@ -14,6 +15,10 @@ struct PiumsClienteApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .onOpenURL { url in
+                    // Maneja el callback de Google Sign-In (URL scheme)
+                    GIDSignIn.sharedInstance.handle(url)
+                }
         }
     }
 }
