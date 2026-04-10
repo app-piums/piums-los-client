@@ -311,62 +311,69 @@ private struct DayCell: View {
 struct RecommendedArtistCard: View {
     let artist: Artist
 
+    private static let gradients: [[Color]] = [
+        [Color(red: 0.55, green: 0.36, blue: 0.96), Color(red: 0.96, green: 0.36, blue: 0.55)],
+        [Color(red: 0.36, green: 0.55, blue: 0.96), Color(red: 0.96, green: 0.55, blue: 0.36)],
+        [Color(red: 0.70, green: 0.30, blue: 0.90), Color(red: 0.90, green: 0.50, blue: 0.70)],
+        [Color(red: 0.40, green: 0.60, blue: 0.90), Color(red: 0.80, green: 0.40, blue: 0.90)],
+    ]
+    private var gradient: [Color] {
+        Self.gradients[abs(artist.id.hashValue) % Self.gradients.count]
+    }
+    private var initials: String {
+        artist.artistName.split(separator: " ").prefix(2)
+            .compactMap { $0.first.map { String($0) } }.joined().uppercased()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Foto
-            ZStack(alignment: .topTrailing) {
-                Group {
-                    if let url = artist.avatarUrl.flatMap(URL.init) {
-                        AsyncImage(url: url) { img in
-                            img.resizable().scaledToFill()
-                        } placeholder: {
-                            photoPlaceholder
-                        }
-                    } else {
-                        photoPlaceholder
-                    }
-                }
-                .frame(width: 160, height: 200)
-                .clipped()
+            // Cover
+            ZStack(alignment: .bottomLeading) {
+                LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .frame(width: 160, height: 120)
 
-                // Badge TOP RATED
                 if let rating = artist.rating, rating >= 4.8 {
                     Text("TOP RATED")
-                        .font(.system(size: 9, weight: .black))
-                        .tracking(0.5)
+                        .font(.system(size: 9, weight: .black)).tracking(0.5)
                         .foregroundStyle(.black)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule().fill(.white)
-                        )
-                        .padding(10)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Capsule().fill(.white))
+                        .padding(8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }
+
+                // Avatar iniciales solapado
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [Color(red:0.85,green:0.30,blue:0.50),
+                                                      Color(red:0.96,green:0.36,blue:0.36)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 36, height: 36)
+                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                    Text(initials).font(.caption.bold()).foregroundStyle(.white)
+                }
+                .offset(x: 10, y: 18)
             }
-            .frame(width: 160, height: 200)
+            .frame(width: 160, height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 14))
 
             // Info
             VStack(alignment: .leading, spacing: 3) {
-                Text(artist.artistName)
-                    .font(.subheadline.bold())
-                    .lineLimit(1)
+                Text(artist.artistName).font(.subheadline.bold()).lineLimit(1).padding(.top, 22)
                 Text("\(artist.specialties?.first ?? "Artista") · \(artist.city ?? "")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if let price = artist.mainServicePrice, price > 0 {
+                    Text(price.piumsFormatted)
+                        .font(.caption.bold()).foregroundStyle(Color.piumsOrange)
+                }
             }
-            .padding(.top, 8)
-            .padding(.horizontal, 2)
+            .padding(.horizontal, 4)
+            .padding(.bottom, 8)
         }
         .frame(width: 160)
-    }
-
-    private var photoPlaceholder: some View {
-        LinearGradient(
-            colors: [Color(.systemGray4), Color(.systemGray5)],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
     }
 }
 

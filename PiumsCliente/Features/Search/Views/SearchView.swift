@@ -9,18 +9,14 @@ struct SearchView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(spacing: 16) {
                 if viewModel.isLoading && viewModel.results.isEmpty {
-                    LoadingView()
-                        .frame(maxWidth: .infinity, minHeight: 300)
+                    LoadingView().frame(maxWidth: .infinity, minHeight: 300)
 
                 } else if !viewModel.hasSearched {
                     TalentPickerView(
                         selectedTalentId: $viewModel.selectedTalentId,
-                        onSelect: { talent in
-                            searchFocused = false
-                            viewModel.selectTalent(talent)
-                        },
+                        onSelect: { talent in searchFocused = false; viewModel.selectTalent(talent) },
                         onClear: { viewModel.clearTalent() }
                     )
                     .padding(.top, 8)
@@ -35,6 +31,7 @@ struct SearchView: View {
                     .padding(.top, 40)
 
                 } else {
+                    // Header
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("\(viewModel.results.count) resultado(s)")
@@ -67,18 +64,23 @@ struct SearchView: View {
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.top, 8)
 
-                    ForEach(viewModel.results) { artist in
-                        let matched = viewModel.isSmartSearch
-                            ? viewModel.smartResults.first(where: { $0.id == artist.id })?.matchedService
-                            : nil
-                        ArtistCardView(artist: artist, matchedService: matched)
-                            .padding(.horizontal)
-                            .contentShape(Rectangle())
-                            .onTapGesture { selectedArtist = artist }
-                            .task { await viewModel.loadNextIfNeeded(currentItem: artist) }
+                    // Grid 2 columnas — igual que la web
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)],
+                        spacing: 14
+                    ) {
+                        ForEach(viewModel.results) { artist in
+                            let matched = viewModel.isSmartSearch
+                                ? viewModel.smartResults.first(where: { $0.id == artist.id })?.matchedService
+                                : nil
+                            ArtistCardView(artist: artist, matchedService: matched)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedArtist = artist }
+                                .task { await viewModel.loadNextIfNeeded(currentItem: artist) }
+                        }
                     }
+                    .padding(.horizontal)
 
                     if viewModel.isLoading {
                         ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
