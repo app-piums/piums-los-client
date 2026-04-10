@@ -11,13 +11,17 @@ import GoogleSignIn
 @main
 struct PiumsClienteApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var appearance = AppearanceManager.shared
 
     var body: some Scene {
         WindowGroup {
             RootView()
+                .preferredColorScheme(appearance.swiftUIScheme)
                 .onOpenURL { url in
-                    // Maneja el callback de Google Sign-In (URL scheme)
                     GIDSignIn.sharedInstance.handle(url)
+                }
+                .onAppear {
+                    appearance.applyOnLaunch()
                 }
         }
     }
