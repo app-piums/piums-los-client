@@ -162,7 +162,9 @@ struct ArtistProfileView: View {
         }
         .sheet(isPresented: $showBooking) {
             if let service = selectedService {
-                BookingFlowView(artist: artist, service: service)
+                NavigationStack {
+                    BookingFlowView(context: BookingFlowContext(artist: artist, service: service))
+                }
             }
         }
     }

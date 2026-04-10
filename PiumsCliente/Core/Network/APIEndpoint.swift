@@ -31,6 +31,8 @@ enum APIEndpoint {
     case getBooking(id: String)
     case cancelBooking(id: String)
     case getAvailableSlots(artistId: String, date: String)
+    case getArtistCalendar(artistId: String, year: Int, month: Int)   // NEW: occupiedDates, blockedDates
+    case calculatePrice(payload: [String: Any])                        // NEW: POST /api/catalog/pricing/calculate
 
     // ── Reviews ───────────────────────────────────────────
     case listReviews(artistId: String, page: Int)
@@ -96,7 +98,7 @@ extension APIEndpoint {
         case .login, .registerClient, .firebaseAuth,
              .createBooking, .createReview, .createDispute, .addDisputeMessage,
              .markNotificationsRead, .registerPushToken, .forgotPassword,
-             .logout, .createPaymentIntent,
+             .logout, .createPaymentIntent, .calculatePrice,
              .createEvent, .sendMessage, .addFavorite:
             return "POST"
         case .cancelBooking:
@@ -213,6 +215,8 @@ extension APIEndpoint {
         case .getBooking(let id):              return "/api/bookings/\(id)"
         case .cancelBooking(let id):           return "/api/bookings/\(id)/cancel"
         case .getAvailableSlots(let a, let d): return "/api/availability/time-slots?artistId=\(a)&date=\(d)"
+        case .getArtistCalendar(let a, let yr, let mo): return "/api/availability/calendar?artistId=\(a)&year=\(yr)&month=\(mo)"
+        case .calculatePrice:                  return "/api/catalog/pricing/calculate"
 
         // Reviews — path directo (el service monta en /api/reviews internamente)
         case .listReviews(let a, let pg):      return "/api/reviews?artistId=\(a)&page=\(pg)&limit=10"

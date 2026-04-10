@@ -652,3 +652,100 @@ struct FavoriteCheckResponse: Codable {
     let isFavorite: Bool
     let favoriteId: String?
 }
+
+// MARK: - Booking Flow Models
+
+/// Slot de disponibilidad horaria  (GET /api/availability/time-slots)
+struct TimeSlot: Codable, Identifiable {
+    var id: String { time }
+    let time: String          // "09:00"
+    let available: Bool
+    let startTime: String?    // ISO
+    let endTime: String?      // ISO
+}
+
+struct TimeSlotsResponse: Codable {
+    let artistId: String?
+    let date: String?
+    let slots: [TimeSlot]
+}
+
+/// Calendario de ocupación  (GET /api/availability/calendar)
+struct ArtistCalendar: Codable {
+    let artistId: String?
+    let year: Int?
+    let month: Int?
+    let occupiedDates: [String]   // ["2026-04-07", ...]
+    let blockedDates: [String]
+}
+
+/// Ítem de cotización de precio
+struct PriceQuoteItem: Codable {
+    let type: String          // "BASE" | "ADDON" | "TRAVEL"
+    let name: String
+    let qty: Int?
+    let unitPriceCents: Int?
+    let totalPriceCents: Int
+    let metadata: PriceQuoteItemMeta?
+}
+
+struct PriceQuoteItemMeta: Codable {
+    let distanceKm: Double?
+    let clientLat: Double?
+    let clientLng: Double?
+}
+
+struct PriceQuoteBreakdown: Codable {
+    let baseCents: Int
+    let addonsCents: Int
+    let travelCents: Int
+    let discountsCents: Int?
+}
+
+/// Cotización completa  (POST /api/catalog/pricing/calculate)
+struct PriceQuote: Codable {
+    let serviceId: String?
+    let currency: String
+    let items: [PriceQuoteItem]
+    let subtotalCents: Int
+    let totalCents: Int
+    let breakdown: PriceQuoteBreakdown?
+
+    var totalInUnits: Double  { Double(totalCents) / 100.0 }
+    var baseInUnits: Double   { Double(breakdown?.baseCents ?? 0) / 100.0 }
+    var travelInUnits: Double { Double(breakdown?.travelCents ?? 0) / 100.0 }
+    var hasTravel: Bool       { (breakdown?.travelCents ?? 0) > 0 }
+}
+
+/// Contexto que fluye entre los pasos de reserva
+struct BookingFlowContext {
+    var artist: Artist
+    var service: ArtistService?
+    var selectedDate: Date?
+    var selectedSlot: TimeSlot?
+    var isMultiDay: Bool = false
+    var numDays: Int = 1
+    var location: String = ""
+    var locationLat: Double?
+    var locationLng: Double?
+    var clientNotes: String = ""
+    var priceQuote: PriceQuote?
+
+    /// Fecha en formato ISO requerido por el backend: "2026-04-28T10:00:00.000Z"
+    var scheduledDateISO: String? {
+        guard let date = selectedDate, let slot = selectedSlot else { return nil }
+        let cal = Calendar.current
+        let comps = slot.time.split(separator: ":").compactMap { Int($0) }
+        guard comps.count == 2 else { return nil }
+        var dc = cal.dateComponents([.year, .month, .day], from: date)
+        dc.hour = comps[0]; dc.minute = comps[1]; dc.second = 0
+        guard let combined = cal.date(from: dc) else { return nil }
+        return ISO8601DateFormatter().string(from: combined)
+    }
+
+    var durationMinutes: Int {
+        if isMultiDay { return numDays * 24 * 60 }
+        return service?.durationMin ?? service?.durationMax ?? 60
+    }
+}
+

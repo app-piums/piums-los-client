@@ -1,9 +1,15 @@
 // HomeView.swift — rediseño según mockup
 import SwiftUI
+import CoreLocation
 
 struct HomeView: View {
     @State private var viewModel = HomeViewModel()
     @State private var selectedArtist: Artist?
+    @State private var selectedDate: Date? = nil
+    @State private var userLocation: CLLocationCoordinate2D? = nil
+    @State private var locationName: String = ""
+    @State private var showArtistSearch = false
+    @State private var locationManager = LocationManager()
 
     var body: some View {
         ScrollView {
@@ -12,7 +18,23 @@ struct HomeView: View {
                 greetingSection
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
+                    .padding(.bottom, 20)
+
+                // ── Selector de fecha ────────────────────────
+                dateSelectorSection
+                    .padding(.bottom, 20)
+
+                // ── Ubicación del evento ─────────────────────
+                locationSection
+                    .padding(.horizontal, 20)
                     .padding(.bottom, 24)
+
+                // ── Error ───────────────────────────────────
+                if let msg = viewModel.errorMessage {
+                    ErrorBannerView(message: msg)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                }
 
                 // ── Mini calendario ─────────────────────────
                 HomeCalendarView(
@@ -21,13 +43,6 @@ struct HomeView: View {
                 )
                 .padding(.horizontal, 20)
                 .padding(.bottom, 28)
-
-                // ── Error ───────────────────────────────────
-                if let msg = viewModel.errorMessage {
-                    ErrorBannerView(message: msg)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 12)
-                }
 
                 // ── Recommended for you ─────────────────────
                 recommendedSection
@@ -48,6 +63,103 @@ struct HomeView: View {
         .toolbar { topBar }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
+        .navigationDestination(isPresented: $showArtistSearch) {
+            if let date = selectedDate {
+                ArtistSearchByDateView(
+                    selectedDate: date,
+                    userLocation: userLocation,
+                    locationName: locationName
+                )
+            }
+        }
+        .onAppear { locationManager.requestOnce { coord, name in
+            userLocation = coord; locationName = name
+        }}
+    }
+
+    // MARK: - Date selector strip (igual al mockup)
+
+    private var dateSelectorSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("SELECCIONAR FECHA")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+                Spacer()
+                Text(monthYearLabel)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(Color.piumsOrange)
+            }
+            .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(nextDays, id: \.self) { date in
+                        DayButton(
+                            date: date,
+                            isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate ?? .distantPast)
+                        ) {
+                            selectedDate = date
+                            showArtistSearch = true
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    private var monthYearLabel: String {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        f.locale = Locale(identifier: "es_ES")
+        return f.string(from: Date()).capitalized
+    }
+
+    private var nextDays: [Date] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        return (0..<14).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
+    }
+
+    // MARK: - Location section
+
+    private var locationSection: some View {
+        Button {
+            locationManager.requestOnce { coord, name in
+                userLocation = coord; locationName = name
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.piumsOrange.opacity(0.12))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: userLocation != nil ? "location.fill" : "location")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.piumsOrange)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("UBICACIÓN DEL EVENTO")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .tracking(0.8)
+                    Text(locationName.isEmpty ? "Toca para usar tu ubicación actual" : locationName)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(14)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Top bar
@@ -89,9 +201,9 @@ struct HomeView: View {
 
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Hello, \(viewModel.firstName) 👋")
+            Text("Hola, \(viewModel.firstName) 👋")
                 .font(.system(size: 28, weight: .bold))
-            Text("Ready to curate your next masterpiece?")
+            Text("¿Qué artista necesitas para tu próximo evento?")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -102,21 +214,22 @@ struct HomeView: View {
     private var recommendedSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Recommended for you")
+                Text("Recomendados para ti")
                     .font(.title3.bold())
                 Spacer()
-                Button("View all") { }
-                    .font(.subheadline.bold())
-                    .foregroundStyle(Color.piumsOrange)
+                Button("Ver todos") {
+                    selectedDate = selectedDate ?? Calendar.current.startOfDay(for: Date())
+                    showArtistSearch = true
+                }
+                .font(.subheadline.bold())
+                .foregroundStyle(Color.piumsOrange)
             }
             .padding(.horizontal, 20)
 
             if viewModel.isLoading && viewModel.artists.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            ArtistCardSkeletonView()
-                        }
+                        ForEach(0..<3, id: \.self) { _ in ArtistCardSkeletonView() }
                     }
                     .padding(.horizontal, 20)
                 }
