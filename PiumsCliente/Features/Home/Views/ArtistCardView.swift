@@ -34,7 +34,7 @@ struct ArtistCardView: View {
                     }
                 }
 
-                Text(artist.category.displayName)
+                Text(artist.specialties?.first ?? "Artista")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -88,7 +88,7 @@ struct ArtistCardView: View {
     private var avatarPlaceholder: some View {
         ZStack {
             Color.piumsOrange.opacity(0.15)
-            Image(systemName: artist.category.systemImage)
+            Image(systemName: "person.crop.circle")
                 .font(.title2)
                 .foregroundStyle(Color.piumsOrange)
         }

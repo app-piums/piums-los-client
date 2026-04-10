@@ -51,15 +51,15 @@ final class AuthManager {
 
     private func verify() async {
         do {
-            let user: AuthUser = try await APIClient.request(.verifyToken)
-            currentUser = user
+            let wrapper: MeResponse = try await APIClient.request(.getMe)
+            currentUser = wrapper.user
         } catch {
             TokenStorage.shared.clearAll()
         }
     }
 
     private func store(_ response: AuthResponse) {
-        TokenStorage.shared.accessToken  = response.accessToken
+        TokenStorage.shared.accessToken  = response.token
         TokenStorage.shared.refreshToken = response.refreshToken
         currentUser = response.user
     }
@@ -67,9 +67,16 @@ final class AuthManager {
 
 // MARK: - Response types
 
+/// Shape real del backend: { token, refreshToken, redirectUrl, user }
 struct AuthResponse: Decodable {
-    let accessToken: String
+    let token: String
     let refreshToken: String
+    let redirectUrl: String?
+    let user: AuthUser
+}
+
+/// Shape de GET /api/auth/me: { user: AuthUser }
+struct MeResponse: Decodable {
     let user: AuthUser
 }
 

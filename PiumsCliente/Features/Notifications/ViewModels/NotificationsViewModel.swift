@@ -58,12 +58,4 @@ final class NotificationsViewModel {
     }
 }
 
-extension PiumsNotification {
-    static var mockList: [PiumsNotification] {
-        [
-            PiumsNotification(id: "n1", title: "Reserva confirmada", body: "Carlos Méndez aceptó tu solicitud.", type: "BOOKING_CONFIRMED", isRead: false, data: ["bookingId": "b1"], createdAt: "2026-04-09T09:00:00Z"),
-            PiumsNotification(id: "n2", title: "Pago procesado", body: "Tu pago de Q150.00 fue procesado.", type: "PAYMENT_COMPLETED", isRead: false, data: nil, createdAt: "2026-04-08T14:30:00Z"),
-            PiumsNotification(id: "n3", title: "Nueva reseña", body: "Dejaste una reseña. ¡Gracias!", type: "NEW_REVIEW", isRead: true, data: nil, createdAt: "2026-04-07T18:00:00Z")
-        ]
-    }
-}
+

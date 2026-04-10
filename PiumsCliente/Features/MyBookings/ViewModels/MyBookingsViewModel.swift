@@ -49,10 +49,10 @@ final class MyBookingsViewModel {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let res: PaginatedResponse<Booking> = try await APIClient.request(
+            let res: BookingsResponse = try await APIClient.request(
                 .listMyBookings(status: selectedStatus?.rawValue, page: currentPage)
             )
-            bookings.append(contentsOf: res.data)
+            bookings.append(contentsOf: res.allBookings)
             hasMore = res.hasMore
             currentPage += 1
         } catch {

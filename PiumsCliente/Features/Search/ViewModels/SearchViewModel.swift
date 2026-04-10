@@ -7,7 +7,7 @@ final class SearchViewModel {
     // MARK: - Filtros
     var query = ""
     var selectedCategory: ArtistCategory?
-    var maxPrice: Double = 5000     // en quetzales (no centavos)
+    var maxPrice: Double = 5000
     var minRating: Double = 0
     var selectedCity: String?
 
@@ -19,12 +19,11 @@ final class SearchViewModel {
     var hasMore = true
     private var currentPage = 1
 
-    var cities = ["Ciudad de Guatemala", "Antigua", "Quetzaltenango", "Cobán", "Escuintla"]
+    var cities = ["Ciudad de Guatemala", "Antigua Guatemala", "Quetzaltenango", "Cobán", "Escuintla", "Chiquimula"]
 
     // MARK: - Actions
 
     func search() async {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         currentPage = 1
         results = []
         hasMore = true
@@ -56,26 +55,30 @@ final class SearchViewModel {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let res: PaginatedResponse<Artist> = try await APIClient.request(
-                .searchArtists(q: query, page: currentPage)
+            let res: SearchArtistsResponse = try await APIClient.request(
+                .searchArtists(
+                    q: query.trimmingCharacters(in: .whitespaces),
+                    page: currentPage,
+                    limit: 20,
+                    category: selectedCategory?.rawValue,
+                    cityId: selectedCity
+                )
             )
-            // Aplicar filtros cliente-side mientras el backend no los soporte en search
-            let filtered = res.data.filter { artist in
-                let priceOk  = artist.basePrice.map { Double($0) / 100 <= maxPrice } ?? true
-                let ratingOk = (artist.rating ?? 0) >= minRating
-                let catOk    = selectedCategory == nil || artist.category == selectedCategory
-                let cityOk   = selectedCity == nil || artist.city == selectedCity
-                return priceOk && ratingOk && catOk && cityOk
+            // Aplicar filtros cliente-side de precio y rating (backend no los soporta en search)
+            let filtered = res.artists.filter { artist in
+                let priceOk  = artist.mainServicePrice.map { Double($0) / 100 <= maxPrice } ?? true
+                let ratingOk = (artist.averageRating ?? 0) >= minRating
+                return priceOk && ratingOk
             }
             results.append(contentsOf: filtered)
-            hasMore = res.hasMore
+            hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {
-            // Fallback mock para desarrollo
             if isInitial {
+                let q = query.lowercased()
                 results = Artist.mockList.filter {
-                    $0.artistName.localizedCaseInsensitiveContains(query) ||
-                    $0.category.displayName.localizedCaseInsensitiveContains(query)
+                    $0.name.localizedCaseInsensitiveContains(q) ||
+                    ($0.specialties?.joined(separator: " ").localizedCaseInsensitiveContains(q) ?? false)
                 }
             }
             errorMessage = AppError(from: error).errorDescription

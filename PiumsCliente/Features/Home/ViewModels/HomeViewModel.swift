@@ -40,20 +40,19 @@ final class HomeViewModel {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let res: PaginatedResponse<Artist> = try await APIClient.request(
-                .listArtists(
+            let res: SearchArtistsResponse = try await APIClient.request(
+                .searchArtists(
+                    q: nil,
                     page: currentPage,
                     limit: 20,
                     category: selectedCategory?.rawValue,
-                    cityId: nil,
-                    q: nil
+                    cityId: nil
                 )
             )
-            artists.append(contentsOf: res.data)
-            hasMore = res.hasMore
+            artists.append(contentsOf: res.artists)
+            hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {
-            // Fallback mock para desarrollo sin backend
             if artists.isEmpty { artists = Artist.mockList }
             errorMessage = AppError(from: error).errorDescription
         }

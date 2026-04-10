@@ -143,7 +143,7 @@ private struct ArtistHeaderView: View {
                             .foregroundStyle(Color.piumsOrange)
                     }
                 }
-                Text(artist.category.displayName)
+                Text(artist.specialties?.first ?? "Artista")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if let city = artist.city {
@@ -159,7 +159,7 @@ private struct ArtistHeaderView: View {
     private var placeholder: some View {
         ZStack {
             Color.piumsOrange.opacity(0.15)
-            Image(systemName: artist.category.systemImage)
+            Image(systemName: "person.crop.circle")
                 .font(.largeTitle)
                 .foregroundStyle(Color.piumsOrange)
         }
