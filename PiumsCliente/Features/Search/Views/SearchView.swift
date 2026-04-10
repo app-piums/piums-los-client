@@ -8,70 +8,63 @@ struct SearchView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            // ── Barra de búsqueda — FUERA del ScrollView para que no se mueva ──
-            searchBar
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-                .background(.bar)  // blur material igual que toolbar
-
-            // Chips de filtros activos
-            if viewModel.hasActiveFilters {
-                activeFiltersBar
-                    .padding(.bottom, 6)
-                    .background(.bar)
-            }
-
-            Divider()
-
-            // ── Contenido scrollable ──
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    if viewModel.isLoading && viewModel.results.isEmpty {
-                        LoadingView()
-                            .frame(maxWidth: .infinity, minHeight: 300)
-                    } else if !viewModel.hasSearched {
-                        SearchSuggestionsView { suggestion in
-                            viewModel.query = suggestion
-                            Task { await viewModel.search() }
-                        }
-                        .padding(.top, 8)
-                    } else if viewModel.results.isEmpty {
-                        EmptyStateView(
-                            systemImage: "magnifyingglass",
-                            title: "Sin resultados",
-                            description: "No encontramos artistas con ese término."
-                        )
+        // ── Contenido scrollable ocupa toda la pantalla ──
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                if viewModel.isLoading && viewModel.results.isEmpty {
+                    LoadingView()
                         .frame(maxWidth: .infinity, minHeight: 300)
-                        .padding(.top, 40)
-                    } else {
-                        Text("\(viewModel.results.count) resultado(s)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-
-                        ForEach(viewModel.results) { artist in
-                            ArtistCardView(artist: artist)
-                                .padding(.horizontal)
-                                .contentShape(Rectangle())
-                                .onTapGesture { selectedArtist = artist }
-                                .task { await viewModel.loadNextIfNeeded(currentItem: artist) }
-                        }
-
-                        if viewModel.isLoading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 20)
-                        }
-
-                        Color.clear.frame(height: 12)
+                } else if !viewModel.hasSearched {
+                    SearchSuggestionsView { suggestion in
+                        viewModel.query = suggestion
+                        Task { await viewModel.search() }
                     }
+                    .padding(.top, 8)
+                } else if viewModel.results.isEmpty {
+                    EmptyStateView(
+                        systemImage: "magnifyingglass",
+                        title: "Sin resultados",
+                        description: "No encontramos artistas con ese término."
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 300)
+                    .padding(.top, 40)
+                } else {
+                    Text("\(viewModel.results.count) resultado(s)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+
+                    ForEach(viewModel.results) { artist in
+                        ArtistCardView(artist: artist)
+                            .padding(.horizontal)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectedArtist = artist }
+                            .task { await viewModel.loadNextIfNeeded(currentItem: artist) }
+                    }
+
+                    if viewModel.isLoading {
+                        ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
+                    }
+                    Color.clear.frame(height: 12)
                 }
             }
-            .scrollDismissesKeyboard(.immediately)
-            .scrollIndicators(.hidden)
+        }
+        .scrollDismissesKeyboard(.immediately)
+        .scrollIndicators(.hidden)
+        // ── Barra de búsqueda fija bajo la navbar como safeAreaInset ──
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                searchBar
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                if viewModel.hasActiveFilters {
+                    activeFiltersBar.padding(.bottom, 6)
+                }
+                Divider()
+            }
+            .background(.bar)
         }
         .navigationTitle("Buscar")
         .navigationBarTitleDisplayMode(.inline)

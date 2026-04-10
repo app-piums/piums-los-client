@@ -7,40 +7,20 @@ struct MyBookingsView: View {
     @State private var bookingToCancel: Booking?
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(viewModel.statusFilters, id: \.self) { status in
-                        StatusFilterChip(
-                            title: viewModel.statusLabel(status),
-                            isSelected: viewModel.selectedStatus == status
-                        ) {
-                            Task { await viewModel.selectStatus(status) }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-            }
-            Divider()
-
-            // Contenido
+        Group {
             if viewModel.isLoading && viewModel.bookings.isEmpty {
                 LoadingView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.bookings.isEmpty {
                 EmptyStateView(
                     systemImage: "calendar.badge.minus",
                     title: "Sin reservas",
                     description: "Aún no tienes reservas. ¡Encuentra un artista y haz tu primera reserva!"
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         if let msg = viewModel.errorMessage {
-                            ErrorBannerView(message: msg)
-                                .padding(.horizontal)
+                            ErrorBannerView(message: msg).padding(.horizontal)
                         }
                         ForEach(viewModel.bookings) { booking in
                             BookingRowView(booking: booking)
@@ -59,9 +39,7 @@ struct MyBookingsView: View {
                                 }
                         }
                         if viewModel.isLoading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 20)
+                            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
                         }
                         Color.clear.frame(height: 12)
                     }
@@ -71,12 +49,29 @@ struct MyBookingsView: View {
                 .refreshable { await viewModel.loadInitial() }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Barra de filtros pegada bajo la navbar — no interfiere con el ScrollView
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.statusFilters, id: \.self) { status in
+                            StatusFilterChip(
+                                title: viewModel.statusLabel(status),
+                                isSelected: viewModel.selectedStatus == status
+                            ) { Task { await viewModel.selectStatus(status) } }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                }
+                Divider()
+            }
+            .background(.bar)
+        }
         .navigationTitle("Mis Reservas")
         .task { await viewModel.loadInitial() }
         .navigationDestination(item: $selectedBooking) { BookingDetailView(booking: $0) }
         .navigationDestination(for: String.self) { bookingId in
-            // Deep link desde notificación push — busca la reserva en la lista o carga placeholder
             if let booking = viewModel.bookings.first(where: { $0.id == bookingId }) {
                 BookingDetailView(booking: booking)
             } else {
@@ -89,9 +84,7 @@ struct MyBookingsView: View {
             titleVisibility: .visible
         ) {
             Button("Sí, cancelar", role: .destructive) {
-                if let id = bookingToCancel?.id {
-                    Task { await viewModel.cancelBooking(id: id) }
-                }
+                if let id = bookingToCancel?.id { Task { await viewModel.cancelBooking(id: id) } }
                 bookingToCancel = nil
             }
             Button("No", role: .cancel) { bookingToCancel = nil }

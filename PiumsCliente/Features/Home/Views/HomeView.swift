@@ -18,12 +18,7 @@ struct HomeView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 // Header — se encoge al hacer scroll
-                headerSection
-                    .padding(.bottom, 12)
-
-                // Categorías — sticky bajo el header
-                categoryBar
-                    .padding(.bottom, 12)
+                headerSection.padding(.bottom, 12)
 
                 // Error
                 if let msg = viewModel.errorMessage {
@@ -41,6 +36,14 @@ struct HomeView: View {
         .scrollIndicators(.hidden)
         .refreshable { await viewModel.loadInitial() }
         .task { await viewModel.loadInitial() }
+        // Barra de categorías pegada bajo la navbar
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                categoryBar.padding(.vertical, 8)
+                Divider()
+            }
+            .background(.bar)
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
