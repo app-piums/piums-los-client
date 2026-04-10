@@ -32,9 +32,7 @@ final class ReviewViewModel {
             let _: Review = try await APIClient.request(.createReview(payload: payload))
             isSuccess = true
         } catch {
-            // Mock para dev
-            isSuccess = true
-            // errorMessage = AppError(from: error).errorDescription
+            errorMessage = AppError(from: error).errorDescription
         }
     }
 }

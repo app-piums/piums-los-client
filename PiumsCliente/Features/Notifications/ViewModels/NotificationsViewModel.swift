@@ -20,42 +20,54 @@ final class NotificationsViewModel {
 
     func markAsRead(id: String) async {
         do {
-            let _: EmptyResponse = try await APIClient.request(.markNotificationRead(id: id))
+            let _: EmptyResponse = try await APIClient.request(.markNotificationsRead(ids: [id]))
+            // Actualizar localmente sin refetch
             if let idx = notifications.firstIndex(where: { $0.id == id }) {
+                let n = notifications[idx]
                 notifications[idx] = PiumsNotification(
-                    id: notifications[idx].id,
-                    title: notifications[idx].title,
-                    body: notifications[idx].body,
-                    type: notifications[idx].type,
-                    isRead: true,
-                    data: notifications[idx].data,
-                    createdAt: notifications[idx].createdAt
+                    id: n.id, title: n.title, message: n.message, type: n.type,
+                    readAt: ISO8601DateFormatter().string(from: Date()),
+                    data: n.data, createdAt: n.createdAt
                 )
             }
         } catch { /* silently fail */ }
     }
 
     func markAllRead() async {
-        for n in notifications where !n.isRead {
-            await markAsRead(id: n.id)
-        }
+        let unreadIds = notifications.filter { !$0.isRead }.map { $0.id }
+        guard !unreadIds.isEmpty else { return }
+        do {
+            let _: EmptyResponse = try await APIClient.request(.markNotificationsRead(ids: unreadIds))
+            let now = ISO8601DateFormatter().string(from: Date())
+            notifications = notifications.map { n in
+                guard !n.isRead else { return n }
+                return PiumsNotification(id: n.id, title: n.title, message: n.message,
+                                         type: n.type, readAt: now, data: n.data, createdAt: n.createdAt)
+            }
+        } catch { await loadInitial() }
+    }
+
+    func loadMoreIfNeeded(current: PiumsNotification) async {
+        guard let last = notifications.last, last.id == current.id, hasMore else { return }
+        await loadNext()
     }
 
     private func loadNext() async {
-        guard !isLoading else { return }
+        guard !isLoading && hasMore else { return }
         isLoading = true
         defer { isLoading = false }
         do {
-            let res: PaginatedResponse<PiumsNotification> = try await APIClient.request(
+            let res: NotificationsResponse = try await APIClient.request(
                 .listNotifications(page: currentPage)
             )
-            notifications.append(contentsOf: res.data)
-            hasMore = res.hasMore
+            notifications.append(contentsOf: res.notifications)
+            hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {
-            if notifications.isEmpty { notifications = PiumsNotification.mockList }
+            if notifications.isEmpty {
+                notifications = PiumsNotification.mockList
+            }
+            errorMessage = AppError(from: error).errorDescription
         }
     }
 }
-
-

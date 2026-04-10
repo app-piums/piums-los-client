@@ -272,16 +272,50 @@ struct ReviewsResponse: Codable {
     var hasMore: Bool { pagination?.hasMore ?? false }
 }
 
-// MARK: - Notification
+// MARK: - Notification  (shape real: GET /api/notifications)
 
 struct PiumsNotification: Codable, Identifiable {
     let id: String
     let title: String
-    let body: String
+    let message: String         // backend usa "message" no "body"
     let type: String
-    let isRead: Bool
-    let data: [String: String]?
+    let readAt: String?         // null = no leída, fecha ISO = leída
+    let data: NotificationData?
     let createdAt: String
+
+    // Computed helpers
+    var isRead: Bool { readAt != nil }
+    var body: String { message }
+}
+
+struct NotificationData: Codable {
+    let bookingId: String?
+    let artistId: String?
+    let reviewId: String?
+    let rating: Int?
+    let disputeId: String?
+    let amount: Double?
+
+    // Soporte para claves extra del backend
+    private enum CodingKeys: String, CodingKey {
+        case bookingId, artistId, reviewId, rating, disputeId, amount
+    }
+}
+
+// MARK: - Notifications Response
+
+struct NotificationsResponse: Codable {
+    let notifications: [PiumsNotification]
+    let pagination: NotificationsPagination
+
+    struct NotificationsPagination: Codable {
+        let page: Int
+        let limit: Int
+        let total: Int
+        let pages: Int         // backend usa "pages" no "totalPages"
+
+        var hasMore: Bool { page < pages }
+    }
 }
 
 // MARK: - Pagination genérica (para endpoints que sí devuelven este shape)
@@ -292,6 +326,78 @@ struct PaginatedResponse<T: Codable>: Codable {
     let page: Int
     let totalPages: Int
     let hasMore: Bool
+}
+
+// MARK: - Dispute  (shape: GET /api/disputes/me → {asReporter:[], asReported:[], total:0})
+
+struct Dispute: Codable, Identifiable, Hashable {
+    let id: String
+    let bookingId: String
+    let reportedBy: String
+    let reportedAgainst: String
+    let type: String
+    let subject: String
+    let description: String
+    let status: DisputeStatus
+    let priority: String?
+    let resolution: String?
+    let refundAmount: Double?
+    let createdAt: String
+    let updatedAt: String?
+    let messages: [DisputeMessage]?
+
+    static func == (lhs: Dispute, rhs: Dispute) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+enum DisputeStatus: String, Codable {
+    case open        = "OPEN"
+    case inReview    = "IN_REVIEW"
+    case awaitingInfo = "AWAITING_INFO"
+    case resolved    = "RESOLVED"
+    case closed      = "CLOSED"
+    case escalated   = "ESCALATED"
+
+    var displayName: String {
+        switch self {
+        case .open:         return "Abierta"
+        case .inReview:     return "En revisión"
+        case .awaitingInfo: return "Esperando info"
+        case .resolved:     return "Resuelta"
+        case .closed:       return "Cerrada"
+        case .escalated:    return "Escalada"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .open:         return "orange"
+        case .inReview:     return "blue"
+        case .awaitingInfo: return "yellow"
+        case .resolved:     return "green"
+        case .closed:       return "gray"
+        case .escalated:    return "red"
+        }
+    }
+}
+
+struct DisputeMessage: Codable, Identifiable {
+    let id: String
+    let disputeId: String
+    let senderId: String
+    let senderRole: String
+    let message: String
+    let createdAt: String
+}
+
+struct DisputesResponse: Codable {
+    let asReporter: [Dispute]
+    let asReported: [Dispute]
+    let total: Int
+
+    var allDisputes: [Dispute] {
+        (asReporter + asReported).sorted { $0.createdAt > $1.createdAt }
+    }
 }
 
 // MARK: - Mock helpers
@@ -345,8 +451,8 @@ extension Review {
 extension PiumsNotification {
     static var mockList: [PiumsNotification] {
         [
-            PiumsNotification(id: "n1", title: "Reserva confirmada", body: "Tu reserva PMS-001 fue confirmada.", type: "BOOKING_CONFIRMED", isRead: false, data: nil, createdAt: "2026-04-09T10:00:00Z"),
-            PiumsNotification(id: "n2", title: "Pago recibido", body: "El artista recibió tu pago.", type: "PAYMENT_COMPLETED", isRead: true, data: nil, createdAt: "2026-04-08T15:00:00Z")
+            PiumsNotification(id: "n1", title: "Reserva confirmada", message: "Tu reserva PMS-001 fue confirmada.", type: "BOOKING_CONFIRMED", readAt: nil, data: NotificationData(bookingId: "b1", artistId: nil, reviewId: nil, rating: nil, disputeId: nil, amount: nil), createdAt: "2026-04-09T10:00:00Z"),
+            PiumsNotification(id: "n2", title: "Pago recibido", message: "El artista recibió tu pago.", type: "PAYMENT_COMPLETED", readAt: "2026-04-08T15:00:00Z", data: nil, createdAt: "2026-04-08T15:00:00Z")
         ]
     }
 }

@@ -91,6 +91,45 @@ struct ArtistProfileView: View {
                 }
                 .padding(.vertical)
 
+                // Galería / Portfolio
+                if !viewModel.portfolio.isEmpty {
+                    Divider().padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Galería")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(viewModel.portfolio) { item in
+                                    AsyncImage(url: URL(string: item.url)) { phase in
+                                        switch phase {
+                                        case .success(let image):
+                                            image.resizable()
+                                                .scaledToFill()
+                                                .frame(width: 140, height: 140)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        case .failure, .empty:
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color(.secondarySystemBackground))
+                                                .frame(width: 140, height: 140)
+                                                .overlay(
+                                                    Image(systemName: "photo")
+                                                        .foregroundStyle(.secondary)
+                                                        .font(.title)
+                                                )
+                                        @unknown default:
+                                            EmptyView()
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical)
+                }
+
                 // Espaciado para el botón flotante
                 Spacer().frame(height: 100)
             }

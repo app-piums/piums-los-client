@@ -59,6 +59,9 @@ struct ProfileView: View {
                 } label: {
                     Label("Cambiar contraseña", systemImage: "lock.rotation")
                 }
+                NavigationLink(destination: PaymentsView()) {
+                    Label("Mis pagos", systemImage: "creditcard")
+                }
             }
 
             // Ayuda y soporte

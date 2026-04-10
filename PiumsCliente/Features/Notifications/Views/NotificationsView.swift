@@ -8,6 +8,13 @@ struct NotificationsView: View {
         Group {
             if viewModel.isLoading && viewModel.notifications.isEmpty {
                 LoadingView()
+            } else if let error = viewModel.errorMessage, viewModel.notifications.isEmpty {
+                EmptyStateView(
+                    systemImage: "bell.slash",
+                    title: "No se pudieron cargar",
+                    description: error,
+                    actionTitle: "Reintentar"
+                ) { Task { await viewModel.loadInitial() } }
             } else if viewModel.notifications.isEmpty {
                 EmptyStateView(
                     systemImage: "bell.slash",
@@ -26,6 +33,7 @@ struct NotificationsView: View {
                                     Task { await viewModel.markAsRead(id: notification.id) }
                                 }
                             }
+                            .task { await viewModel.loadMoreIfNeeded(current: notification) }
                     }
                     if viewModel.isLoading {
                         ProgressView().frame(maxWidth: .infinity).listRowSeparator(.hidden)
@@ -78,7 +86,7 @@ struct NotificationRowView: View {
                             .frame(width: 8, height: 8)
                     }
                 }
-                Text(notification.body)
+                Text(notification.message)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)

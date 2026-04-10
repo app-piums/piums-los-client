@@ -63,8 +63,8 @@ struct DisputeDetailView: View {
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label(viewModel.dispute.disputeType.displayName,
-                      systemImage: viewModel.dispute.disputeType.systemImage)
+                Label(viewModel.dispute.type.replacingOccurrences(of: "_", with: " ").capitalized,
+                      systemImage: "exclamationmark.bubble")
                     .font(.subheadline.bold())
                 Spacer()
                 StatusPill(status: viewModel.dispute.status)
@@ -75,7 +75,7 @@ struct DisputeDetailView: View {
 
             HStack(spacing: 16) {
                 Label(viewModel.dispute.createdAt.shortDate, systemImage: "calendar")
-                if viewModel.dispute.priority > 0 {
+                if let priority = viewModel.dispute.priority, priority == "HIGH" || priority == "URGENT" {
                     Label("Alta prioridad", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
@@ -90,20 +90,15 @@ struct DisputeDetailView: View {
 
     // MARK: - Resolution card
 
-    private func resolutionCard(_ resolution: DisputeResolution) -> some View {
+    private func resolutionCard(_ resolutionText: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Resolución", systemImage: "checkmark.seal.fill")
                 .font(.headline)
                 .foregroundStyle(.green)
-            Text(resolution.displayName)
+            Text(resolutionText)
                 .font(.subheadline.bold())
-            if let notes = viewModel.dispute.resolutionNotes {
-                Text(notes)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
             if let amount = viewModel.dispute.refundAmount, amount > 0 {
-                Label("Reembolso: \(amount.piumsFormatted)", systemImage: "creditcard")
+                Label("Reembolso: Q\(String(format: "%.2f", amount))", systemImage: "creditcard")
                     .font(.subheadline)
                     .foregroundStyle(.green)
             }
@@ -200,7 +195,8 @@ private struct MessageBubble: View {
         HStack {
             if isOwn { Spacer(minLength: 60) }
             VStack(alignment: isOwn ? .trailing : .leading, spacing: 4) {
-                if !isOwn, let role = message.senderRole {
+                if !isOwn {
+                    let role = message.senderRole
                     Text(role == "admin" || role == "staff" ? "Soporte Piums" : "Tú")
                         .font(.caption2.bold())
                         .foregroundStyle(.secondary)
@@ -264,18 +260,17 @@ private extension String {
     NavigationStack {
         DisputeDetailView(dispute: Dispute(
             id: "d1", bookingId: "b1", reportedBy: "u1", reportedAgainst: "a1",
-            disputeType: .quality, status: .inReview,
-            subject: "El artista llegó tarde 30 minutos",
+            type: "QUALITY", subject: "El artista llegó tarde 30 minutos",
             description: "Contraté un músico para las 15:00 y llegó a las 15:30 sin avisar.",
-            resolution: nil, resolutionNotes: nil, priority: 1,
+            status: .inReview, priority: "HIGH",
+            resolution: nil, refundAmount: nil,
+            createdAt: "2026-04-09T09:00:00Z", updatedAt: "2026-04-09T11:00:00Z",
             messages: [
                 DisputeMessage(id: "m1", disputeId: "d1", senderId: "u1", senderRole: "cliente",
                                message: "Por favor resuelvan esto pronto.", createdAt: "2026-04-09T10:00:00Z"),
                 DisputeMessage(id: "m2", disputeId: "d1", senderId: "staff1", senderRole: "staff",
-                               message: "Hemos notificado al artista. Esperamos su respuesta.", createdAt: "2026-04-09T11:00:00Z")
-            ],
-            refundAmount: nil, refundIssued: false,
-            createdAt: "2026-04-09T09:00:00Z", updatedAt: "2026-04-09T11:00:00Z"
+                               message: "Hemos notificado al artista.", createdAt: "2026-04-09T11:00:00Z")
+            ]
         ))
     }
 }

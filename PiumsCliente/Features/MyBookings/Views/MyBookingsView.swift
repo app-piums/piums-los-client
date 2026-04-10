@@ -75,6 +75,14 @@ struct MyBookingsView: View {
         .navigationTitle("Mis Reservas")
         .task { await viewModel.loadInitial() }
         .navigationDestination(item: $selectedBooking) { BookingDetailView(booking: $0) }
+        .navigationDestination(for: String.self) { bookingId in
+            // Deep link desde notificación push — busca la reserva en la lista o carga placeholder
+            if let booking = viewModel.bookings.first(where: { $0.id == bookingId }) {
+                BookingDetailView(booking: booking)
+            } else {
+                DeepLinkBookingView(bookingId: bookingId)
+            }
+        }
         .confirmationDialog(
             "¿Cancelar esta reserva?",
             isPresented: Binding(get: { bookingToCancel != nil }, set: { if !$0 { bookingToCancel = nil } }),

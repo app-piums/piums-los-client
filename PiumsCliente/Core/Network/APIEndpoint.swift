@@ -8,13 +8,14 @@ enum APIEndpoint {
     case firebaseAuth(token: String)
     case refreshToken(token: String)
     case logout
-    case getMe                           // GET /api/auth/me  (requiere token)
+    case getMe                           // GET /api/auth/me
     case forgotPassword(email: String)
 
     // ── Artists ───────────────────────────────────────────
     case getArtist(id: String)
+    case getArtistPortfolio(id: String)
 
-    // ── Search (listado y búsqueda de artistas) ───────────
+    // ── Search ────────────────────────────────────────────
     case searchArtists(q: String?, page: Int, limit: Int, category: String?, cityId: String?)
 
     // ── Catalog ───────────────────────────────────────────
@@ -34,19 +35,24 @@ enum APIEndpoint {
 
     // ── Notifications ─────────────────────────────────────
     case listNotifications(page: Int)
-    case markNotificationRead(id: String)
+    case markNotificationsRead(ids: [String])   // POST /api/notifications/read
     case registerPushToken(token: String, platform: String)
 
     // ── Disputes / Quejas ─────────────────────────────────
-    case listMyDisputes(page: Int)
+    case listMyDisputes
     case createDispute(payload: [String: Any])
     case getDispute(id: String)
     case addDisputeMessage(id: String, message: String)
 
-    // ── Users ─────────────────────────────────────────────
-    case getMyProfile
-    case updateMyProfile(payload: [String: Any])
-    case changePassword(current: String, new: String)
+    // ── Users / Profile ───────────────────────────────────
+    case getMyProfile                                    // GET /api/auth/me
+    case updateMyProfile(payload: [String: Any])         // PATCH /api/auth/profile
+    case changePassword(current: String, new: String)    // POST /api/auth/change-password
+
+    // ── Payments ──────────────────────────────────────────
+    case createPaymentIntent(bookingId: String)
+    case listPayments(page: Int)
+    case getPayment(id: String)
 }
 
 extension APIEndpoint {
@@ -62,13 +68,14 @@ extension APIEndpoint {
         switch self {
         case .login, .registerClient, .firebaseAuth,
              .createBooking, .createReview, .createDispute, .addDisputeMessage,
-             .registerPushToken, .forgotPassword:
+             .markNotificationsRead, .registerPushToken, .forgotPassword,
+             .logout, .createPaymentIntent:
+            return "POST"
+        case .cancelBooking:
             return "POST"
         case .updateMyProfile:
             return "PATCH"
-        case .cancelBooking:
-            return "POST"           // POST /bookings/:id/cancel
-        case .logout:
+        case .changePassword:
             return "POST"
         default:
             return "GET"
@@ -78,25 +85,29 @@ extension APIEndpoint {
     var body: Data? {
         switch self {
         case .login(let e, let p):
-            return try? JSONSerialization.data(withJSONObject: ["email": e, "password": p])
+            return encode(["email": e, "password": p])
         case .registerClient(let n, let e, let p):
-            return try? JSONSerialization.data(withJSONObject: ["nombre": n, "email": e, "password": p])
+            return encode(["nombre": n, "email": e, "password": p])
         case .firebaseAuth(let t):
-            return try? JSONSerialization.data(withJSONObject: ["firebaseToken": t])
+            return encode(["idToken": t, "role": "cliente"])
         case .refreshToken(let t):
-            return try? JSONSerialization.data(withJSONObject: ["refreshToken": t])
+            return encode(["refreshToken": t])
         case .forgotPassword(let e):
-            return try? JSONSerialization.data(withJSONObject: ["email": e])
+            return encode(["email": e])
         case .createBooking(let p), .createReview(let p), .createDispute(let p):
             return try? JSONSerialization.data(withJSONObject: p)
         case .addDisputeMessage(_, let msg):
-            return try? JSONSerialization.data(withJSONObject: ["message": msg])
+            return encode(["message": msg])
         case .updateMyProfile(let p):
             return try? JSONSerialization.data(withJSONObject: p)
+        case .markNotificationsRead(let ids):
+            return encode(["notificationIds": ids])
         case .registerPushToken(let t, let pl):
-            return try? JSONSerialization.data(withJSONObject: ["token": t, "platform": pl])
+            return encode(["token": t, "platform": pl])
         case .changePassword(let cur, let new):
-            return try? JSONSerialization.data(withJSONObject: ["currentPassword": cur, "newPassword": new])
+            return encode(["currentPassword": cur, "newPassword": new])
+        case .createPaymentIntent(let bId):
+            return encode(["bookingId": bId])
         default:
             return nil
         }
@@ -105,12 +116,13 @@ extension APIEndpoint {
     var requiresAuth: Bool {
         switch self {
         case .login, .registerClient, .firebaseAuth, .forgotPassword,
-             .searchArtists, .getArtist, .listReviews:
+             .searchArtists, .getArtist, .listReviews, .getArtistPortfolio:
             return false
         default:
             return true
         }
     }
+
     private var path: String {
         switch self {
         // Auth
@@ -124,13 +136,12 @@ extension APIEndpoint {
 
         // Artists
         case .getArtist(let id):               return "/api/artists/\(id)"
+        case .getArtistPortfolio(let id):      return "/api/artists/\(id)/portfolio"
 
-        // Search — listado y búsqueda unificados
+        // Search
         case .searchArtists(let q, let pg, let lm, let cat, let city):
             var p = "/api/search/artists?page=\(pg)&limit=\(lm)"
-            if let q = q, !q.isEmpty {
-                p += "&q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)"
-            }
+            if let q = q, !q.isEmpty { p += "&q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)" }
             if let cat  = cat  { p += "&specialty=\(cat)" }
             if let city = city { p += "&city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)" }
             return p
@@ -147,28 +158,36 @@ extension APIEndpoint {
             return p
         case .getBooking(let id):              return "/api/bookings/\(id)"
         case .cancelBooking(let id):           return "/api/bookings/\(id)/cancel"
-        case .getAvailableSlots(let a, let d):
-            return "/api/availability/time-slots?artistId=\(a)&date=\(d)"
+        case .getAvailableSlots(let a, let d): return "/api/availability/time-slots?artistId=\(a)&date=\(d)"
 
-        // Reviews
+        // Reviews — path directo (el service monta en /api/reviews internamente)
         case .listReviews(let a, let pg):      return "/api/reviews?artistId=\(a)&page=\(pg)&limit=10"
         case .createReview:                    return "/api/reviews"
 
         // Notifications
         case .listNotifications(let pg):       return "/api/notifications?page=\(pg)&limit=20"
-        case .markNotificationRead(let id):    return "/api/notifications/\(id)/read"
+        case .markNotificationsRead:           return "/api/notifications/read"
         case .registerPushToken:               return "/api/notifications/push-token"
 
         // Disputes
-        case .listMyDisputes(let pg):          return "/api/disputes/me?page=\(pg)&limit=20"
+        case .listMyDisputes:                  return "/api/disputes/me"
         case .createDispute:                   return "/api/disputes"
         case .getDispute(let id):              return "/api/disputes/\(id)"
         case .addDisputeMessage(let id, _):    return "/api/disputes/\(id)/messages"
 
-        // Users
-        case .getMyProfile:                    return "/api/users/me"
-        case .updateMyProfile:                 return "/api/users/me"
+        // Users / Profile — todo via auth-service (mismo JWT)
+        case .getMyProfile:                    return "/api/auth/me"
+        case .updateMyProfile:                 return "/api/auth/profile"
         case .changePassword:                  return "/api/auth/change-password"
+
+        // Payments
+        case .createPaymentIntent:             return "/api/payments/intent"
+        case .listPayments(let pg):            return "/api/payments?page=\(pg)&limit=20"
+        case .getPayment(let id):              return "/api/payments/\(id)"
         }
+    }
+
+    private func encode(_ dict: [String: Any]) -> Data? {
+        try? JSONSerialization.data(withJSONObject: dict)
     }
 }

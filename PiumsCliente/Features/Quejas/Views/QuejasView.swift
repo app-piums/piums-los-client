@@ -27,7 +27,6 @@ struct QuejasView: View {
                                 .padding(.horizontal)
                                 .contentShape(Rectangle())
                                 .onTapGesture { selectedDispute = dispute }
-                                .task { await viewModel.loadNextIfNeeded(item: dispute) }
                         }
                         if viewModel.isLoading {
                             ProgressView()
@@ -62,7 +61,7 @@ struct DisputeRowView: View {
                 .fill(statusColor.opacity(0.15))
                 .frame(width: 48, height: 48)
                 .overlay(
-                    Image(systemName: dispute.disputeType.systemImage)
+                    Image(systemName: "exclamationmark.bubble")
                         .foregroundStyle(statusColor)
                         .font(.system(size: 18))
                 )
@@ -76,14 +75,14 @@ struct DisputeRowView: View {
                     StatusPill(status: dispute.status)
                 }
 
-                Text(dispute.disputeType.displayName)
+                Text(dispute.type.replacingOccurrences(of: "_", with: " ").capitalized)
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 4) {
                     Image(systemName: "calendar").font(.caption2)
                     Text(dispute.createdAt.shortDate)
-                    if dispute.priority > 0 {
+                    if let p = dispute.priority, p == "HIGH" || p == "URGENT" {
                         Text("·")
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.caption2)
