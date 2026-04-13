@@ -11,26 +11,24 @@ import GoogleSignIn
 @main
 struct PiumsClienteApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var appearance = AppearanceManager.shared
+    @AppStorage("piums.colorScheme") private var colorSchemeRaw: String = ColorSchemePreference.system.rawValue
+
+    private var colorScheme: ColorScheme? {
+        ColorSchemePreference(rawValue: colorSchemeRaw)?.swiftUIScheme
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .preferredColorScheme(appearance.preference.swiftUIScheme)
+                .preferredColorScheme(colorScheme)
+                .environmentObject(AppearanceManager.shared)
                 .environment(\.locationStore, LocationStore.shared)
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
                 }
                 .onAppear {
-                    print("🎨 PiumsClienteApp: onAppear - current preference: \(appearance.preference.rawValue)")
-                    // Solicitar ubicación al arrancar para que esté lista cuanto antes
+                    print("🎨 PiumsClienteApp: onAppear - current preference: \(colorSchemeRaw)")
                     LocationStore.shared.requestIfNeeded()
-                }
-                .onChange(of: appearance.preference) {
-                    print("🔥🔥🔥 PiumsClienteApp.onChange FIRED! New preference: \(appearance.preference.rawValue)")
-                    let schemeStr = appearance.preference.swiftUIScheme == .light ? "light" :
-                                   appearance.preference.swiftUIScheme == .dark ? "dark" : "nil (system)"
-                    print("🔥🔥🔥 PiumsClienteApp: applying scheme: \(schemeStr)")
                 }
         }
     }
