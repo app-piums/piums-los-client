@@ -76,7 +76,7 @@ struct DisputeDetailView: View {
 
             HStack(spacing: 16) {
                 Label(viewModel.dispute.createdAt.shortDate, systemImage: "calendar")
-                if let priority = viewModel.dispute.priority, priority == "HIGH" || priority == "URGENT" {
+                if let priority = viewModel.dispute.priority, priority >= 2 {
                     Label("Alta prioridad", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
@@ -261,16 +261,20 @@ private extension String {
     NavigationStack {
         DisputeDetailView(dispute: Dispute(
             id: "d1", bookingId: "b1", reportedBy: "u1", reportedAgainst: "a1",
-            type: "QUALITY", subject: "El artista llegó tarde 30 minutos",
+            disputeType: "QUALITY", subject: "El artista llegó tarde 30 minutos",
             description: "Contraté un músico para las 15:00 y llegó a las 15:30 sin avisar.",
-            status: .inReview, priority: "HIGH",
-            resolution: nil, refundAmount: nil,
+            status: .inReview, priority: 0,
+            resolution: nil, resolutionNotes: nil, refundAmount: nil,
             createdAt: "2026-04-09T09:00:00Z", updatedAt: "2026-04-09T11:00:00Z",
             messages: [
-                DisputeMessage(id: "m1", disputeId: "d1", senderId: "u1", senderRole: "cliente",
-                               message: "Por favor resuelvan esto pronto.", createdAt: "2026-04-09T10:00:00Z"),
-                DisputeMessage(id: "m2", disputeId: "d1", senderId: "staff1", senderRole: "staff",
-                               message: "Hemos notificado al artista.", createdAt: "2026-04-09T11:00:00Z")
+                DisputeMessage(id: "m1", disputeId: "d1", senderId: "u1", senderType: "cliente",
+                               message: "Por favor resuelvan esto pronto.",
+                               isStatusUpdate: false, oldStatus: nil, newStatus: nil,
+                               createdAt: "2026-04-09T10:00:00Z"),
+                DisputeMessage(id: "m2", disputeId: "d1", senderId: "staff1", senderType: "staff",
+                               message: "Hemos notificado al artista.",
+                               isStatusUpdate: false, oldStatus: nil, newStatus: nil,
+                               createdAt: "2026-04-09T11:00:00Z")
             ]
         ))
     }

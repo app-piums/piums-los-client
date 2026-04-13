@@ -82,7 +82,7 @@ struct DisputeRowView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "calendar").font(.caption2)
                     Text(dispute.createdAt.shortDate)
-                    if let p = dispute.priority, p == "HIGH" || p == "URGENT" {
+                    if let p = dispute.priority, p >= 2 {
                         Text("·")
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.caption2)

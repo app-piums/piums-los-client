@@ -401,17 +401,21 @@ struct Dispute: Codable, Identifiable, Hashable {
     let id: String
     let bookingId: String
     let reportedBy: String
-    let reportedAgainst: String
-    let type: String
+    let reportedAgainst: String?
+    let disputeType: String
     let subject: String
     let description: String
     let status: DisputeStatus
-    let priority: String?
+    let priority: Int?
     let resolution: String?
+    let resolutionNotes: String?
     let refundAmount: Double?
     let createdAt: String
     let updatedAt: String?
     let messages: [DisputeMessage]?
+
+    // Computed property for backward compatibility
+    var type: String { disputeType }
 
     static func == (lhs: Dispute, rhs: Dispute) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -452,9 +456,15 @@ struct DisputeMessage: Codable, Identifiable {
     let id: String
     let disputeId: String
     let senderId: String
-    let senderRole: String
+    let senderType: String
     let message: String
+    let isStatusUpdate: Bool?
+    let oldStatus: String?
+    let newStatus: String?
     let createdAt: String
+
+    // Computed property for backward compatibility
+    var senderRole: String { senderType }
 }
 
 struct DisputesResponse: Codable {

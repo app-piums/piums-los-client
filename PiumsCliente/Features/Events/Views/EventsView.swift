@@ -55,9 +55,9 @@ private struct EventRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(Color.piumsOrange.opacity(0.15))
+                .fill(statusColor.opacity(0.15))
                 .frame(width: 44, height: 44)
-                .overlay(Image(systemName: "ticket.fill").foregroundStyle(Color.piumsOrange))
+                .overlay(Image(systemName: "ticket.fill").foregroundStyle(statusColor))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.name)
@@ -65,17 +65,47 @@ private struct EventRow: View {
                 Text(event.eventDate ?? "Sin fecha")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let bookingsCount = event.bookings?.count, bookingsCount > 0 {
+                    Text("\(bookingsCount) reserva(s)")
+                        .font(.caption2)
+                        .foregroundStyle(Color.piumsOrange)
+                }
             }
             Spacer()
-            Text(event.status.rawValue)
-                .font(.caption2.bold())
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(Capsule())
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(statusDisplayName)
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(statusColor.opacity(0.1))
+                    .foregroundStyle(statusColor)
+                    .clipShape(Capsule())
+                if let location = event.location, !location.isEmpty {
+                    Text(location)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
         }
         .padding(12)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+    
+    private var statusColor: Color {
+        switch event.status {
+        case .active: return Color.piumsOrange
+        case .cancelled: return .red
+        case .draft: return .gray
+        }
+    }
+    
+    private var statusDisplayName: String {
+        switch event.status {
+        case .active: return "Activo"
+        case .cancelled: return "Cancelado"
+        case .draft: return "Borrador"
+        }
     }
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct LoginView: View {
     @Bindable var viewModel: AuthViewModel
     @FocusState private var focused: Field?
+    @State private var showPassword = false
 
     enum Field { case email, password }
 
@@ -58,14 +59,32 @@ struct LoginView: View {
                                         .font(.caption.bold())
                                         .foregroundStyle(.secondary)
                                         .tracking(1)
-                                    SecureField("••••••••", text: $viewModel.password)
+                                    
+                                    HStack {
+                                        Group {
+                                            if showPassword {
+                                                TextField("••••••••", text: $viewModel.password)
+                                            } else {
+                                                SecureField("••••••••", text: $viewModel.password)
+                                            }
+                                        }
                                         .textContentType(.password)
                                         .focused($focused, equals: .password)
                                         .submitLabel(.done)
                                         .onSubmit { Task { await viewModel.login() } }
-                                        .padding(16)
-                                        .background(Color(.systemGray6))
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                                        
+                                        Button {
+                                            showPassword.toggle()
+                                        } label: {
+                                            Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                                .font(.system(size: 16))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .padding(.trailing, 4)
+                                    }
+                                    .padding(16)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
 
                                     HStack {
                                         Spacer()
