@@ -36,6 +36,12 @@ struct APIClient {
 
         // Leer mensaje real del backend para cualquier error
         let backendMessage = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
+        
+        // Debug: imprimir la respuesta raw si hay error
+        if http.statusCode >= 400 {
+            let raw = String(data: data, encoding: .utf8) ?? "(binary)"
+            print("❌ APIClient [\(http.statusCode)] \(endpoint.url.path):\n\(raw)")
+        }
 
         switch http.statusCode {
         case 200..<300:

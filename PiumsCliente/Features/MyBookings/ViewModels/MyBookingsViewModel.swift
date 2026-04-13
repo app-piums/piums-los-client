@@ -56,8 +56,9 @@ final class MyBookingsViewModel {
             hasMore = res.hasMore
             currentPage += 1
         } catch {
-            if bookings.isEmpty { bookings = [.mock] }
+            // No usar mock — mostrar el error real para debug
             errorMessage = AppError(from: error).errorDescription
+            print("❌ MyBookingsViewModel.loadNext failed: \(error)")
         }
     }
 }
