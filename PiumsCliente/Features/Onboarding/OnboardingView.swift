@@ -55,10 +55,10 @@ private struct OnboardingWelcomeStep: View {
                 // Barra superior
                 HStack {
                     HStack(spacing: 8) {
-                        Image(systemName: "music.note.house.fill")
-                            .font(.title3)
-                            .foregroundStyle(Color.piumsOrange)
-                        Text("Piums").font(.title3.bold())
+                        Image("PiumsLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(height: 24)
                     }
                     Spacer()
                     Button("Omitir") { Task { await vm.skip() } }

@@ -129,13 +129,12 @@ struct RegisterView: View {
             Color.black.opacity(0.35)
                 .frame(height: geo.size.height * 0.35)
                 .frame(maxWidth: .infinity)
-            HStack(spacing: 8) {
-                Image(systemName: "music.note.house.fill").font(.title3)
-                Text("Piums").font(.title3.bold())
-            }
-            .foregroundStyle(.white)
-            .padding(.top, geo.safeAreaInsets.top + 16)
-            .padding(.leading, 28)
+            Image("PiumsLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 32)
+                .padding(.top, geo.safeAreaInsets.top + 16)
+                .padding(.leading, 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

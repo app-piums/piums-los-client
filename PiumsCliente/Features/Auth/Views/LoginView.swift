@@ -200,15 +200,12 @@ struct LoginView: View {
                 .frame(maxWidth: .infinity)
 
             // Logo Piums
-            HStack(spacing: 8) {
-                Image(systemName: "music.note.house.fill")
-                    .font(.title3)
-                Text("Piums")
-                    .font(.title3.bold())
-            }
-            .foregroundStyle(.white)
-            .padding(.top, geo.safeAreaInsets.top + 16)
-            .padding(.leading, 28)
+            Image("PiumsLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 32)
+                .padding(.top, geo.safeAreaInsets.top + 16)
+                .padding(.leading, 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

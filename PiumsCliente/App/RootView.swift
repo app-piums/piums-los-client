@@ -5,10 +5,27 @@ struct RootView: View {
     @State private var auth = AuthManager.shared
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var deepLinkBookingId: String?
+    @State private var isLoading = true
 
     var body: some View {
         Group {
-            if !hasSeenOnboarding {
+            if isLoading {
+                // Splash screen con logo
+                ZStack {
+                    Color.piumsOrange.ignoresSafeArea()
+                    
+                    VStack(spacing: 20) {
+                        Image("PiumsLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(height: 60)
+                            .foregroundStyle(.white)
+                        
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                }
+            } else if !hasSeenOnboarding {
                 OnboardingView {
                     withAnimation { hasSeenOnboarding = true }
                 }
@@ -23,6 +40,13 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToBooking)) { notif in
             if let bookingId = notif.userInfo?["bookingId"] as? String {
                 deepLinkBookingId = bookingId
+            }
+        }
+        .task {
+            // Simular tiempo de carga inicial
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 segundos
+            withAnimation {
+                isLoading = false
             }
         }
     }
