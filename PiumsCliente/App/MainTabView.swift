@@ -14,19 +14,19 @@ struct MainTabView: View {
             // ── Tab View ──────────────────────────────────
             TabView(selection: $selectedTab) {
                 NavigationStack { HomeView() }
-                    .tabItem { Label("Home",     systemImage: "house.fill") }
+                    .tabItem { Label("Inicio",     systemImage: "house.fill") }
                     .tag(0)
 
                 NavigationStack { SearchView() }
-                    .tabItem { Label("Explore",  systemImage: "magnifyingglass") }
+                    .tabItem { Label("Explorar",  systemImage: "magnifyingglass") }
                     .tag(1)
 
                 NavigationStack(path: $bookingsPath) { MySpaceView() }
-                    .tabItem { Label("My Space", systemImage: "square.grid.2x2.fill") }
+                    .tabItem { Label("Mi Espacio", systemImage: "square.grid.2x2.fill") }
                     .tag(2)
 
                 NavigationStack { InboxView() }
-                    .tabItem { Label("Inbox",    systemImage: "message.fill") }
+                    .tabItem { Label("Mensajes",    systemImage: "message.fill") }
                     .badge(chatStore.unreadCount)
                     .tag(3)
 

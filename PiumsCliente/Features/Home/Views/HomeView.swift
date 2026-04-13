@@ -244,7 +244,7 @@ struct HomeCalendarView: View {
 
     // Helpers
     private var monthTitle: String {
-        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; f.locale = Locale(identifier: "en_US")
+        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; f.locale = Locale(identifier: "es_ES")
         return f.string(from: displayMonth)
     }
 

@@ -135,7 +135,7 @@ struct BookingFlowView: View {
             .scrollIndicators(.hidden)
             bottomBar
         }
-        .navigationTitle("Book Service")
+        .navigationTitle("Reservar Servicio")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)

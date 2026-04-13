@@ -178,7 +178,7 @@ struct InboxView: View {
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: selected)
         }
-        .navigationTitle("Inbox")
+        .navigationTitle("Mensajes")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .task { unreadStore.startIfNeeded() }

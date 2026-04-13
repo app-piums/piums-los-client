@@ -537,7 +537,7 @@ struct MySpaceView: View {
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: selected)
         }
-        .navigationTitle("My Space")
+        .navigationTitle("Mi Espacio")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
     }
