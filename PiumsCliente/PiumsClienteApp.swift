@@ -22,7 +22,6 @@ struct PiumsClienteApp: App {
                     GIDSignIn.sharedInstance.handle(url)
                 }
                 .onAppear {
-                    AppearanceManager.shared.applyOnLaunch()
                     // Solicitar ubicación al arrancar para que esté lista cuanto antes
                     LocationStore.shared.requestIfNeeded()
                 }
