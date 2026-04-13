@@ -49,7 +49,11 @@ final class AppearanceManager: ObservableObject {
             .sink { [weak self] newValue in
                 guard let self = self else { return }
                 UserDefaults.standard.set(newValue.rawValue, forKey: self.key)
-                print("🎨 AppearanceManager: preference changed to \(newValue.rawValue), saved to UserDefaults")
+                print("🎨🎨🎨 AppearanceManager: preference changed to \(newValue.rawValue), saved to UserDefaults")
+                // Forzar notificación explícita a observers
+                Task { @MainActor in
+                    self.objectWillChange.send()
+                }
             }
     }
 }

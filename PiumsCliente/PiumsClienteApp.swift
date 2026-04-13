@@ -27,10 +27,10 @@ struct PiumsClienteApp: App {
                     LocationStore.shared.requestIfNeeded()
                 }
                 .onChange(of: appearance.preference) {
-                    print("🎨 PiumsClienteApp: preference changed to \(appearance.preference.rawValue)")
+                    print("🔥🔥🔥 PiumsClienteApp.onChange FIRED! New preference: \(appearance.preference.rawValue)")
                     let schemeStr = appearance.preference.swiftUIScheme == .light ? "light" :
                                    appearance.preference.swiftUIScheme == .dark ? "dark" : "nil (system)"
-                    print("🎨 PiumsClienteApp: applying scheme: \(schemeStr)")
+                    print("🔥🔥🔥 PiumsClienteApp: applying scheme: \(schemeStr)")
                 }
         }
     }
