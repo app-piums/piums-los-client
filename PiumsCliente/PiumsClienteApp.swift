@@ -15,13 +15,17 @@ struct PiumsClienteApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(AppearanceManager.shared)
+                .environment(\.colorScheme, .light)
                 .environment(\.locationStore, LocationStore.shared)
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
                 }
                 .onAppear {
-                    AppearanceManager.shared.applyOnLaunch()
+                    // Forzar modo claro en todos los windows
+                    UIApplication.shared.connectedScenes
+                        .compactMap { $0 as? UIWindowScene }
+                        .flatMap { $0.windows }
+                        .forEach { $0.overrideUserInterfaceStyle = .light }
                     LocationStore.shared.requestIfNeeded()
                 }
         }

@@ -4,7 +4,6 @@ import SwiftUI
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showLogoutConfirm = false
-    @EnvironmentObject var appearance: AppearanceManager
 
     var body: some View {
         List {
@@ -63,39 +62,6 @@ struct ProfileView: View {
                 NavigationLink(destination: PaymentsView()) {
                     Label("Mis pagos", systemImage: "creditcard")
                 }
-            }
-
-            // Apariencia
-            Section("Apariencia") {
-                HStack(spacing: 0) {
-                    ForEach(ColorSchemePreference.allCases, id: \.self) { scheme in
-                        Button {
-                            appearance.preference = scheme
-                        } label: {
-                            VStack(spacing: 6) {
-                                Image(systemName: scheme.systemImage)
-                                    .font(.title3)
-                                Text(scheme.displayName)
-                                    .font(.caption2.weight(.medium))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(
-                                appearance.preference == scheme
-                                ? Color.piumsOrange
-                                : Color(.secondarySystemBackground)
-                            )
-                            .foregroundStyle(
-                                appearance.preference == scheme ? .white : .primary
-                            )
-                        }
-                        .animation(.easeInOut(duration: 0.2), value: appearance.preference)
-                        if scheme != .dark { Divider() }
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                .listRowSeparator(.hidden)
             }
 
             // Ayuda y soporte
