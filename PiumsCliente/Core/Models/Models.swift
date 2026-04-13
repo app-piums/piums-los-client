@@ -737,6 +737,7 @@ struct BookingFlowContext {
     var locationLng: Double?
     var clientNotes: String = ""
     var priceQuote: PriceQuote?
+    var eventId: String? = nil  // NEW: asociar reserva a un evento
 
     /// Fecha en formato ISO requerido por el backend: "2026-04-28T10:00:00.000Z"
     var scheduledDateISO: String? {

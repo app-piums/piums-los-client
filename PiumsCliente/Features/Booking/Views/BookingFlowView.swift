@@ -91,6 +91,7 @@ final class BookingFlowViewModel {
         if let lat = context.locationLat { payload["locationLat"] = lat }
         if let lng = context.locationLng { payload["locationLng"] = lng }
         if !context.clientNotes.isEmpty  { payload["clientNotes"] = context.clientNotes }
+        if let eventId = context.eventId { payload["eventId"] = eventId }
         do {
             bookingResult = try await APIClient.request(.createBooking(payload: payload))
             didComplete = true

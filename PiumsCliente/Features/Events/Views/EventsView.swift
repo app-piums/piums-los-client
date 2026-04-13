@@ -86,6 +86,7 @@ private struct EventDetailView: View {
     @State private var showEdit = false
     @State private var showDeleteConfirm = false
     @State private var showShareSheet = false
+    @State private var showAddBooking = false
     @State var viewModel: EventsViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -197,6 +198,22 @@ private struct EventDetailView: View {
                             .padding(.top, 10)
                         }
                     }
+                    
+                    // Botón agregar reserva
+                    Button(action: { showAddBooking = true }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Agregar Reserva")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.piumsOrange)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 12)
                 }
 
                 // ── Acciones ────────────────────────────────
@@ -241,6 +258,11 @@ private struct EventDetailView: View {
         }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(items: ["\(event.name) — \(formattedDate)\nCódigo: \(event.code)"])
+        }
+        .sheet(isPresented: $showAddBooking) {
+            NavigationStack {
+                AddBookingToEventView(event: event)
+            }
         }
     }
 
@@ -405,6 +427,129 @@ private struct EventFormView: View {
                 notes = event.notes ?? ""
                 descriptionText = event.description ?? ""
             }
+        }
+    }
+}
+
+// MARK: - AddBookingToEventView
+
+private struct AddBookingToEventView: View {
+    let event: EventSummary
+    @State private var searchQuery = ""
+    @State private var artists: [Artist] = []
+    @State private var isLoading = false
+    @State private var selectedArtist: Artist?
+    @State private var showBookingFlow = false
+    @Environment(\.dismiss) private var dismiss
+    
+    var filteredArtists: [Artist] {
+        guard !searchQuery.isEmpty else { return artists }
+        let q = searchQuery.lowercased()
+        return artists.filter {
+            $0.artistName.lowercased().contains(q) ||
+            ($0.specialties ?? []).joined().lowercased().contains(q)
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search bar
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Buscar artista...", text: $searchQuery)
+                    .textInputAutocapitalization(.never)
+                if !searchQuery.isEmpty {
+                    Button { searchQuery = "" } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding()
+            
+            Divider()
+            
+            // Artists list
+            if isLoading {
+                Spacer()
+                ProgressView()
+                Spacer()
+            } else if filteredArtists.isEmpty {
+                Spacer()
+                EmptyStateView(
+                    systemImage: "person.3.fill",
+                    title: searchQuery.isEmpty ? "Sin artistas" : "No se encontraron artistas",
+                    description: searchQuery.isEmpty
+                        ? "Carga la lista de artistas disponibles."
+                        : "Intenta con otro término de búsqueda."
+                )
+                Spacer()
+            } else {
+                List(filteredArtists) { artist in
+                    Button {
+                        selectedArtist = artist
+                        showBookingFlow = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle().fill(Color.piumsOrange.opacity(0.15)).frame(width: 48, height: 48)
+                                Text(String(artist.artistName.prefix(2)).uppercased())
+                                    .font(.subheadline.bold()).foregroundStyle(Color.piumsOrange)
+                            }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(artist.artistName).font(.subheadline.bold())
+                                if let spec = artist.specialties?.first {
+                                    Text(spec).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle("Seleccionar Artista")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancelar") { dismiss() }
+            }
+        }
+        .task { await loadArtists() }
+        .sheet(isPresented: $showBookingFlow) {
+            if let artist = selectedArtist {
+                NavigationStack {
+                    BookingFlowView(context: BookingFlowContext(
+                        artist: artist,
+                        location: event.location ?? "",
+                        locationLat: nil,
+                        locationLng: nil,
+                        eventId: event.id
+                    ))
+                }
+                .presentationDetents([.large])
+            }
+        }
+    }
+    
+    private func loadArtists() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let res: SearchArtistsResponse = try await APIClient.request(
+                .searchArtists(q: nil, page: 1, limit: 50, specialty: nil, city: nil,
+                               minPrice: nil, maxPrice: nil, minRating: nil,
+                               isVerified: nil, sortBy: nil, sortOrder: nil)
+            )
+            artists = res.artists
+        } catch {
+            print("❌ Failed to load artists: \(error)")
         }
     }
 }
