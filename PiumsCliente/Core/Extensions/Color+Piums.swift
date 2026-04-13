@@ -1,5 +1,6 @@
 // Color+Piums.swift
 import SwiftUI
+import Combine
 
 // MARK: - Brand colors
 // Xcode genera automáticamente desde Assets.xcassets:
@@ -26,26 +27,30 @@ extension Color {
 // MARK: - AppearanceManager
 
 /// Gestiona la preferencia de apariencia del usuario (light / dark / system)
-@Observable
 @MainActor
-final class AppearanceManager {
+final class AppearanceManager: ObservableObject {
     static let shared = AppearanceManager()
     
-    @ObservationIgnored
     private let key = "piums.colorScheme"
+    private var cancellable: AnyCancellable?
     
     /// Preferencia observable para que SwiftUI re-renderice
-    var preference: ColorSchemePreference = .system {
-        didSet {
-            UserDefaults.standard.set(preference.rawValue, forKey: key)
-            print("🎨 AppearanceManager: preference changed to \(preference.rawValue)")
-        }
-    }
+    @Published var preference: ColorSchemePreference = .system
     
     private init() {
+        // Cargar valor guardado
         let raw = UserDefaults.standard.string(forKey: key) ?? ColorSchemePreference.system.rawValue
         preference = ColorSchemePreference(rawValue: raw) ?? .system
         print("🎨 AppearanceManager: initialized with \(preference.rawValue)")
+        
+        // Observar cambios DESPUÉS del init y guardar en UserDefaults
+        cancellable = $preference
+            .dropFirst() // Ignora el valor inicial
+            .sink { [weak self] newValue in
+                guard let self = self else { return }
+                UserDefaults.standard.set(newValue.rawValue, forKey: self.key)
+                print("🎨 AppearanceManager: preference changed to \(newValue.rawValue), saved to UserDefaults")
+            }
     }
 }
 

@@ -4,7 +4,7 @@ import SwiftUI
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showLogoutConfirm = false
-    @Bindable var appearance = AppearanceManager.shared
+    @ObservedObject var appearance = AppearanceManager.shared
 
     var body: some View {
         List {

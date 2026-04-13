@@ -11,7 +11,7 @@ import GoogleSignIn
 @main
 struct PiumsClienteApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var appearance = AppearanceManager.shared
+    @StateObject private var appearance = AppearanceManager.shared
 
     var body: some Scene {
         WindowGroup {
