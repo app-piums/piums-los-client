@@ -42,21 +42,15 @@ final class AppearanceManager {
     var preference: ColorSchemePreference {
         didSet {
             UserDefaults.standard.set(preference.rawValue, forKey: key)
-            apply(preference)
+            // SwiftUI ya maneja el color scheme via .preferredColorScheme()
+            // Solo guardamos la preferencia, no aplicamos manualmente
         }
     }
 
-    var swiftUIScheme: ColorScheme? {
-        switch preference {
-        case .light:  return .light
-        case .dark:   return .dark
-        case .system: return nil
-        }
-    }
-
-    func apply(_ scheme: ColorSchemePreference) {
+    func applyOnLaunch() {
+        // Al iniciar, forzar el estilo en UIKit (por si hay views que no usan SwiftUI)
         let style: UIUserInterfaceStyle
-        switch scheme {
+        switch preference {
         case .light:  style = .light
         case .dark:   style = .dark
         case .system: style = .unspecified
@@ -66,8 +60,6 @@ final class AppearanceManager {
             .flatMap { $0.windows }
             .forEach { $0.overrideUserInterfaceStyle = style }
     }
-
-    func applyOnLaunch() { apply(preference) }
 }
 
 enum ColorSchemePreference: String, CaseIterable {

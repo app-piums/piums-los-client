@@ -16,7 +16,7 @@ struct PiumsClienteApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .preferredColorScheme(appearance.swiftUIScheme)
+                .preferredColorScheme(appearance.preference.swiftUIScheme)
                 .environment(\.locationStore, LocationStore.shared)
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
