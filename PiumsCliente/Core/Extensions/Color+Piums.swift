@@ -2,12 +2,6 @@
 import SwiftUI
 import Combine
 
-// MARK: - Brand colors
-// Xcode genera automáticamente desde Assets.xcassets:
-//   Color.piumsOrange, .piumsBackground, .piumsBackgroundSecondary,
-//   .piumsBackgroundElevated, .piumsLabel, .piumsLabelSecondary, .piumsSeparator
-// No redeclarar aquí — solo el legacy helper y el hex init.
-
 extension Color {
     /// Legacy — usar .piumsBackground del asset catalog en código nuevo
     static let piumsDark = Color(hex: "#1A1A1A")
@@ -26,32 +20,41 @@ extension Color {
 
 // MARK: - AppearanceManager
 
-/// Gestiona la preferencia de apariencia del usuario (light / dark / system)
-@MainActor
 final class AppearanceManager: ObservableObject {
     static let shared = AppearanceManager()
-    
     private let key = "piums.colorScheme"
-    private var cancellable: AnyCancellable?
-    
-    /// Preferencia observable para que SwiftUI re-renderice
-    @Published var preference: ColorSchemePreference = .system
-    
+
+    @Published var preference: ColorSchemePreference {
+        didSet {
+            UserDefaults.standard.set(preference.rawValue, forKey: key)
+            applyToWindows(preference)
+        }
+    }
+
     private init() {
-        // Cargar valor guardado
         let raw = UserDefaults.standard.string(forKey: key) ?? ColorSchemePreference.system.rawValue
         preference = ColorSchemePreference(rawValue: raw) ?? .system
-        print("🎨 AppearanceManager: initialized with \(preference.rawValue)")
-        
-        // Observar cambios DESPUÉS del init y guardar en UserDefaults
-        cancellable = $preference
-            .dropFirst() // Ignora el valor inicial
-            .sink { [weak self] newValue in
-                guard let self = self else { return }
-                // Guardar en UserDefaults (esto dispara @AppStorage en PiumsClienteApp)
-                UserDefaults.standard.set(newValue.rawValue, forKey: self.key)
-                print("🎨🎨🎨 AppearanceManager: preference changed to \(newValue.rawValue), saved to UserDefaults")
-            }
+    }
+
+    func applyOnLaunch() {
+        applyToWindows(preference)
+    }
+
+    private func applyToWindows(_ pref: ColorSchemePreference) {
+        let style: UIUserInterfaceStyle
+        switch pref {
+        case .light:  style = .light
+        case .dark:   style = .dark
+        case .system: style = .unspecified
+        }
+        DispatchQueue.main.async {
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+                    ?? UIApplication.shared.connectedScenes
+                        .compactMap({ $0 as? UIWindowScene }).first else { return }
+            scene.windows.forEach { $0.overrideUserInterfaceStyle = style }
+        }
     }
 }
 
