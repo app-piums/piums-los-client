@@ -85,43 +85,152 @@ private struct EventDetailView: View {
     let event: EventSummary
     @State private var showEdit = false
     @State private var showDeleteConfirm = false
+    @State private var showShareSheet = false
     @State var viewModel: EventsViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    private var formattedDate: String {
+        guard let raw = event.eventDate else { return "Sin fecha" }
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let d = iso.date(from: raw) ?? df.date(from: String(raw.prefix(10))) else { return raw }
+        let out = DateFormatter(); out.dateFormat = "EEEE d 'de' MMMM, yyyy"; out.locale = Locale(identifier: "es_ES")
+        return out.string(from: d).capitalized
+    }
+
+    private var totalCost: Int {
+        (event.bookings ?? []).reduce(0) { $0 + $1.totalPrice }
+    }
+
+    private var statusColor: Color {
+        switch event.status {
+        case .active:    return .green
+        case .draft:     return .orange
+        case .cancelled: return .red
+        }
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(event.name)
-                    .font(.title2.bold())
-                if let date = event.eventDate {
-                    Label(date, systemImage: "calendar")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+            VStack(spacing: 20) {
+
+                // ── Hero: estado ────────────────────────────
+                VStack(spacing: 12) {
+                    ZStack {
+                        Circle().fill(statusColor.opacity(0.15)).frame(width: 72, height: 72)
+                        Image(systemName: "ticket.fill").font(.system(size: 32)).foregroundStyle(statusColor)
+                    }
+                    VStack(spacing: 4) {
+                        Text(event.name).font(.title2.bold()).multilineTextAlignment(.center)
+                        HStack(spacing: 6) {
+                            Circle().fill(statusColor).frame(width: 7, height: 7)
+                            Text(event.status.rawValue.capitalized)
+                                .font(.caption.weight(.semibold)).foregroundStyle(statusColor)
+                        }
+                    }
                 }
-                if let loc = event.location {
-                    Label(loc, systemImage: "mappin.circle")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity).padding(.vertical, 24)
+                .background(statusColor.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .padding(.horizontal, 20)
+
+                // ── Código del evento ───────────────────────
+                VStack(spacing: 6) {
+                    Text("CÓDIGO DEL EVENTO")
+                        .font(.caption2.weight(.semibold)).foregroundStyle(.secondary).tracking(1.2)
+                    Text(event.code).font(.title3.bold().monospaced())
                 }
-                if let desc = event.description {
-                    Text(desc).font(.subheadline).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity).padding(.vertical, 18)
+                .background(Color.piumsOrange.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.piumsOrange.opacity(0.2)))
+                .padding(.horizontal, 20)
+
+                // ── Info del evento ─────────────────────────
+                EventDetailCard(title: "Información del Evento") {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
+                        EventInfoCell(label: "FECHA") {
+                            Text(formattedDate).font(.subheadline.bold()).lineLimit(3)
+                        }
+                        EventInfoCell(label: "UBICACIÓN") {
+                            Text(event.location ?? "No especificada")
+                                .font(.subheadline.bold()).lineLimit(2)
+                        }
+                        if let desc = event.description {
+                            EventInfoCell(label: "DESCRIPCIÓN") {
+                                Text(desc).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                            }
+                        }
+                        if let notes = event.notes {
+                            EventInfoCell(label: "NOTAS") {
+                                Text(notes).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                            }
+                        }
+                    }
                 }
-                if let notes = event.notes {
-                    Text(notes).font(.footnote).foregroundStyle(.secondary)
+
+                // ── Reservas asociadas ──────────────────────
+                let bookings = event.bookings ?? []
+                EventDetailCard(title: "Reservas del Evento (\(bookings.count))") {
+                    if bookings.isEmpty {
+                        HStack(spacing: 10) {
+                            Image(systemName: "calendar.badge.plus").foregroundStyle(.secondary)
+                            Text("Aún no hay reservas asociadas a este evento.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(bookings.enumerated()), id: \.1.id) { idx, eb in
+                                if idx > 0 { Divider() }
+                                EventBookingRow(booking: eb)
+                            }
+                            Divider().padding(.top, 8)
+                            // Grand total
+                            HStack {
+                                Text("Total del Evento").font(.headline)
+                                Spacer()
+                                Text(totalCost.piumsFormatted)
+                                    .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
+                            }
+                            .padding(.top, 10)
+                        }
+                    }
                 }
+
+                // ── Acciones ────────────────────────────────
+                EventDetailCard(title: "Acciones") {
+                    VStack(spacing: 10) {
+                        eventActionButton(icon: "pencil", label: "Editar evento", color: Color.piumsOrange) {
+                            showEdit = true
+                        }
+                        eventActionButton(icon: "calendar.badge.plus", label: "Agregar al Calendario", color: .blue) {
+                            addToCalendar()
+                        }
+                        eventActionButton(icon: "square.and.arrow.up", label: "Compartir evento", color: .teal) {
+                            showShareSheet = true
+                        }
+                        Divider()
+                        eventActionButton(icon: "trash", label: "Eliminar evento", color: .red) {
+                            showDeleteConfirm = true
+                        }
+                    }
+                }
+
+                Color.clear.frame(height: 20)
             }
-            .padding(20)
+            .padding(.top, 16)
         }
+        .scrollIndicators(.hidden)
         .navigationTitle("Evento")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Editar") { showEdit = true }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .confirmationDialog("¿Eliminar este evento?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Eliminar", role: .destructive) {
+                Task { await viewModel.deleteEvent(event) }
+                dismiss()
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(role: .destructive) { showDeleteConfirm = true } label: { Image(systemName: "trash") }
-            }
-        }
-        .confirmationDialog("¿Eliminar evento?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-            Button("Eliminar", role: .destructive) { Task { await viewModel.deleteEvent(event) } }
             Button("Cancelar", role: .cancel) {}
         }
         .sheet(isPresented: $showEdit) {
@@ -130,7 +239,125 @@ private struct EventDetailView: View {
                 showEdit = false
             })
         }
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(items: ["\(event.name) — \(formattedDate)\nCódigo: \(event.code)"])
+        }
     }
+
+    private func addToCalendar() {
+        guard let raw = event.eventDate else { return }
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let d = iso.date(from: raw) ?? df.date(from: String(raw.prefix(10))) else { return }
+        let title = event.name
+        let loc = event.location ?? ""
+        let startStr = d.formatted(.iso8601.year().month().day())
+            .replacingOccurrences(of: "-", with: "")
+        let url = URL(string: "https://calendar.google.com/calendar/render?action=TEMPLATE&text=\(title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title)&dates=\(startStr)/\(startStr)&location=\(loc.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? loc)")!
+        UIApplication.shared.open(url)
+    }
+
+    @ViewBuilder
+    private func eventActionButton(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 9).fill(color.opacity(0.12)).frame(width: 36, height: 36)
+                    Image(systemName: icon).font(.system(size: 15)).foregroundStyle(color)
+                }
+                Text(label).font(.subheadline.weight(.medium)).foregroundStyle(color == .red ? .red : .primary)
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - EventBookingRow
+
+private struct EventBookingRow: View {
+    let booking: EventBooking
+
+    private var statusColor: Color {
+        switch booking.status {
+        case .pending:   return .orange
+        case .confirmed: return .blue
+        case .completed: return .green
+        case .cancelledClient, .cancelledArtist, .rejected: return .red
+        default:         return .secondary
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Code / ID
+            VStack(alignment: .leading, spacing: 3) {
+                Text(booking.code ?? String(booking.id.prefix(8)))
+                    .font(.caption.weight(.semibold).monospaced())
+                    .foregroundStyle(.secondary)
+                Text(scheduledFormatted).font(.subheadline.bold()).lineLimit(1)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(booking.totalPrice.piumsFormatted)
+                    .font(.subheadline.bold()).foregroundStyle(Color.piumsOrange)
+                HStack(spacing: 4) {
+                    Circle().fill(statusColor).frame(width: 6, height: 6)
+                    Text(booking.status.displayName)
+                        .font(.caption2.weight(.semibold)).foregroundStyle(statusColor)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
+    private var scheduledFormatted: String {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let d = iso.date(from: booking.scheduledDate) ??
+              df.date(from: String(booking.scheduledDate.prefix(10))) else { return booking.scheduledDate }
+        let out = DateFormatter(); out.dateFormat = "d MMM yyyy"; out.locale = Locale(identifier: "es_ES")
+        return out.string(from: d)
+    }
+}
+
+// MARK: - Reusable event detail card + cell
+
+private struct EventDetailCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title).font(.headline)
+            content()
+        }
+        .padding(18)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 20)
+    }
+}
+
+private struct EventInfoCell<Content: View>: View {
+    let label: String
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary).tracking(0.8)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// ShareSheet bridge (reused from BookingDetailView module)
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ uvc: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Event Form
