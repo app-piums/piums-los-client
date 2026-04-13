@@ -71,6 +71,7 @@ enum APIEndpoint {
     case getEvent(id: String)
     case updateEvent(id: String, payload: [String: Any])
     case deleteEvent(id: String)
+    case addBookingToEvent(eventId: String, bookingId: String)
 
     // ── Chat ──────────────────────────────────────────────
     case listConversations(page: Int)
@@ -105,7 +106,7 @@ extension APIEndpoint {
             return "POST"
         case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead:
             return "PATCH"
-        case .changePassword:
+        case .changePassword, .addBookingToEvent:
             return "POST"
         case .deleteEvent, .deleteFavorite:
             return "DELETE"
@@ -261,6 +262,8 @@ extension APIEndpoint {
         case .getEvent(let id):                return "/api/events/\(id)"
         case .updateEvent(let id, _):          return "/api/events/\(id)"
         case .deleteEvent(let id):             return "/api/events/\(id)"
+        case .addBookingToEvent(let eventId, let bookingId): 
+            return "/api/events/\(eventId)/bookings/\(bookingId)"
 
         // Chat
         case .listConversations(let pg):       return "/api/chat/conversations?page=\(pg)&limit=20"

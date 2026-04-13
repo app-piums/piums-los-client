@@ -248,6 +248,7 @@ struct Booking: Codable, Identifiable, Hashable {
     let duration: Int?
     let notes: String?
     let location: String?
+    let eventId: String?    // Nueva propiedad para vincular a eventos
     let createdAt: String
 
     // Hashable
@@ -613,7 +614,7 @@ extension Booking {
         Booking(id: "b1", code: "PMS-001", clientId: "c1", artistId: "1", serviceId: "s1",
                 status: .confirmed, paymentStatus: .completed, totalPrice: 15000,
                 scheduledDate: "2026-05-10", scheduledTime: "15:00", duration: 60,
-                notes: nil, location: "Salón Principal", createdAt: "2026-04-09T10:00:00Z")
+                notes: nil, location: "Salón Principal", eventId: nil, createdAt: "2026-04-09T10:00:00Z")
     }
 }
 

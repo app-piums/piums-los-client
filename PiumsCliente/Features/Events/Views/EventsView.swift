@@ -465,12 +465,202 @@ private struct EventFormView: View {
 
 private struct AddBookingToEventView: View {
     let event: EventSummary
+    @State private var selectedTab: BookingTab = .existing
+    @Environment(\.dismiss) private var dismiss
+    
+    enum BookingTab: String, CaseIterable {
+        case existing = "Reservas existentes"
+        case create = "Crear nueva"
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Tab selector
+                Picker("Opción", selection: $selectedTab) {
+                    ForEach(BookingTab.allCases, id: \.self) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding()
+                
+                // Content based on selected tab
+                switch selectedTab {
+                case .existing:
+                    ExistingBookingsView(event: event)
+                case .create:
+                    CreateNewBookingView(event: event)
+                }
+            }
+            .navigationTitle("Agregar al Evento")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - ExistingBookingsView
+
+private struct ExistingBookingsView: View {
+    let event: EventSummary
+    @State private var viewModel = ExistingBookingsViewModel()
+    @State private var selectedBooking: Booking?
+    
+    var body: some View {
+        Group {
+            if viewModel.isLoading && viewModel.availableBookings.isEmpty {
+                LoadingView()
+            } else if viewModel.availableBookings.isEmpty {
+                EmptyStateView(
+                    systemImage: "calendar.badge.minus",
+                    title: "Sin reservas disponibles",
+                    description: "No tienes reservas que se puedan agregar a este evento. Las reservas ya vinculadas a eventos no aparecen aquí."
+                )
+            } else {
+                VStack(spacing: 16) {
+                    // Info header
+                    HStack(spacing: 12) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundStyle(Color.piumsOrange)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Reservas disponibles")
+                                .font(.subheadline.bold())
+                            Text("Selecciona las reservas que quieres vincular a '\(event.name)'")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.piumsOrange.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal)
+                    
+                    // Bookings list
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(viewModel.availableBookings) { booking in
+                                ExistingBookingRow(
+                                    booking: booking,
+                                    isSelected: selectedBooking?.id == booking.id
+                                ) {
+                                    selectedBooking = booking
+                                    Task {
+                                        await viewModel.addBookingToEvent(booking, eventId: event.id)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+        }
+        .task { await viewModel.loadAvailableBookings() }
+        .refreshable { await viewModel.loadAvailableBookings() }
+    }
+}
+
+// MARK: - ExistingBookingRow
+
+private struct ExistingBookingRow: View {
+    let booking: Booking
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Status indicator
+                Circle()
+                    .fill(statusColor.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Image(systemName: "calendar")
+                            .foregroundStyle(statusColor)
+                            .font(.system(size: 18))
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(booking.code ?? "Sin código")
+                            .font(.subheadline.bold())
+                        Spacer()
+                        Text(booking.status.displayName)
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(statusColor.opacity(0.15))
+                            .foregroundStyle(statusColor)
+                            .clipShape(Capsule())
+                    }
+                    
+                    Text("Fecha: \(formattedDate)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Total: \(booking.totalPrice.piumsFormatted)")
+                        .font(.caption)
+                        .foregroundStyle(Color.piumsOrange)
+                }
+                
+                if isSelected {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(Color.piumsOrange)
+                }
+            }
+            .padding(14)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(isSelected ? Color.piumsOrange : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSelected)
+    }
+    
+    private var statusColor: Color {
+        switch booking.status {
+        case .pending, .paymentPending: return .orange
+        case .confirmed, .inProgress: return Color.piumsOrange
+        case .completed: return .green
+        default: return .gray
+        }
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.locale = Locale(identifier: "es_ES")
+        
+        if let date = formatter.date(from: booking.scheduledDate) {
+            return formatter.string(from: date)
+        }
+        return booking.scheduledDate
+    }
+}
+
+// MARK: - CreateNewBookingView
+
+private struct CreateNewBookingView: View {
+    let event: EventSummary
     @State private var searchQuery = ""
     @State private var artists: [Artist] = []
     @State private var isLoading = false
     @State private var selectedArtist: Artist?
     @State private var showBookingFlow = false
-    @Environment(\.dismiss) private var dismiss
     
     var filteredArtists: [Artist] {
         guard !searchQuery.isEmpty else { return artists }
@@ -544,13 +734,6 @@ private struct AddBookingToEventView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Seleccionar Artista")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancelar") { dismiss() }
-            }
-        }
         .task { await loadArtists() }
         .sheet(isPresented: $showBookingFlow) {
             if let artist = selectedArtist {
@@ -580,6 +763,49 @@ private struct AddBookingToEventView: View {
             artists = res.artists
         } catch {
             print("❌ Failed to load artists: \(error)")
+        }
+    }
+}
+
+// MARK: - ExistingBookingsViewModel
+
+@Observable
+@MainActor
+final class ExistingBookingsViewModel {
+    var availableBookings: [Booking] = []
+    var isLoading = false
+    var errorMessage: String?
+    
+    func loadAvailableBookings() async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            // Cargar todas las reservas del usuario
+            let res: BookingsResponse = try await APIClient.request(.listMyBookings(status: nil, page: 1))
+            
+            // Filtrar solo las que no están vinculadas a eventos
+            availableBookings = res.bookings.filter { booking in
+                booking.eventId == nil && 
+                (booking.status == .confirmed || booking.status == .pending || booking.status == .paymentPending)
+            }
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+    }
+    
+    func addBookingToEvent(_ booking: Booking, eventId: String) async {
+        do {
+            let _: EmptyResponse = try await APIClient.request(.addBookingToEvent(eventId: eventId, bookingId: booking.id))
+            
+            // Remover de la lista local si se vinculó exitosamente
+            if let index = availableBookings.firstIndex(where: { $0.id == booking.id }) {
+                availableBookings.remove(at: index)
+            }
+            
+            // TODO: Opcional - mostrar toast de éxito
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
         }
     }
 }
