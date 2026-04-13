@@ -11,16 +11,12 @@ import GoogleSignIn
 @main
 struct PiumsClienteApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @AppStorage("piums.colorScheme") private var appearanceRaw = ColorSchemePreference.system.rawValue
-
-    private var preferredScheme: ColorScheme? {
-        ColorSchemePreference(rawValue: appearanceRaw)?.swiftUIScheme
-    }
+    @State private var appearance = AppearanceManager.shared
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .preferredColorScheme(preferredScheme)
+                .preferredColorScheme(appearance.swiftUIScheme)
                 .environment(\.locationStore, LocationStore.shared)
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
