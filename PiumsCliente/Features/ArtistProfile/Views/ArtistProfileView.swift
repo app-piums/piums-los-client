@@ -1,5 +1,6 @@
 // ArtistProfileView.swift
 import SwiftUI
+import CoreLocation
 
 struct ArtistProfileView: View {
     let artist: Artist
@@ -163,13 +164,16 @@ struct ArtistProfileView: View {
         }
         .sheet(isPresented: $showBooking) {
             if let service = selectedService {
+                let coord = locationStore.coordinate
+                let lat: Double? = coord.map { $0.latitude }
+                let lng: Double? = coord.map { $0.longitude }
                 NavigationStack {
                     BookingFlowView(context: BookingFlowContext(
                         artist: artist,
                         service: service,
                         location: locationStore.cityName,
-                        locationLat: locationStore.coordinate?.latitude,
-                        locationLng: locationStore.coordinate?.longitude
+                        locationLat: lat,
+                        locationLng: lng
                     ))
                 }
             }
