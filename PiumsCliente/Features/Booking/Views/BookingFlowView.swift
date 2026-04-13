@@ -108,6 +108,7 @@ private struct _BFServicesRes: Codable { let services: [ArtistService] }
 struct BookingFlowView: View {
     var context: BookingFlowContext
     @State private var vm: BookingFlowViewModel
+    @State private var showConfirmModal = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locationStore) private var locationStore
 
@@ -174,6 +175,17 @@ struct BookingFlowView: View {
                 vm.context.locationLng = coord.longitude
                 if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
             }
+        }
+        .sheet(isPresented: $showConfirmModal) {
+            BookingConfirmModalView(vm: vm) {
+                showConfirmModal = false
+                guard let id = AuthManager.shared.currentUser?.id else { return }
+                Task { await vm.submitBooking(clientId: id) }
+            } onCancel: {
+                showConfirmModal = false
+            }
+            .presentationDetents([.medium])
+            .presentationCornerRadius(24)
         }
         .sheet(isPresented: Binding(get: { vm.didComplete }, set: { if !$0 { dismiss() } })) {
             BookingSuccessView(booking: vm.bookingResult, artist: context.artist) { dismiss() }
@@ -253,8 +265,7 @@ struct BookingFlowView: View {
 
     private func handleNext() {
         if vm.step == .review {
-            guard let id = AuthManager.shared.currentUser?.id else { return }
-            Task { await vm.submitBooking(clientId: id) }
+            showConfirmModal = true
         } else {
             vm.next()
             if vm.step == .datetime { Task { await vm.loadCalendar(); if let d = vm.context.selectedDate { await vm.loadSlots(for: d) } } }
@@ -627,34 +638,307 @@ private struct BFCalendarView: View {
     }
 }
 
-// MARK: - BookingSuccessView
+// MARK: - BookingConfirmModalView
 
-struct BookingSuccessView: View {
-    let booking: Booking?; let artist: Artist; let onDone: () -> Void
+struct BookingConfirmModalView: View {
+    let vm: BookingFlowViewModel
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var dateLabel: String {
+        guard let d = vm.context.selectedDate else { return "—" }
+        let f = DateFormatter(); f.dateFormat = "EEEE d 'de' MMMM"; f.locale = Locale(identifier: "es_ES")
+        return f.string(from: d).capitalized
+    }
+
     var body: some View {
-        VStack(spacing: 28) {
-            Spacer()
-            ZStack {
-                Circle().fill(Color.green.opacity(0.12)).frame(width: 100, height: 100)
-                Image(systemName: "checkmark.circle.fill").font(.system(size: 56)).foregroundStyle(.green)
-            }
-            VStack(spacing: 10) {
-                Text("¡Reserva Enviada!").font(.title.bold())
-                Text("Tu solicitud fue enviada a \(artist.artistName). Recibirás confirmación pronto.")
-                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 30)
-                if let code = booking?.code {
-                    Text("Código: \(code)").font(.headline.bold()).foregroundStyle(Color.piumsOrange)
-                        .padding(.horizontal, 20).padding(.vertical, 10).background(Color.piumsOrange.opacity(0.08)).clipShape(Capsule())
+        VStack(spacing: 0) {
+            // Handle
+            Capsule().fill(Color(.systemGray4)).frame(width: 36, height: 4).padding(.top, 14).padding(.bottom, 20)
+
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Confirmar Reserva")
+                        .font(.title2.bold())
+                    Rectangle()
+                        .fill(Color.piumsOrange)
+                        .frame(width: 40, height: 3)
+                        .clipShape(Capsule())
+                }
+
+                // Artista card
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.piumsOrange.opacity(0.15))
+                            .frame(width: 56, height: 56)
+                        Text(String(vm.context.artist.artistName.prefix(2)).uppercased())
+                            .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("ARTISTA").font(.caption2.weight(.semibold)).foregroundStyle(.secondary).tracking(0.8)
+                        Text(vm.context.artist.artistName).font(.title3.bold())
+                        if let specialties = vm.context.artist.specialties?.first {
+                            Text(specialties).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(14)
+                .background(Color.piumsOrange.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                // Detalles
+                VStack(spacing: 0) {
+                    confirmRow(icon: "sparkles", label: "Servicio", value: vm.context.service?.name ?? "—")
+                    Divider().padding(.leading, 44)
+                    confirmRow(icon: "calendar", label: "Fecha", value: dateLabel)
+                    Divider().padding(.leading, 44)
+                    confirmRow(icon: "clock", label: "Hora", value: vm.context.selectedSlot?.time ?? "—")
+                    if let q = vm.priceQuote {
+                        Divider().padding(.leading, 44)
+                        confirmRow(icon: "banknote", label: "Total", value: q.totalCents.piumsFormatted, highlight: true)
+                    }
+                }
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                // Aviso legal
+                Text("Al confirmar, aceptas nuestras políticas de cancelación y términos de servicio. El cargo se realizará de forma inmediata.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+
+                // Botones
+                VStack(spacing: 10) {
+                    Button(action: onConfirm) {
+                        Text("Sí, confirmar")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.piumsOrange)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                    }
+                    Button(action: onCancel) {
+                        Text("Cancelar")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.piumsOrange)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
                 }
             }
-            Spacer()
-            Button(action: onDone) {
-                Text("Ver mis Reservas").font(.headline).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity).padding(.vertical, 15)
-                    .background(Color.piumsOrange).clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-            .padding(.horizontal, 30).padding(.bottom, 30)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 30)
         }
-        .presentationDetents([.medium, .large])
+    }
+
+    private func confirmRow(icon: String, label: String, value: String, highlight: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundStyle(Color.piumsOrange)
+                .frame(width: 20)
+                .padding(.leading, 12)
+            Text(label).font(.subheadline).foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(highlight ? .title3.bold() : .subheadline.weight(.semibold))
+                .foregroundStyle(highlight ? Color.piumsOrange : .primary)
+                .padding(.trailing, 12)
+        }
+        .padding(.vertical, 13)
+    }
+}
+
+struct BookingSuccessView: View {
+    let booking: Booking?
+    let artist: Artist
+    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var formattedDate: String {
+        guard let dateStr = booking?.scheduledDate else { return "—" }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let iso2 = ISO8601DateFormatter()
+        guard let date = iso.date(from: dateStr) ?? iso2.date(from: dateStr) else {
+            // scheduledDate may just be "YYYY-MM-DD"
+            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+            if let d = df.date(from: String(dateStr.prefix(10))) {
+                let out = DateFormatter(); out.dateFormat = "d 'de' MMMM, yyyy"; out.locale = Locale(identifier: "es_ES")
+                return out.string(from: d)
+            }
+            return dateStr
+        }
+        let f = DateFormatter(); f.dateFormat = "d 'de' MMMM, yyyy"; f.locale = Locale(identifier: "es_ES")
+        return f.string(from: date)
+    }
+
+    private var formattedTime: String {
+        guard let t = booking?.scheduledTime else { return "" }
+        let parts = t.split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return t }
+        let h = parts[0]; let m = parts[1]
+        let suffix = h >= 12 ? "PM" : "AM"
+        let h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h)
+        return String(format: "%d:%02d %@", h12, m, suffix)
+    }
+
+    private var initials: String {
+        artist.artistName.split(separator: " ").prefix(2)
+            .compactMap { $0.first.map { String($0) } }.joined().uppercased()
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 28) {
+
+                    // ── Check + Título ──────────────────────
+                    VStack(spacing: 14) {
+                        ZStack {
+                            Circle().fill(Color.green.opacity(0.15)).frame(width: 88, height: 88)
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 50)).foregroundStyle(.green)
+                        }
+                        VStack(spacing: 6) {
+                            Text("¡Reserva Confirmada!").font(.title.bold())
+                            Text("Tu reserva ha sido creada exitosamente. El profesional revisará tu solicitud en breve.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center).padding(.horizontal, 20)
+                        }
+                    }
+                    .padding(.top, 32)
+
+                    // ── Código de reserva ───────────────────
+                    if let code = booking?.code {
+                        VStack(spacing: 8) {
+                            Text("CÓDIGO DE RESERVA")
+                                .font(.caption2.weight(.semibold)).foregroundStyle(.secondary).tracking(1.2)
+                            Text(code).font(.title2.bold().monospaced())
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 20)
+                        .background(Color.piumsOrange.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.piumsOrange.opacity(0.2), lineWidth: 1))
+                        .padding(.horizontal, 24)
+                    }
+
+                    // ── Detalles del servicio ───────────────
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Detalles del Servicio").font(.headline)
+                        Divider()
+
+                        // Artista row
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.piumsOrange.opacity(0.15)).frame(width: 52, height: 52)
+                                Text(initials).font(.subheadline.bold()).foregroundStyle(Color.piumsOrange)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(artist.artistName).font(.headline)
+                                Text(artist.specialties?.first ?? "Artista")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+
+                        // Info grid
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
+                            SuccessInfoCell(label: "INFORMACIÓN DEL EVENTO") {
+                                Text(formattedDate).font(.subheadline.bold())
+                                if !formattedTime.isEmpty {
+                                    Text(formattedTime).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            SuccessInfoCell(label: "UBICACIÓN") {
+                                Text(booking?.location ?? "No especificada").font(.subheadline.bold())
+                                Text("Modalidad Presencial").font(.caption).foregroundStyle(.secondary)
+                            }
+                            SuccessInfoCell(label: "ESTADO") {
+                                HStack(spacing: 6) {
+                                    Circle().fill(Color.orange).frame(width: 8, height: 8)
+                                    Text(booking?.status.displayName.uppercased() ?? "PENDIENTE")
+                                        .font(.caption.weight(.semibold))
+                                }
+                            }
+                            SuccessInfoCell(label: "RESUMEN DE PAGO") {
+                                Text((booking?.totalPrice ?? 0).piumsFormatted)
+                                    .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
+                                Text("GTQ Total").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .padding(.horizontal, 20)
+
+                    // ── Próximos Pasos ──────────────────────
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Próximos Pasos").font(.headline)
+                        let steps = [
+                            "\(artist.artistName) revisará tu solicitud de reserva en las próximas 24 horas.",
+                            "Recibirás una notificación por correo una vez sea confirmada.",
+                            "Podrás chatear con el profesional directamente desde tu panel."
+                        ]
+                        ForEach(Array(steps.enumerated()), id: \.0) { idx, text in
+                            HStack(alignment: .top, spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(idx == 0 ? Color.piumsOrange : Color.piumsOrange.opacity(0.15))
+                                        .frame(width: 28, height: 28)
+                                    Text("\(idx + 1)").font(.caption.bold())
+                                        .foregroundStyle(idx == 0 ? .white : Color.piumsOrange)
+                                }
+                                Text(text).font(.subheadline).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .padding(.horizontal, 20)
+
+                    // ── Botones ─────────────────────────────
+                    VStack(spacing: 10) {
+                        Button(action: onDone) {
+                            Text("Ver Mis Reservas").font(.headline).foregroundStyle(.white)
+                                .frame(maxWidth: .infinity).padding(.vertical, 16)
+                                .background(Color.piumsOrange).clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                        Button { dismiss() } label: {
+                            Text("Ir al Dashboard").font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.piumsOrange)
+                                .frame(maxWidth: .infinity).padding(.vertical, 14)
+                                .background(Color.piumsOrange.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                    }
+                    .padding(.horizontal, 20).padding(.bottom, 40)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .navigationBarHidden(true)
+        }
+    }
+}
+
+// MARK: - SuccessInfoCell
+
+private struct SuccessInfoCell<Content: View>: View {
+    let label: String
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary).tracking(0.8)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
