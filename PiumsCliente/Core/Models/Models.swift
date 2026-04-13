@@ -43,6 +43,9 @@ struct Artist: Codable, Identifiable, Hashable {
     let serviceTitles: [String]?
     let specialties: [String]?
     let createdAt: String?
+    // Coordenadas exactas del artista (cuando el backend las devuelve)
+    let baseLocationLat: Double?
+    let baseLocationLng: Double?
 
     // Computed helpers para la UI
     var artistName: String { name }
@@ -107,6 +110,9 @@ struct SmartArtist: Codable, Identifiable {
     let matchedService: MatchedService?
     let score: Double?
     let createdAt: String?
+    // Coordenadas exactas
+    let baseLocationLat: Double?
+    let baseLocationLng: Double?
 
     /// Convierte a Artist para reutilizar las vistas existentes
     func toArtist() -> Artist {
@@ -117,7 +123,8 @@ struct SmartArtist: Codable, Identifiable {
                mainServiceName: matchedService?.name ?? mainServiceName,
                isVerified: isVerified, isActive: isActive, isAvailable: isAvailable,
                servicesCount: servicesCount, serviceIds: serviceIds, serviceTitles: serviceTitles,
-               specialties: specialties, createdAt: createdAt)
+               specialties: specialties, createdAt: createdAt,
+               baseLocationLat: baseLocationLat, baseLocationLng: baseLocationLng)
     }
 }
 
@@ -579,14 +586,14 @@ extension Artist {
                hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000,
                mainServiceName: "Show 1 hora", isVerified: true, isActive: true, isAvailable: true,
                servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra", "Eventos"],
-               createdAt: nil)
+               createdAt: nil, baseLocationLat: nil, baseLocationLng: nil)
     }
 
     static var mockList: [Artist] {
         [
-            Artist(id: "1", name: "Carlos Méndez", bio: nil, city: "Ciudad de Guatemala", state: nil, country: "GT", averageRating: 4.8, totalReviews: 32, totalBookings: 5, hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra"], createdAt: nil),
-            Artist(id: "2", name: "Sofía Ramírez", bio: nil, city: "Antigua", state: nil, country: "GT", averageRating: 4.5, totalReviews: 18, totalBookings: 10, hourlyRateMin: 20000, hourlyRateMax: 40000, mainServicePrice: 20000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 3, serviceIds: nil, serviceTitles: nil, specialties: ["Baile"], createdAt: nil),
-            Artist(id: "3", name: "Javier Torres", bio: nil, city: "Quetzaltenango", state: nil, country: "GT", averageRating: 4.9, totalReviews: 55, totalBookings: 20, hourlyRateMin: 25000, hourlyRateMax: 50000, mainServicePrice: 25000, mainServiceName: "Sesión foto", isVerified: false, isActive: true, isAvailable: true, servicesCount: 4, serviceIds: nil, serviceTitles: nil, specialties: ["Fotografía"], createdAt: nil),
+            Artist(id: "1", name: "Carlos Méndez", bio: nil, city: "Ciudad de Guatemala", state: nil, country: "GT", averageRating: 4.8, totalReviews: 32, totalBookings: 5, hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil),
+            Artist(id: "2", name: "Sofía Ramírez", bio: nil, city: "Antigua", state: nil, country: "GT", averageRating: 4.5, totalReviews: 18, totalBookings: 10, hourlyRateMin: 20000, hourlyRateMax: 40000, mainServicePrice: 20000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 3, serviceIds: nil, serviceTitles: nil, specialties: ["Baile"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil),
+            Artist(id: "3", name: "Javier Torres", bio: nil, city: "Quetzaltenango", state: nil, country: "GT", averageRating: 4.9, totalReviews: 55, totalBookings: 20, hourlyRateMin: 25000, hourlyRateMax: 50000, mainServicePrice: 25000, mainServiceName: "Sesión foto", isVerified: false, isActive: true, isAvailable: true, servicesCount: 4, serviceIds: nil, serviceTitles: nil, specialties: ["Fotografía"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil),
         ]
     }
 }

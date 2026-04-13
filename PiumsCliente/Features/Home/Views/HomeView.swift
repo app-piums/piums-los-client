@@ -6,10 +6,8 @@ struct HomeView: View {
     @State private var viewModel = HomeViewModel()
     @State private var selectedArtist: Artist?
     @State private var selectedDate: Date? = nil
-    @State private var userLocation: CLLocationCoordinate2D? = nil
-    @State private var locationName: String = ""
     @State private var showArtistSearch = false
-    @State private var locationManager = LocationManager()
+    @Environment(\.locationStore) private var locationStore
 
     var body: some View {
         ScrollView {
@@ -19,15 +17,6 @@ struct HomeView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 20)
-
-                // ── Selector de fecha ────────────────────────
-                dateSelectorSection
-                    .padding(.bottom, 20)
-
-                // ── Ubicación del evento ─────────────────────
-                locationSection
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
 
                 // ── Error ───────────────────────────────────
                 if let msg = viewModel.errorMessage {
@@ -40,7 +29,10 @@ struct HomeView: View {
                 HomeCalendarView(
                     bookingDates: viewModel.upcomingBookingDates,
                     nextBooking: viewModel.nextBooking
-                )
+                ) { tappedDay in
+                    selectedDate = tappedDay
+                    showArtistSearch = true
+                }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 28)
 
@@ -67,99 +59,12 @@ struct HomeView: View {
             if let date = selectedDate {
                 ArtistSearchByDateView(
                     selectedDate: date,
-                    userLocation: userLocation,
-                    locationName: locationName
+                    userLocation: locationStore.coordinate,
+                    locationName: locationStore.cityName
                 )
             }
         }
-        .onAppear { locationManager.requestOnce { coord, name in
-            userLocation = coord; locationName = name
-        }}
-    }
-
-    // MARK: - Date selector strip (igual al mockup)
-
-    private var dateSelectorSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("SELECCIONAR FECHA")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(1)
-                Spacer()
-                Text(monthYearLabel)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(Color.piumsOrange)
-            }
-            .padding(.horizontal, 20)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(nextDays, id: \.self) { date in
-                        DayButton(
-                            date: date,
-                            isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate ?? .distantPast)
-                        ) {
-                            selectedDate = date
-                            showArtistSearch = true
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
-
-    private var monthYearLabel: String {
-        let f = DateFormatter()
-        f.dateFormat = "MMMM yyyy"
-        f.locale = Locale(identifier: "es_ES")
-        return f.string(from: Date()).capitalized
-    }
-
-    private var nextDays: [Date] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        return (0..<14).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
-    }
-
-    // MARK: - Location section
-
-    private var locationSection: some View {
-        Button {
-            locationManager.requestOnce { coord, name in
-                userLocation = coord; locationName = name
-            }
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.piumsOrange.opacity(0.12))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: userLocation != nil ? "location.fill" : "location")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.piumsOrange)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("UBICACIÓN DEL EVENTO")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .tracking(0.8)
-                    Text(locationName.isEmpty ? "Toca para usar tu ubicación actual" : locationName)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-        }
-        .buttonStyle(.plain)
+        .onAppear { locationStore.requestIfNeeded() }
     }
 
     // MARK: - Top bar
@@ -255,6 +160,7 @@ struct HomeView: View {
 struct HomeCalendarView: View {
     let bookingDates: Set<String>
     var nextBooking: Booking? = nil
+    var onDayTap: ((Date) -> Void)? = nil
 
     @State private var displayMonth = Date()
     private let calendar = Calendar.current
@@ -297,7 +203,8 @@ struct HomeCalendarView: View {
                         day: day,
                         isToday: isToday(day),
                         hasBooking: hasBooking(day),
-                        isCurrentMonth: isCurrentMonth(day)
+                        isCurrentMonth: isCurrentMonth(day),
+                        onTap: isCurrentMonth(day) ? { onDayTap?(day) } : nil
                     )
                 }
             }
@@ -392,6 +299,7 @@ private struct DayCell: View {
     let isToday: Bool
     let hasBooking: Bool
     let isCurrentMonth: Bool
+    var onTap: (() -> Void)? = nil
 
     private let calendar = Calendar.current
 
@@ -400,6 +308,8 @@ private struct DayCell: View {
             ZStack {
                 if isToday {
                     Circle().fill(Color.piumsOrange).frame(width: 32, height: 32)
+                } else if onTap != nil && isCurrentMonth {
+                    Circle().fill(Color.piumsOrange.opacity(0.0)).frame(width: 32, height: 32)
                 }
                 Text("\(calendar.component(.day, from: day))")
                     .font(.system(size: 13, weight: isToday ? .bold : .regular))
@@ -414,6 +324,8 @@ private struct DayCell: View {
                 .frame(width: 4, height: 4)
         }
         .frame(height: 42)
+        .contentShape(Rectangle())
+        .onTapGesture { onTap?() }
     }
 }
 

@@ -1,5 +1,6 @@
 // SearchView.swift
 import SwiftUI
+import CoreLocation
 
 // MARK: - Categorías del cliente (simples, igual que la web)
 
@@ -33,6 +34,7 @@ struct SearchView: View {
     @State private var viewModel = SearchViewModel()
     @State private var selectedArtist: Artist?
     @State private var showFilters = false
+    @Environment(\.locationStore) private var locationStore
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -142,6 +144,13 @@ struct SearchView: View {
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
         .sheet(isPresented: $showFilters) {
             SearchFiltersSheet(viewModel: viewModel) { Task { await viewModel.search() } }
+        }
+        .onAppear {
+            locationStore.requestIfNeeded()
+            viewModel.userLocation = locationStore.coordinate
+        }
+        .onChange(of: locationStore.coordinate?.latitude) { _, _ in
+            viewModel.userLocation = locationStore.coordinate
         }
     }
 

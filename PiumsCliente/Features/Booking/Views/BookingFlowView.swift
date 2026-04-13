@@ -107,8 +107,8 @@ private struct _BFServicesRes: Codable { let services: [ArtistService] }
 struct BookingFlowView: View {
     var context: BookingFlowContext
     @State private var vm: BookingFlowViewModel
-    @State private var locationManager = LocationManager()
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locationStore) private var locationStore
 
     init(context: BookingFlowContext) {
         self.context = context
@@ -147,6 +147,14 @@ struct BookingFlowView: View {
             }
         }
         .task { await vm.loadServices() }
+        .onAppear {
+            // Pre-fill location coords from shared store if not already set
+            if vm.context.locationLat == nil, let coord = locationStore.coordinate {
+                vm.context.locationLat = coord.latitude
+                vm.context.locationLng = coord.longitude
+                if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
+            }
+        }
         .sheet(isPresented: Binding(get: { vm.didComplete }, set: { if !$0 { dismiss() } })) {
             BookingSuccessView(booking: vm.bookingResult, artist: context.artist) { dismiss() }
         }
@@ -303,11 +311,12 @@ struct BookingFlowView: View {
                 TextField("Ej. Salón Los Jardines, Zona 15", text: $vm.context.location)
                     .padding(12).background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
                 Button {
-                    locationManager.requestOnce { coord, name in
-                        if let c = coord {
-                            vm.context.locationLat = c.latitude; vm.context.locationLng = c.longitude
-                            if vm.context.location.isEmpty { vm.context.location = name }
-                        }
+                    if let coord = locationStore.coordinate {
+                        vm.context.locationLat = coord.latitude
+                        vm.context.locationLng = coord.longitude
+                        if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
+                    } else {
+                        locationStore.refresh()
                     }
                 } label: {
                     Label(vm.context.locationLat != nil ? "Ubicación detectada ✓" : "Usar mi ubicación",
@@ -316,6 +325,14 @@ struct BookingFlowView: View {
                         .background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
                         .foregroundStyle(vm.context.locationLat != nil ? .green : Color.piumsOrange)
                 }.buttonStyle(.plain)
+                .onChange(of: locationStore.coordinate?.latitude) { _, _ in
+                    // Auto-fill when store gets a new fix and we don't have coords yet
+                    if vm.context.locationLat == nil, let coord = locationStore.coordinate {
+                        vm.context.locationLat = coord.latitude
+                        vm.context.locationLng = coord.longitude
+                        if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
+                    }
+                }
             }
             VStack(alignment: .leading, spacing: 10) {
                 Label("Notas para el artista", systemImage: "note.text").font(.headline)

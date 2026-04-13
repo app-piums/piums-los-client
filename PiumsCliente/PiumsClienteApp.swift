@@ -21,11 +21,14 @@ struct PiumsClienteApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(preferredScheme)
+                .environment(\.locationStore, LocationStore.shared)
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
                 }
                 .onAppear {
                     AppearanceManager.shared.applyOnLaunch()
+                    // Solicitar ubicación al arrancar para que esté lista cuanto antes
+                    LocationStore.shared.requestIfNeeded()
                 }
         }
     }

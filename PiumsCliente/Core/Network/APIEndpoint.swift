@@ -19,7 +19,7 @@ enum APIEndpoint {
     case searchArtists(q: String?, page: Int, limit: Int, specialty: String?, city: String?,
                        minPrice: Int?, maxPrice: Int?, minRating: Double?,
                        isVerified: Bool?, sortBy: String?, sortOrder: String?)
-    case smartSearch(q: String, city: String?, limit: Int)
+    case smartSearch(q: String, city: String?, lat: Double?, lng: Double?, limit: Int)
 
     // ── Catalog ───────────────────────────────────────────
     case listServices(artistId: String)
@@ -197,9 +197,11 @@ extension APIEndpoint {
             if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
             return p
 
-        case .smartSearch(let q, let city, let limit):
+        case .smartSearch(let q, let city, let lat, let lng, let limit):
             var p = "/api/search/smart?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)&limit=\(limit)"
             if let city = city, !city.isEmpty { p += "&city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)" }
+            if let lat = lat { p += "&lat=\(lat)" }
+            if let lng = lng { p += "&lng=\(lng)" }
             return p
 
         // Catalog

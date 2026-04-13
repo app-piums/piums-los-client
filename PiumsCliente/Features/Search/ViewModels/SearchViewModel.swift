@@ -1,5 +1,6 @@
 // SearchViewModel.swift
 import Foundation
+import CoreLocation
 
 // Opciones de ordenamiento que acepta el backend
 enum SearchSortOption: String, CaseIterable {
@@ -72,6 +73,9 @@ final class SearchViewModel {
     var smartResults: [SmartArtist] = []
     var expandedTerms: [String] = []
     var isSmartSearch: Bool = false
+
+    // Ubicación del usuario para SmartSearch con lat/lng
+    var userLocation: CLLocationCoordinate2D? = nil
 
     // MARK: - Estado
     var results: [Artist] = []
@@ -161,6 +165,8 @@ final class SearchViewModel {
             let res: SmartSearchResponse = try await APIClient.request(
                 .smartSearch(q: query.trimmingCharacters(in: .whitespaces),
                              city: selectedCity,
+                             lat: userLocation?.latitude,
+                             lng: userLocation?.longitude,
                              limit: 40)
             )
             smartResults = res.artists
