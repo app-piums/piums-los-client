@@ -70,7 +70,10 @@ struct ProfileView: View {
                 HStack(spacing: 0) {
                     ForEach(ColorSchemePreference.allCases, id: \.self) { scheme in
                         Button {
+                            print("🎨 ProfileView: User tapped \(scheme.rawValue)")
+                            print("🎨 ProfileView: Before change - appearance.preference = \(appearance.preference.rawValue)")
                             appearance.preference = scheme
+                            print("🎨 ProfileView: After change - appearance.preference = \(appearance.preference.rawValue)")
                         } label: {
                             VStack(spacing: 6) {
                                 Image(systemName: scheme.systemImage)

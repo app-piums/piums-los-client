@@ -22,8 +22,15 @@ struct PiumsClienteApp: App {
                     GIDSignIn.sharedInstance.handle(url)
                 }
                 .onAppear {
+                    print("🎨 PiumsClienteApp: onAppear - current preference: \(appearance.preference.rawValue)")
                     // Solicitar ubicación al arrancar para que esté lista cuanto antes
                     LocationStore.shared.requestIfNeeded()
+                }
+                .onChange(of: appearance.preference) {
+                    print("🎨 PiumsClienteApp: preference changed to \(appearance.preference.rawValue)")
+                    let schemeStr = appearance.preference.swiftUIScheme == .light ? "light" :
+                                   appearance.preference.swiftUIScheme == .dark ? "dark" : "nil (system)"
+                    print("🎨 PiumsClienteApp: applying scheme: \(schemeStr)")
                 }
         }
     }

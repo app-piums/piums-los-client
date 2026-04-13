@@ -30,21 +30,22 @@ extension Color {
 @MainActor
 final class AppearanceManager {
     static let shared = AppearanceManager()
+    
+    @ObservationIgnored
+    private let key = "piums.colorScheme"
+    
+    /// Preferencia observable para que SwiftUI re-renderice
+    var preference: ColorSchemePreference = .system {
+        didSet {
+            UserDefaults.standard.set(preference.rawValue, forKey: key)
+            print("🎨 AppearanceManager: preference changed to \(preference.rawValue)")
+        }
+    }
+    
     private init() {
         let raw = UserDefaults.standard.string(forKey: key) ?? ColorSchemePreference.system.rawValue
         preference = ColorSchemePreference(rawValue: raw) ?? .system
-    }
-
-    @ObservationIgnored
-    private let key = "piums.colorScheme"
-
-    /// Preferencia observable para que SwiftUI re-renderice
-    var preference: ColorSchemePreference {
-        didSet {
-            UserDefaults.standard.set(preference.rawValue, forKey: key)
-            // SwiftUI maneja el color scheme via .preferredColorScheme()
-            // NO tocar UIWindow.overrideUserInterfaceStyle - causaría conflictos
-        }
+        print("🎨 AppearanceManager: initialized with \(preference.rawValue)")
     }
 }
 
