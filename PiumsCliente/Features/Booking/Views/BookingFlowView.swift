@@ -64,6 +64,7 @@ final class BookingFlowViewModel {
         var payload: [String: Any] = ["serviceId": svc.id, "durationMinutes": context.durationMinutes]
         if let lat = context.locationLat { payload["locationLat"] = lat }
         if let lng = context.locationLng { payload["locationLng"] = lng }
+        if context.isMultiDay { payload["numDays"] = context.numDays }
         do {
             priceQuote = try await APIClient.request(.calculatePrice(payload: payload))
             context.priceQuote = priceQuote
@@ -154,6 +155,25 @@ struct BookingFlowView: View {
                 vm.context.locationLng = coord.longitude
                 if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
             }
+            // If already on review step and coords just arrived, recalculate
+            if vm.step == .review, vm.context.locationLat != nil {
+                Task { await vm.calculatePrice() }
+            }
+            // Keep requesting if we still don't have location
+            if locationStore.coordinate == nil { locationStore.requestIfNeeded() }
+        }
+        .onChange(of: vm.context.locationLat) { _, newLat in
+            // Recalculate price whenever coordinates become available/change while on review
+            guard vm.step == .review, newLat != nil else { return }
+            Task { await vm.calculatePrice() }
+        }
+        .onChange(of: locationStore.coordinate?.latitude) { _, _ in
+            guard let coord = locationStore.coordinate else { return }
+            if vm.context.locationLat == nil {
+                vm.context.locationLat = coord.latitude
+                vm.context.locationLng = coord.longitude
+                if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
+            }
         }
         .sheet(isPresented: Binding(get: { vm.didComplete }, set: { if !$0 { dismiss() } })) {
             BookingSuccessView(booking: vm.bookingResult, artist: context.artist) { dismiss() }
@@ -238,7 +258,15 @@ struct BookingFlowView: View {
         } else {
             vm.next()
             if vm.step == .datetime { Task { await vm.loadCalendar(); if let d = vm.context.selectedDate { await vm.loadSlots(for: d) } } }
-            if vm.step == .review   { Task { await vm.calculatePrice() } }
+            if vm.step == .review {
+                // Make sure we have the latest coords before calculating price
+                if vm.context.locationLat == nil, let coord = locationStore.coordinate {
+                    vm.context.locationLat = coord.latitude
+                    vm.context.locationLng = coord.longitude
+                    if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
+                }
+                Task { await vm.calculatePrice() }
+            }
         }
     }
 
@@ -403,16 +431,69 @@ struct BookingFlowView: View {
     private func priceView(_ q: PriceQuote) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Desglose de Precio").font(.headline)
-            VStack(spacing: 8) {
-                ForEach(q.items, id: \.type) { item in
-                    HStack {
-                        HStack(spacing: 6) {
-                            if item.type == "TRAVEL" { Image(systemName: "car.fill").foregroundStyle(.orange) }
-                            Text(item.name).font(.subheadline)
+
+            // If no location yet, show an actionable nudge
+            if vm.context.locationLat == nil {
+                Button {
+                    if let coord = locationStore.coordinate {
+                        vm.context.locationLat = coord.latitude
+                        vm.context.locationLng = coord.longitude
+                        if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
+                        Task { await vm.calculatePrice() }
+                    } else {
+                        locationStore.refresh()
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "location.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(Color.piumsOrange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Agrega tu ubicación")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Text("Necesaria para calcular el costo de traslado del artista.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(item.totalPriceCents.piumsFormatted).font(.subheadline.bold())
-                            .foregroundStyle(item.type == "TRAVEL" ? .orange : .primary)
+                        if locationStore.isLocating {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.piumsOrange.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.piumsOrange.opacity(0.25), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .onChange(of: locationStore.coordinate?.latitude) { _, _ in
+                    guard let coord = locationStore.coordinate, vm.context.locationLat == nil else { return }
+                    vm.context.locationLat = coord.latitude
+                    vm.context.locationLng = coord.longitude
+                    if vm.context.location.isEmpty { vm.context.location = locationStore.cityName }
+                    Task { await vm.calculatePrice() }
+                }
+            }
+
+            VStack(spacing: 8) {
+                ForEach(q.items, id: \.type) { item in
+                    // Hide travel row if location not set yet (would show Q0)
+                    if item.type == "TRAVEL" && vm.context.locationLat == nil { EmptyView() }
+                    else {
+                        HStack {
+                            HStack(spacing: 6) {
+                                if item.type == "TRAVEL" { Image(systemName: "car.fill").foregroundStyle(.orange) }
+                                Text(item.name).font(.subheadline)
+                            }
+                            Spacer()
+                            Text(item.totalPriceCents.piumsFormatted).font(.subheadline.bold())
+                                .foregroundStyle(item.type == "TRAVEL" ? .orange : .primary)
+                        }
                     }
                 }
                 Divider()
@@ -423,6 +504,7 @@ struct BookingFlowView: View {
                 }
             }
             .padding(14).background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
+
             if q.hasTravel {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle.fill").foregroundStyle(.orange)

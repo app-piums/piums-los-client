@@ -373,7 +373,10 @@ struct ArtistSearchByDateView: View {
                             .onTapGesture {
                                 bookingContext = BookingFlowContext(
                                     artist: item.artist,
-                                    selectedDate: selectedDate
+                                    selectedDate: selectedDate,
+                                    location: locationName,
+                                    locationLat: userLocation?.latitude,
+                                    locationLng: userLocation?.longitude
                                 )
                             }
                         }

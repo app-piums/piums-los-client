@@ -7,6 +7,7 @@ struct ArtistProfileView: View {
     @State private var selectedService: ArtistService?
     @State private var showBooking = false
     @State private var favorites = FavoritesStore.shared
+    @Environment(\.locationStore) private var locationStore
 
     init(artist: Artist) {
         self.artist = artist
@@ -163,7 +164,13 @@ struct ArtistProfileView: View {
         .sheet(isPresented: $showBooking) {
             if let service = selectedService {
                 NavigationStack {
-                    BookingFlowView(context: BookingFlowContext(artist: artist, service: service))
+                    BookingFlowView(context: BookingFlowContext(
+                        artist: artist,
+                        service: service,
+                        location: locationStore.cityName,
+                        locationLat: locationStore.coordinate?.latitude,
+                        locationLng: locationStore.coordinate?.longitude
+                    ))
                 }
             }
         }
