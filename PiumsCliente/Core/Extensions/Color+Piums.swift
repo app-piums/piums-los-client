@@ -1,8 +1,11 @@
 // Color+Piums.swift
 import SwiftUI
 
-// MARK: - Brand colors
 extension Color {
+    // piumsOrange, piumsBackground, piumsBackgroundElevated, piumsBackgroundSecondary,
+    // piumsLabel, piumsLabelSecondary y piumsSeparator son auto-generados por Xcode
+    // desde los .colorset en Assets.xcassets — no definir aquí para evitar ambigüedad.
+
     static let piumsDark = Color(hex: "#1A1A1A")
 
     init(hex: String) {

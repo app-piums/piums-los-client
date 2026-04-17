@@ -6,6 +6,7 @@ struct LoginView: View {
     @FocusState private var focused: Field?
     @State private var showPassword = false
     @State private var animateIn = false
+    @State private var glowPulse = false
 
     enum Field { case email, password }
 
@@ -14,19 +15,20 @@ struct LoginView: View {
             ZStack(alignment: .bottom) {
                 backgroundLayer(geo: geo)
 
-                VStack(spacing: 0) {
-                    Spacer()
-                    loginSheet
-                }
-                .ignoresSafeArea(edges: .bottom)
-                .offset(y: animateIn ? 0 : 420)
+                loginCard
+                    .frame(height: geo.size.height * 0.68)
+                    .offset(y: animateIn ? 0 : geo.size.height * 0.7)
             }
             .ignoresSafeArea()
         }
         .navigationBarHidden(true)
+        .preferredColorScheme(.dark)
         .onAppear {
-            withAnimation(.spring(response: 0.7, dampingFraction: 0.85).delay(0.1)) {
+            withAnimation(.spring(response: 0.75, dampingFraction: 0.88).delay(0.05)) {
                 animateIn = true
+            }
+            withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true).delay(0.3)) {
+                glowPulse = true
             }
         }
     }
@@ -35,106 +37,102 @@ struct LoginView: View {
 
     @ViewBuilder
     private func backgroundLayer(geo: GeometryProxy) -> some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.06, blue: 0.10),
-                    Color(red: 0.09, green: 0.07, blue: 0.06)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+        ZStack(alignment: .top) {
 
-            // Glow sutil naranja
+            // Fondo — PiumsBackground dark #121212
+            Color.piumsBackground.ignoresSafeArea()
+
+            // Glow naranja cálido detrás del ícono
             Circle()
-                .fill(Color.piumsOrange.opacity(0.12))
-                .frame(width: 260, height: 260)
-                .blur(radius: 65)
-                .offset(x: -70, y: -50)
-                .opacity(animateIn ? 1 : 0)
-                .animation(.easeOut(duration: 1.4).delay(0.2), value: animateIn)
+                .fill(Color.piumsOrange.opacity(glowPulse ? 0.30 : 0.18))
+                .frame(width: 300, height: 300)
+                .blur(radius: 55)
+                .offset(y: geo.safeAreaInsets.top + 80)
 
-            // Contenido superior centrado
-            VStack(spacing: 22) {
-                Spacer().frame(height: geo.safeAreaInsets.top + 12)
+            // Contenido superior centrado verticalmente en el área libre
+            VStack(spacing: 0) {
+                Spacer().frame(height: geo.safeAreaInsets.top + 20)
 
-                // Logo
+                // Logo wordmark naranja
                 Image("PiumsLogo")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(height: 44)
+                    .frame(height: 32)
                     .opacity(animateIn ? 1 : 0)
-                    .offset(y: animateIn ? 0 : -16)
-                    .animation(.easeOut(duration: 0.55).delay(0.05), value: animateIn)
+                    .animation(.easeOut(duration: 0.4).delay(0.0), value: animateIn)
 
-                // Ícono circular
+                Spacer().frame(height: 28)
+
+                // Ícono — círculo marrón cálido exacto del artista
                 ZStack {
+                    // Halo suave detrás del círculo
                     Circle()
-                        .fill(Color.white.opacity(0.04))
-                        .frame(width: 110, height: 110)
-                    Circle()
-                        .fill(Color.piumsOrange.opacity(0.13))
-                        .frame(width: 82, height: 82)
-                    Image(systemName: "ticket.fill")
-                        .font(.system(size: 36, weight: .light))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.piumsOrange, Color(red: 1, green: 0.62, blue: 0.35)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-                .scaleEffect(animateIn ? 1 : 0.55)
-                .opacity(animateIn ? 1 : 0)
-                .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.15), value: animateIn)
+                        .fill(Color.piumsOrange.opacity(0.15))
+                        .frame(width: 116, height: 116)
+                        .blur(radius: 12)
 
-                // Título + subtítulo
+                    // Círculo — PiumsBackgroundElevated con tinte naranja encima
+                    Circle()
+                        .fill(Color.piumsBackgroundElevated)
+                        .frame(width: 92, height: 92)
+                        .overlay(Circle().fill(Color.piumsOrange.opacity(0.22)))
+
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 36, weight: .regular))
+                        .foregroundStyle(Color.piumsOrange)
+                }
+                .scaleEffect(animateIn ? 1 : 0.6)
+                .opacity(animateIn ? 1 : 0)
+                .animation(.spring(response: 0.55, dampingFraction: 0.7).delay(0.08), value: animateIn)
+
+                Spacer().frame(height: 20)
+
+                // Título y subtítulo
                 VStack(spacing: 6) {
                     Text("Panel de Clientes")
-                        .font(.title2.bold())
+                        .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(.white)
+
                     Text("Reserva el mejor talento para tu evento")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.48))
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.white.opacity(0.5))
                         .multilineTextAlignment(.center)
                 }
                 .opacity(animateIn ? 1 : 0)
-                .offset(y: animateIn ? 0 : 10)
-                .animation(.easeOut(duration: 0.55).delay(0.25), value: animateIn)
+                .animation(.easeOut(duration: 0.45).delay(0.15), value: animateIn)
 
                 Spacer()
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Sheet
+    // MARK: - Card
 
-    private var loginSheet: some View {
+    private var loginCard: some View {
         VStack(spacing: 0) {
-            // Drag indicator
+            // Handle
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color.secondary.opacity(0.3))
-                .frame(width: 40, height: 4)
-                .padding(.top, 12)
-                .padding(.bottom, 26)
+                .fill(Color.white.opacity(0.18))
+                .frame(width: 36, height: 4)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 28) {
 
                     // Header
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Bienvenido de nuevo")
-                            .font(.system(size: 28, weight: .bold))
-                        Text("Accede a tu panel de control creativo.")
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundStyle(Color.piumsLabel)
+                        Text("Accede a tu panel de control.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.piumsLabelSecondary)
                     }
 
                     // Campos
-                    VStack(spacing: 16) {
+                    VStack(spacing: 14) {
                         fieldEmail
                         fieldPassword
                     }
@@ -144,19 +142,11 @@ struct LoginView: View {
                         ErrorBannerView(message: msg)
                     }
 
-                    // Botón principal
+                    // Botón login
                     loginButton
 
                     // Divisor
-                    HStack(spacing: 12) {
-                        Rectangle().fill(Color.secondary.opacity(0.2)).frame(height: 1)
-                        Text("O CONTINUAR CON")
-                            .font(.caption.bold())
-                            .foregroundStyle(.secondary)
-                            .tracking(0.8)
-                            .fixedSize()
-                        Rectangle().fill(Color.secondary.opacity(0.2)).frame(height: 1)
-                    }
+                    divider
 
                     // Social
                     HStack(spacing: 12) {
@@ -165,7 +155,7 @@ struct LoginView: View {
                         }
                         .disabled(viewModel.isLoading)
 
-                        AppleButton { /* Apple — próximamente */ }
+                        AppleSignInButton { /* próximamente */ }
                     }
 
                     // Registro
@@ -182,26 +172,27 @@ struct LoginView: View {
                     .font(.subheadline)
                     .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 44)
+                .padding(.horizontal, 26)
+                .padding(.bottom, 50)
             }
             .scrollDismissesKeyboard(.interactively)
         }
         .background(
-            RoundedRectangle(cornerRadius: 32)
-                .fill(Color(.systemBackground))
+            RoundedRectangle(cornerRadius: 28)
+                .fill(Color.piumsBackgroundSecondary)
                 .ignoresSafeArea(edges: .bottom)
         )
     }
 
-    // MARK: - Field Email
+    // MARK: - Fields
 
     private var fieldEmail: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             Text("CORREO")
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
-                .tracking(1)
+                .tracking(1.2)
+
             TextField("nombre@ejemplo.com", text: $viewModel.email)
                 .keyboardType(.emailAddress)
                 .textContentType(.emailAddress)
@@ -210,22 +201,29 @@ struct LoginView: View {
                 .focused($focused, equals: .email)
                 .submitLabel(.next)
                 .onSubmit { focused = .password }
-                .padding(16)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 15)
+                .background(fieldBackground(isFocused: focused == .email))
+                .clipShape(RoundedRectangle(cornerRadius: 13))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13)
+                        .strokeBorder(
+                            focused == .email ? Color.piumsOrange.opacity(0.7) : Color.clear,
+                            lineWidth: 1.5
+                        )
+                )
+                .animation(.easeInOut(duration: 0.2), value: focused == .email)
         }
     }
 
-    // MARK: - Field Password
-
     private var fieldPassword: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             Text("CONTRASEÑA")
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
-                .tracking(1)
+                .tracking(1.2)
 
-            HStack {
+            HStack(spacing: 0) {
                 Group {
                     if showPassword {
                         TextField("••••••••", text: $viewModel.password)
@@ -238,16 +236,27 @@ struct LoginView: View {
                 .submitLabel(.done)
                 .onSubmit { Task { await viewModel.login() } }
 
-                Button { showPassword.toggle() } label: {
+                Button {
+                    showPassword.toggle()
+                } label: {
                     Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 15))
+                        .foregroundStyle(focused == .password ? Color.piumsOrange.opacity(0.8) : .secondary)
+                        .padding(.trailing, 2)
                 }
-                .padding(.trailing, 4)
             }
-            .padding(16)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
+            .background(fieldBackground(isFocused: focused == .password))
+            .clipShape(RoundedRectangle(cornerRadius: 13))
+            .overlay(
+                RoundedRectangle(cornerRadius: 13)
+                    .strokeBorder(
+                        focused == .password ? Color.piumsOrange.opacity(0.7) : Color.clear,
+                        lineWidth: 1.5
+                    )
+            )
+            .animation(.easeInOut(duration: 0.2), value: focused == .password)
 
             HStack {
                 Spacer()
@@ -255,39 +264,64 @@ struct LoginView: View {
                     viewModel.clearMessages()
                     viewModel.activeScreen = .forgotPassword
                 }
-                .font(.subheadline.weight(.medium))
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(Color.piumsOrange)
             }
+            .padding(.top, 2)
         }
+    }
+
+    private func fieldBackground(isFocused: Bool) -> some ShapeStyle {
+        AnyShapeStyle(Color.piumsBackgroundElevated)
     }
 
     // MARK: - Login Button
 
     private var loginButton: some View {
-        let disabled = viewModel.email.isEmpty || viewModel.password.isEmpty
+        let empty = viewModel.email.isEmpty || viewModel.password.isEmpty
         return Button {
             Task { await viewModel.login() }
         } label: {
             ZStack {
                 if viewModel.isLoading {
                     HStack(spacing: 8) {
-                        ProgressView().tint(.white).scaleEffect(0.9)
-                        Text("Iniciando sesión...")
-                            .font(.body.bold())
+                        ProgressView().tint(.white).scaleEffect(0.85)
+                        Text("Iniciando sesión…").font(.body.bold())
                     }
                 } else {
-                    Text("Iniciar sesión")
-                        .font(.body.bold())
+                    Text("Iniciar sesión").font(.body.bold())
                 }
             }
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(disabled ? Color.piumsOrange.opacity(0.5) : Color.piumsOrange)
+            .background(
+                LinearGradient(
+                    colors: empty
+                        ? [Color.piumsOrange.opacity(0.4), Color.piumsOrange.opacity(0.4)]
+                        : [Color(red: 0.85, green: 0.38, blue: 0.12), Color(red: 0.72, green: 0.28, blue: 0.07)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
-        .disabled(viewModel.isLoading || disabled)
-        .animation(.easeInOut(duration: 0.2), value: disabled)
+        .disabled(viewModel.isLoading || empty)
+        .animation(.easeInOut(duration: 0.2), value: empty)
+    }
+
+    // MARK: - Divisor
+
+    private var divider: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(Color.piumsSeparator).frame(height: 1)
+            Text("O CONTINUAR CON")
+                .font(.caption.bold())
+                .foregroundStyle(Color.piumsLabelSecondary)
+                .tracking(0.8)
+                .fixedSize()
+            Rectangle().fill(Color.piumsSeparator).frame(height: 1)
+        }
     }
 }
 
@@ -300,7 +334,7 @@ private struct GoogleSignInButton: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 7)
                         .fill(Color(.systemGray5))
                         .frame(width: 30, height: 30)
                     Text("G")
@@ -320,25 +354,27 @@ private struct GoogleSignInButton: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.piumsBackgroundElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 13))
         }
     }
 }
 
-// MARK: - AppleButton
+// MARK: - AppleSignInButton
 
-private struct AppleButton: View {
+private struct AppleSignInButton: View {
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "applelogo")
-                .font(.title3.weight(.medium))
-                .foregroundStyle(.primary)
-                .frame(width: 52, height: 52)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            HStack(spacing: 8) {
+                Image(systemName: "applelogo")
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .foregroundStyle(Color.piumsLabel)
+            .frame(width: 52, height: 52)
+            .background(Color.piumsBackgroundElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 13))
         }
     }
 }

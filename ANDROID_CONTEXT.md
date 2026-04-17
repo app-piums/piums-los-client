@@ -153,17 +153,24 @@ val paddingCard  = 16.dp
 fun LoginScreen(viewModel: AuthViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var animateIn by remember { mutableStateOf(false) }
+    // Pulso infinito para orbes de luz ambiental
+    val infiniteTransition = rememberInfiniteTransition(label = "glow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.10f, targetValue = 0.20f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ), label = "glowAlpha"
+    )
 
     LaunchedEffect(Unit) { animateIn = true }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Fondo
-        LoginBackground(animateIn = animateIn)
+        LoginBackground(animateIn = animateIn, glowAlpha = glowAlpha)
 
-        // Card deslizante
         val offsetY by animateDpAsState(
-            targetValue = if (animateIn) 0.dp else 500.dp,
-            animationSpec = spring(dampingRatio = 0.82f, stiffness = 200f),
+            targetValue = if (animateIn) 0.dp else 600.dp,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = 190f),
             label = "sheet"
         )
         Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
@@ -180,50 +187,357 @@ fun LoginScreen(viewModel: AuthViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun LoginBackground(animateIn: Boolean) {
+private fun LoginBackground(animateIn: Boolean, glowAlpha: Float) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Degradado
+
+        // Gradiente base — cálido oscuro marrón/negro, igual que app de artistas
         Box(modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.linearGradient(
-                    colors = listOf(Color(0xFF0F0F1A), Color(0xFF0D1F3C)),
-                    start = Offset(0f, 0f), end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0F0A08),  // marrón muy oscuro arriba
+                        Color(0xFF170E09),  // marrón ligeramente más cálido
+                        Color(0xFF0F0A08)   // igual abajo
+                    )
                 )
             )
         )
-        // Glow naranja
-        if (animateIn) {
-            Box(modifier = Modifier
-                .size(300.dp)
-                .offset(x = (-60).dp, y = (-40).dp)
-                .blur(70.dp)
-                .background(PiumsOrange.copy(alpha = 0.18f), CircleShape)
-            )
-        }
-        // Logo + ícono + texto centrado
+
+        // Glow naranja central detrás del ícono — produce el tono marrón cálido
+        Box(modifier = Modifier
+            .size(320.dp)
+            .align(Alignment.TopCenter)
+            .offset(y = (-80).dp)
+            .blur(80.dp)
+            .background(PiumsOrange.copy(alpha = glowAlpha), CircleShape)
+        )
+        // Glow naranja sutil abajo
+        Box(modifier = Modifier
+            .size(220.dp)
+            .align(Alignment.TopCenter)
+            .offset(x = 60.dp, y = 100.dp)
+            .blur(70.dp)
+            .background(PiumsOrange.copy(alpha = glowAlpha * 0.4f), CircleShape)
+        )
+
+        // Contenido superior centrado
+        val logoAlpha by animateFloatAsState(if (animateIn) 1f else 0f,
+            animationSpec = tween(500, delayMillis = 50), label = "logo")
+        val iconScale by animateFloatAsState(if (animateIn) 1f else 0.5f,
+            animationSpec = spring(dampingRatio = 0.68f, stiffness = 220f), label = "icon")
+        val textAlpha by animateFloatAsState(if (animateIn) 1f else 0f,
+            animationSpec = tween(600, delayMillis = 220), label = "text")
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 72.dp),
+                .statusBarsPadding()
+                .padding(top = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Image(painter = painterResource(R.drawable.piums_logo),
-                  contentDescription = null, modifier = Modifier.height(44.dp))
-            Spacer(Modifier.height(24.dp))
-            // Ícono doble círculo
-            Box(contentAlignment = Alignment.Center) {
-                Box(Modifier.size(110.dp).background(Color.White.copy(0.04f), CircleShape))
-                Box(Modifier.size(82.dp).background(PiumsOrange.copy(0.13f), CircleShape))
-                Icon(Icons.Default.ConfirmationNumber, null, // ticket
-                     tint = PiumsOrange, modifier = Modifier.size(36.dp))
+            // Logo
+            Image(
+                painter = painterResource(R.drawable.piums_logo),
+                contentDescription = null,
+                modifier = Modifier.height(38.dp).alpha(logoAlpha)
+            )
+
+            Spacer(Modifier.height(32.dp))
+
+            // Ícono — círculo marrón cálido oscuro + ícono naranja (igual que artistas)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .scale(iconScale)
+                    .alpha(iconScale)
+            ) {
+                // Halo glow naranja difuso detrás
+                Box(Modifier
+                    .size(130.dp)
+                    .blur(18.dp)
+                    .background(PiumsOrange.copy(alpha = glowAlpha), CircleShape)
+                )
+                // Círculo principal — marrón cálido oscuro (#381E0F)
+                Box(Modifier
+                    .size(100.dp)
+                    .background(Color(0xFF381E0F), CircleShape)
+                )
+                Icon(
+                    Icons.Default.ConfirmationNumber, null,
+                    tint = PiumsOrange,
+                    modifier = Modifier.size(36.dp)
+                )
             }
-            Spacer(Modifier.height(20.dp))
-            Text("Panel de Clientes", style = MaterialTheme.typography.titleLarge,
-                 color = Color.White, fontWeight = FontWeight.Bold)
-            Text("Reserva el mejor talento para tu evento",
-                 style = MaterialTheme.typography.bodyMedium,
-                 color = Color.White.copy(0.48f), textAlign = TextAlign.Center)
+
+            Spacer(Modifier.height(24.dp))
+
+            // Título con glow sutil
+            Text(
+                "Panel de Clientes",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.alpha(textAlpha)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Reserva el mejor talento\npara tu evento",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(0.45f),
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp,
+                modifier = Modifier.alpha(textAlpha)
+            )
+        }
+    }
+}
+
+@Composable
+private fun LoginSheet(
+    modifier: Modifier = Modifier,
+    uiState: AuthUiState,
+    onLoginClick: () -> Unit,
+    onGoogleClick: () -> Unit,
+    onForgotClick: () -> Unit,
+    onRegisterClick: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
+    var emailFocused by remember { mutableStateOf(false) }
+    var passwordFocused by remember { mutableStateOf(false) }
+
+    val isEmpty = email.isBlank() || password.isBlank()
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            brush = Brush.verticalGradient(
+                listOf(PiumsOrange.copy(0.35f), Color.Transparent),
+                endY = 200f
+            )
+        )
+    ) {
+        Column {
+            // Handle
+            Box(Modifier.fillMaxWidth().padding(top = 14.dp), Alignment.Center) {
+                Box(Modifier.size(width = 36.dp, height = 4.dp)
+                    .background(Color.White.copy(0.18f), RoundedCornerShape(2.dp)))
+            }
+            Spacer(Modifier.height(28.dp))
+
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 26.dp, bottom = 50.dp),
+                verticalArrangement = Arrangement.spacedBy(28.dp)
+            ) {
+                item {
+                    Text("Bienvenido de nuevo",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Accede a tu panel de control.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                }
+                item {
+                    // Campo Email
+                    PiumsAuthField(
+                        label = "CORREO",
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "nombre@ejemplo.com",
+                        isFocused = emailFocused,
+                        onFocusChange = { emailFocused = it },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Next
+                        )
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    // Campo Password
+                    PiumsAuthField(
+                        label = "CONTRASEÑA",
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = "••••••••",
+                        isFocused = passwordFocused,
+                        onFocusChange = { passwordFocused = it },
+                        isPassword = true,
+                        showPassword = showPassword,
+                        onTogglePassword = { showPassword = !showPassword },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
+                        onDone = onLoginClick
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
+                        TextButton(onClick = onForgotClick) {
+                            Text("¿Olvidaste tu contraseña?",
+                                color = PiumsOrange,
+                                style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+                if (uiState.error != null) {
+                    item { ErrorBanner(uiState.error) }
+                }
+                item {
+                    // Botón login con gradiente y sombra naranja
+                    val gradient = if (isEmpty)
+                        SolidColor(PiumsOrange.copy(0.45f))
+                    else
+                        Brush.linearGradient(listOf(PiumsOrange, Color(0xFF FF8438)))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .shadow(if (isEmpty) 0.dp else 14.dp, RoundedCornerShape(14.dp),
+                                ambientColor = PiumsOrange, spotColor = PiumsOrange)
+                            .background(gradient, RoundedCornerShape(14.dp))
+                            .clickable(enabled = !isEmpty && !uiState.isLoading) { onLoginClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (uiState.isLoading) {
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                CircularProgressIndicator(color = Color.White,
+                                    modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Text("Iniciando sesión…", color = Color.White,
+                                    fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Text("Iniciar sesión", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                item {
+                    // Divisor
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Divider(Modifier.weight(1f), color = Color.Gray.copy(0.2f))
+                        Text("O CONTINUAR CON", style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray, letterSpacing = 0.8.sp)
+                        Divider(Modifier.weight(1f), color = Color.Gray.copy(0.2f))
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // Google
+                        Surface(
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(13.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            onClick = onGoogleClick
+                        ) {
+                            Row(Modifier.padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center) {
+                                Box(Modifier.size(30.dp)
+                                    .background(Color.Gray.copy(0.2f), RoundedCornerShape(7.dp)),
+                                    Alignment.Center) {
+                                    Text("G", fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF4285F4), fontSize = 15.sp)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Text("Continuar con Google",
+                                    style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                        // Apple
+                        Surface(
+                            modifier = Modifier.size(52.dp),
+                            shape = RoundedCornerShape(13.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            onClick = { /* próximamente */ }
+                        ) {
+                            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                                Icon(Icons.Default.Apple, null)
+                            }
+                        }
+                    }
+                }
+                item {
+                    Row(Modifier.fillMaxWidth(), Arrangement.Center) {
+                        Text("¿Aún no tienes cuenta? ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                        Text("Regístrate gratis",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PiumsOrange, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable { onRegisterClick() })
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Campo reutilizable con borde naranja al enfocar
+@Composable
+fun PiumsAuthField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    isFocused: Boolean,
+    onFocusChange: (Boolean) -> Unit,
+    isPassword: Boolean = false,
+    showPassword: Boolean = false,
+    onTogglePassword: (() -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    onDone: (() -> Unit)? = null
+) {
+    val borderColor by animateColorAsState(
+        if (isFocused) PiumsOrange.copy(0.7f) else Color.Transparent,
+        animationSpec = tween(200), label = "border"
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(13.dp))
+                .border(1.5.dp, borderColor, RoundedCornerShape(13.dp))
+                .padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val visual = if (isPassword && !showPassword) PasswordVisualTransformation()
+                         else VisualTransformation.None
+            BasicTextField(
+                value = value, onValueChange = onValueChange,
+                modifier = Modifier.weight(1f).onFocusChanged { onFocusChange(it.isFocused) },
+                visualTransformation = visual,
+                keyboardOptions = keyboardOptions,
+                keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                decorationBox = { inner ->
+                    if (value.isEmpty()) Text(placeholder,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(0.35f))
+                    inner()
+                }
+            )
+            if (isPassword && onTogglePassword != null) {
+                IconButton(onClick = onTogglePassword, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        null,
+                        tint = if (isFocused) PiumsOrange.copy(0.8f)
+                               else MaterialTheme.colorScheme.onSurface.copy(0.4f)
+                    )
+                }
+            }
         }
     }
 }
@@ -232,26 +546,16 @@ private fun LoginBackground(animateIn: Boolean) {
 ### Reglas críticas del botón de login
 
 ```kotlin
-// Botón se atenúa si campos vacíos — igual que iOS
-val isEnabled = email.isNotEmpty() && password.isNotEmpty() && !isLoading
-Button(
-    onClick = onLoginClick,
-    enabled = isEnabled,
-    colors = ButtonDefaults.buttonColors(
-        containerColor = PiumsOrange,
-        disabledContainerColor = PiumsOrange.copy(alpha = 0.5f)
-    ),
-    shape = RoundedCornerShape(14.dp),
-    modifier = Modifier.fillMaxWidth().height(54.dp)
-) {
-    if (isLoading) {
-        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Iniciando sesión...", fontWeight = FontWeight.Bold)
-    } else {
-        Text("Iniciar sesión", fontWeight = FontWeight.Bold)
-    }
-}
+// Botón: gradiente naranja cuando activo, semitransparente cuando vacío, sombra naranja
+val isEmpty = email.isBlank() || password.isBlank()
+val gradient = if (isEmpty)
+    SolidColor(PiumsOrange.copy(alpha = 0.45f))
+else
+    Brush.linearGradient(listOf(PiumsOrange, Color(0xFFFF8438)))
+
+// Sombra naranja solo cuando habilitado:
+Modifier.shadow(if (isEmpty) 0.dp else 14.dp, RoundedCornerShape(14.dp),
+    ambientColor = PiumsOrange, spotColor = PiumsOrange)
 ```
 
 ---

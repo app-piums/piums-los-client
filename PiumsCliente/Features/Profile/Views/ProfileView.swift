@@ -98,18 +98,16 @@ struct ProfileView: View {
 
             // Cerrar sesión
             Section {
-                Button(role: .destructive) {
-                    showLogoutConfirm = true
-                } label: {
+                Button(role: .destructive) { showLogoutConfirm = true } label: {
                     HStack {
                         Spacer()
-                        Label("Cerrar sesión", systemImage: "rectangle.portrait.and.arrow.right")
-                            .fontWeight(.semibold)
+                        Text("Cerrar Sesión")
+                            .font(.subheadline.weight(.medium))
                         Spacer()
                     }
                 }
-                .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
+            .listRowBackground(Color(.tertiarySystemGroupedBackground))
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -119,17 +117,19 @@ struct ProfileView: View {
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .preferredColorScheme(themeManager.colorScheme)
-        .confirmationDialog("¿Cerrar sesión?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
-            Button("Cerrar sesión", role: .destructive) { Task { await viewModel.logout() } }
-            Button("Cancelar", role: .cancel) {}
-        }
-        // Sheet — Editar perfil
         .sheet(isPresented: $viewModel.showEditSheet) {
             EditProfileSheet(viewModel: viewModel)
         }
-        // Sheet — Cambiar contraseña
         .sheet(isPresented: $viewModel.showPasswordSheet) {
             ChangePasswordSheet(viewModel: viewModel)
+        }
+        .alert("¿Cerrar sesión?", isPresented: $showLogoutConfirm) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Cerrar sesión", role: .destructive) {
+                Task { await viewModel.logout() }
+            }
+        } message: {
+            Text("Se cerrará tu sesión actual y tendrás que iniciar sesión de nuevo.")
         }
     }
 
@@ -215,6 +215,7 @@ private struct ChangePasswordSheet: View {
         }
     }
 }
+
 
 #Preview {
     NavigationStack { ProfileView() }
