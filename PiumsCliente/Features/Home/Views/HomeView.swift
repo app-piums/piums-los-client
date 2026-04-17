@@ -7,6 +7,7 @@ struct HomeView: View {
     @State private var selectedArtist: Artist?
     @State private var selectedDate: Date? = nil
     @State private var showArtistSearch = false
+    @State private var showNotifications = false
     @Environment(\.locationStore) private var locationStore
 
     var body: some View {
@@ -56,6 +57,7 @@ struct HomeView: View {
         .toolbar { topBar }
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .navigationDestination(isPresented: $showNotifications) { NotificationsView() }
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
         .navigationDestination(isPresented: $showArtistSearch) {
             if let date = selectedDate {
@@ -90,7 +92,7 @@ struct HomeView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button {
-                // notificaciones
+                showNotifications = true
             } label: {
                 Image(systemName: "bell.fill")
                     .font(.system(size: 18))
@@ -466,7 +468,7 @@ struct PromoBannerView: View {
                     .lineSpacing(2)
 
                 Button {
-                    // acción
+                    showArtistSearch = true
                 } label: {
                     Text("Register Now")
                         .font(.subheadline.bold())

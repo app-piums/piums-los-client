@@ -5,6 +5,7 @@ struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showLogoutConfirm = false
     @EnvironmentObject private var themeManager: ThemeManager
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         List {
@@ -87,12 +88,18 @@ struct ProfileView: View {
                     Label("Mis quejas", systemImage: "exclamationmark.bubble")
                 }
                 .listRowBackground(Color(.tertiarySystemGroupedBackground))
-                Label("Términos y condiciones", systemImage: "doc.text")
-                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
-                Label("Política de privacidad", systemImage: "hand.raised")
-                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
-                Label("Contactar soporte", systemImage: "message")
-                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                Button { openURL(URL(string: "https://piums.io/terminos")!) } label: {
+                    Label("Términos y condiciones", systemImage: "doc.text")
+                }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                Button { openURL(URL(string: "https://piums.io/privacidad")!) } label: {
+                    Label("Política de privacidad", systemImage: "hand.raised")
+                }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                Button { openURL(URL(string: "mailto:soporte@piums.io")!) } label: {
+                    Label("Contactar soporte", systemImage: "message")
+                }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
             .foregroundStyle(.primary)
 
