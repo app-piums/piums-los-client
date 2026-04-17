@@ -19,7 +19,11 @@ enum APIEndpoint {
     case searchArtists(q: String?, page: Int, limit: Int, specialty: String?, city: String?,
                        minPrice: Int?, maxPrice: Int?, minRating: Double?,
                        isVerified: Bool?, sortBy: String?, sortOrder: String?)
-    case smartSearch(q: String, city: String?, lat: Double?, lng: Double?, limit: Int)
+    case smartSearch(q: String, city: String?, lat: Double?, lng: Double?,
+                     page: Int, limit: Int,
+                     specialty: String?, minPrice: Int?, maxPrice: Int?,
+                     minRating: Double?, isVerified: Bool?,
+                     sortBy: String?, sortOrder: String?)
 
     // ── Catalog ───────────────────────────────────────────
     case listServices(artistId: String)
@@ -198,11 +202,20 @@ extension APIEndpoint {
             if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
             return p
 
-        case .smartSearch(let q, let city, let lat, let lng, let limit):
-            var p = "/api/search/smart?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)&limit=\(limit)"
+        case .smartSearch(let q, let city, let lat, let lng, let page, let limit,
+                          let specialty, let minPrice, let maxPrice,
+                          let minRating, let isVerified, let sortBy, let sortOrder):
+            var p = "/api/search/smart?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)&page=\(page)&limit=\(limit)"
             if let city = city, !city.isEmpty { p += "&city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)" }
             if let lat = lat { p += "&lat=\(lat)" }
             if let lng = lng { p += "&lng=\(lng)" }
+            if let specialty = specialty, !specialty.isEmpty { p += "&specialty=\(specialty.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? specialty)" }
+            if let minPrice = minPrice { p += "&minPrice=\(minPrice)" }
+            if let maxPrice = maxPrice { p += "&maxPrice=\(maxPrice)" }
+            if let minRating = minRating { p += "&minRating=\(minRating)" }
+            if let isVerified = isVerified, isVerified { p += "&isVerified=true" }
+            if let sortBy = sortBy, !sortBy.isEmpty { p += "&sortBy=\(sortBy)" }
+            if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
             return p
 
         // Catalog

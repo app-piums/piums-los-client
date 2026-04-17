@@ -1,0 +1,1092 @@
+# ANDROID_CONTEXT.md — Piums Cliente Android
+> Referencia completa para replicar la app iOS en Android con Jetpack Compose.
+> Última actualización: Abril 2026
+
+---
+
+## 1. VISIÓN GENERAL
+
+**App**: Piums Cliente — marketplace de servicios creativos  
+**Rol del usuario**: Cliente que busca y reserva artistas para eventos  
+**Stack Android**: Kotlin + Jetpack Compose + MVVM + Hilt  
+**Backend**: REST API en `https://api.piums.com` (dev: `http://localhost:3005`)  
+**Auth**: JWT Bearer Token + Google Firebase OAuth
+
+---
+
+## 2. SISTEMA DE DISEÑO
+
+### 2.1 Paleta de Colores
+
+```kotlin
+// ui/theme/Color.kt
+val PiumsOrange       = Color(0xFFFF6B35)   // #FF6B35 — color primario de marca
+val PiumsOrangeDim    = Color(0x80FF6B35)   // 50% opacidad — botón deshabilitado
+val PiumsDark         = Color(0xFF1A1A1A)
+
+// Dark Mode — equivalentes exactos de los semantic colors iOS
+val PageBackground    = Color(0xFF1C1C1E)   // secondarySystemGroupedBackground
+val CardBackground    = Color(0xFF2C2C2E)   // tertiarySystemGroupedBackground
+val InputBackground   = Color(0xFF3A3A3C)   // systemGray6 en dark
+
+// Light Mode
+val PageBackgroundLight = Color(0xFFFFFFFF)
+val CardBackgroundLight = Color(0xFFF2F2F7)
+val InputBackgroundLight = Color(0xFFEFEFF4)
+```
+
+```kotlin
+// ui/theme/PiumsTheme.kt
+private val DarkColorScheme = darkColorScheme(
+    primary        = PiumsOrange,
+    background     = PageBackground,        // #1C1C1E
+    surface        = CardBackground,        // #2C2C2E
+    surfaceVariant = Color(0xFF3A3A3C),
+    onBackground   = Color.White,
+    onSurface      = Color.White,
+    secondary      = Color(0xFF3A6AFF),
+    outline        = Color(0xFF48484A)
+)
+
+private val LightColorScheme = lightColorScheme(
+    primary        = PiumsOrange,
+    background     = PageBackgroundLight,
+    surface        = CardBackgroundLight,
+    onBackground   = Color(0xFF1C1C1E),
+    onSurface      = Color(0xFF1C1C1E),
+    secondary      = Color(0xFF3A6AFF),
+    outline        = Color(0xFFD1D1D6)
+)
+
+@Composable
+fun PiumsTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    MaterialTheme(colorScheme = colorScheme, typography = PiumsTypography, content = content)
+}
+```
+
+### 2.2 Tipografía
+
+```kotlin
+// ui/theme/Type.kt
+val PiumsTypography = Typography(
+    headlineLarge  = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.Bold),
+    headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold),
+    titleLarge     = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+    titleMedium    = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
+    bodyLarge      = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal),
+    bodyMedium     = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal),
+    labelSmall     = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                               letterSpacing = 0.8.sp)
+)
+```
+
+### 2.3 Regla de Superficies (equivalente iOS)
+
+| Rol            | iOS                              | Android (dark)  | Android (light) |
+|----------------|----------------------------------|-----------------|-----------------|
+| Fondo de página | `secondarySystemGroupedBackground` | `#1C1C1E`       | `#FFFFFF`       |
+| Cards / filas  | `tertiarySystemGroupedBackground`  | `#2C2C2E`       | `#F2F2F7`       |
+| Inputs         | `systemGray6`                    | `#3A3A3C`       | `#EFEFF4`       |
+| Nav bar        | `secondarySystemGroupedBackground` | `#1C1C1E`       | `#FFFFFF`       |
+
+### 2.4 Shape & Spacing
+
+```kotlin
+// Radios de esquina
+val radiusCard   = 14.dp   // Cards de artistas, filas de reserva
+val radiusInput  = 12.dp   // Campos de texto
+val radiusButton = 14.dp   // Botón principal
+val radiusSheet  = 32.dp   // Bottom sheets
+
+// Padding estándar de página
+val paddingPage  = 20.dp
+val paddingCard  = 16.dp
+```
+
+---
+
+## 3. PANTALLA DE LOGIN (Referencia visual exacta)
+
+### Diseño (replicar pixel-perfect del artista iOS)
+
+```
+┌────────────────────────────────┐
+│  (fondo oscuro degradado)      │
+│                                │
+│         [PiumsLogo]            │  ← logo centrado, height: 44dp
+│                                │
+│    ┌──────────────────────┐    │
+│    │  ⬤ (ícono ticket)   │    │  ← círculo doble, 110dp
+│    └──────────────────────┘    │
+│                                │
+│    "Panel de Clientes"         │  ← title2.bold, blanco
+│  "Reserva el mejor talento"    │  ← subheadline, white 50%
+│                                │
+├────────────────────────────────┤  ← card oscura R=32dp desliza arriba
+│  ———  (drag indicator)         │
+│                                │
+│  Bienvenido de nuevo           │  ← headline bold
+│  Accede a tu panel...          │  ← body, secondary
+│                                │
+│  CORREO                        │  ← caption bold, tracking
+│  [nombre@ejemplo.com       ]   │  ← input R=12dp
+│                                │
+│  CONTRASEÑA                    │
+│  [••••••••          👁]        │
+│         ¿Olvidaste tu...?      │  ← naranja, trailing
+│                                │
+│  [    Iniciar sesión    ]       │  ← naranja R=14dp, h=54dp
+│                                │
+│  ─────  O CONTINUAR CON  ───── │
+│                                │
+│  [G Continuar con Google] [🍎] │
+│                                │
+│  ¿Aún no tienes cuenta?        │
+│  Regístrate gratis             │  ← naranja
+└────────────────────────────────┘
+```
+
+```kotlin
+// screens/auth/LoginScreen.kt
+@Composable
+fun LoginScreen(viewModel: AuthViewModel = hiltViewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    var animateIn by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { animateIn = true }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Fondo
+        LoginBackground(animateIn = animateIn)
+
+        // Card deslizante
+        val offsetY by animateDpAsState(
+            targetValue = if (animateIn) 0.dp else 500.dp,
+            animationSpec = spring(dampingRatio = 0.82f, stiffness = 200f),
+            label = "sheet"
+        )
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
+            LoginSheet(
+                modifier = Modifier.offset(y = offsetY),
+                uiState = uiState,
+                onLoginClick = { viewModel.login() },
+                onGoogleClick = { viewModel.loginWithGoogle() },
+                onForgotClick = { /* navigate */ },
+                onRegisterClick = { /* navigate */ }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LoginBackground(animateIn: Boolean) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Degradado
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(Color(0xFF0F0F1A), Color(0xFF0D1F3C)),
+                    start = Offset(0f, 0f), end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                )
+            )
+        )
+        // Glow naranja
+        if (animateIn) {
+            Box(modifier = Modifier
+                .size(300.dp)
+                .offset(x = (-60).dp, y = (-40).dp)
+                .blur(70.dp)
+                .background(PiumsOrange.copy(alpha = 0.18f), CircleShape)
+            )
+        }
+        // Logo + ícono + texto centrado
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 72.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(painter = painterResource(R.drawable.piums_logo),
+                  contentDescription = null, modifier = Modifier.height(44.dp))
+            Spacer(Modifier.height(24.dp))
+            // Ícono doble círculo
+            Box(contentAlignment = Alignment.Center) {
+                Box(Modifier.size(110.dp).background(Color.White.copy(0.04f), CircleShape))
+                Box(Modifier.size(82.dp).background(PiumsOrange.copy(0.13f), CircleShape))
+                Icon(Icons.Default.ConfirmationNumber, null, // ticket
+                     tint = PiumsOrange, modifier = Modifier.size(36.dp))
+            }
+            Spacer(Modifier.height(20.dp))
+            Text("Panel de Clientes", style = MaterialTheme.typography.titleLarge,
+                 color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Reserva el mejor talento para tu evento",
+                 style = MaterialTheme.typography.bodyMedium,
+                 color = Color.White.copy(0.48f), textAlign = TextAlign.Center)
+        }
+    }
+}
+```
+
+### Reglas críticas del botón de login
+
+```kotlin
+// Botón se atenúa si campos vacíos — igual que iOS
+val isEnabled = email.isNotEmpty() && password.isNotEmpty() && !isLoading
+Button(
+    onClick = onLoginClick,
+    enabled = isEnabled,
+    colors = ButtonDefaults.buttonColors(
+        containerColor = PiumsOrange,
+        disabledContainerColor = PiumsOrange.copy(alpha = 0.5f)
+    ),
+    shape = RoundedCornerShape(14.dp),
+    modifier = Modifier.fillMaxWidth().height(54.dp)
+) {
+    if (isLoading) {
+        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Iniciando sesión...", fontWeight = FontWeight.Bold)
+    } else {
+        Text("Iniciar sesión", fontWeight = FontWeight.Bold)
+    }
+}
+```
+
+---
+
+## 4. NAVEGACIÓN PRINCIPAL
+
+### Bottom Navigation (5 tabs — igual que iOS)
+
+```kotlin
+// navigation/Screen.kt
+sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
+    object Home     : Screen("home",      "Inicio",     Icons.Filled.Home)
+    object Search   : Screen("search",    "Explorar",   Icons.Filled.Search)
+    object MySpace  : Screen("my_space",  "Mi Espacio", Icons.Filled.GridView)
+    object Inbox    : Screen("inbox",     "Mensajes",   Icons.Filled.Message)
+    object Profile  : Screen("profile",   "Perfil",     Icons.Filled.Person)
+}
+```
+
+```kotlin
+// Tint del tab seleccionado = PiumsOrange
+// FAB naranja flotante encima del tab bar (igual que iOS)
+```
+
+---
+
+## 5. FEATURES Y PANTALLAS
+
+### 5.1 Onboarding (3 pasos — mostrar solo primera vez)
+
+| Paso | Contenido iOS | Android equivalente |
+|------|--------------|---------------------|
+| 1 | Bienvenida + logo + animación | `AnimatedVisibility` + Pager |
+| 2 | Selección de intereses (chips) | `FlowRow` con `FilterChip` |
+| 3 | Refinamiento + finalización | Confirmación + `POST /api/auth/complete-onboarding` |
+
+- Guardar `hasSeenOnboarding` en `DataStore<Preferences>`
+
+### 5.2 Home
+
+```
+Saludo "Hola, {nombre} 👋"  
+Mini-calendario horizontal (reservas = dots naranjas)  
+Sección "Recomendados" — horizontal LazyRow de ArtistCard  
+PromoBanner naranja  
+```
+
+- Datos: `GET /api/auth/me` (nombre) + `GET /api/bookings?page=1` (fechas para calendario)
+- Pull-to-refresh con `SwipeRefresh` (Accompanist)
+
+### 5.3 Search & Discovery
+
+**Estado inicial** — Grid de categorías (3 columnas):
+```
+Música | DJ | Fotografía | Baile | Maquillaje | Tatuajes
+Iluminación | Bodas | Quinceañeras | Corporativo | Barbería | Shows
+```
+
+**Búsqueda activa** — Grid 2 columnas de `ArtistCard`
+
+**SmartSearch**: usar `GET /api/search/smart?q=&lat=&lng=` si el usuario da permisos de ubicación
+
+**Filtros sheet** (BottomSheet):
+- Especialidad (chips)
+- Rango precio (RangeSlider)
+- Rating mínimo (chips: Todos, 3.0★, 3.5★, 4.0★, 4.5★, 5.0★)
+- Ciudad (chips)
+- Solo verificados (Switch)
+- Ordenar por (RadioGroup)
+
+### 5.4 Perfil de Artista
+
+```
+Header: avatar + nombre + ciudad + verificado ✓
+Stats bar: Rating | Reseñas | Verificado
+Bio text
+Lista de servicios (seleccionable → highlight naranja)
+Lista de reseñas
+Galería horizontal (portfolio)
+FAB "Contratar" sticky al fondo → abre BookingFlow
+```
+
+- `GET /api/artists/{id}` (profile completo — solo disponible en detalle)
+- `GET /api/catalog/services?artistId={id}`
+- `GET /api/reviews?artistId={id}&page=1`
+- `GET /api/artists/{id}/portfolio`
+
+### 5.5 Booking Flow (4 pasos en BottomSheet / pantalla)
+
+```
+Paso 1 → Servicio (ya viene seleccionado desde ArtistProfile)
+Paso 2 → Fecha: calendario + slots de tiempo
+          GET /api/availability/calendar?artistId=&year=&month=
+          GET /api/availability/time-slots?artistId=&date=
+Paso 3 → Detalles: ubicación, notas, ¿multi-día?
+          POST /api/catalog/pricing/calculate → muestra precio dinámico
+Paso 4 → Resumen + confirmar
+          POST /api/bookings
+```
+
+**Cálculo de precio dinámico**:
+```json
+POST /api/catalog/pricing/calculate
+{
+  "serviceId": "xxx",
+  "scheduledDate": "2026-05-10T15:00:00.000Z",
+  "duration": 60,
+  "locationLat": 14.64,
+  "locationLng": -90.51,
+  "numDays": 1
+}
+→ { totalCents, breakdown: { baseCents, travelCents } }
+```
+
+### 5.6 Mi Espacio (3 tabs internos)
+
+**Tab Reservas**:
+- Filtro horizontal: Todas | Pendiente | Confirmada | Completada | Cancelada
+- `GET /api/bookings?status=&page=`
+- Swipe-to-cancel en reservas PENDING/CONFIRMED
+
+**Detalle de Reserva**:
+- Hero de estado (ícono circular + color según estado)
+- Código de reserva (monospaced, fondo naranja 8%)
+- Cards: Información, Resumen de pago, Notas, Acciones
+- Acciones: Agregar al calendario, Compartir, Dejar reseña (si completed), Abrir queja
+
+**Tab Eventos**:
+- CRUD: `GET/POST/PATCH/DELETE /api/events`
+- Vincular reservas existentes: `POST /api/events/{eventId}/bookings/{bookingId}`
+- Mostrar total del evento = suma de reservas
+
+**Tab Favoritos**:
+- `GET /api/users/me/favorites?entityType=ARTIST`
+- Add: `POST /api/users/me/favorites`
+- Remove: `DELETE /api/users/me/favorites/{id}`
+
+### 5.7 Inbox (2 tabs internos)
+
+**Tab Mensajes**:
+- Lista conversaciones: `GET /api/chat/conversations?page=`
+- Chat detalle: `GET /api/chat/messages/{conversationId}?page=`
+- WebSocket: `ws://api.piums.com/api/chat/ws` con JWT
+- Badge counter en tab bar
+- Mensajes propios: fondo naranja | recibidos: `CardBackground`
+
+**Tab Quejas**:
+- Lista: `GET /api/disputes/me`
+- Detalle: `GET /api/disputes/{id}` (incluye messages)
+- Crear: `POST /api/disputes`
+- Responder: `POST /api/disputes/{id}/messages`
+
+### 5.8 Perfil
+
+```
+Section Avatar + nombre + email + badge "Cliente"
+Section Cuenta: Editar perfil | Cambiar contraseña | Mis pagos
+Section Apariencia: Toggle dark/light mode
+Section Ayuda: Mis quejas | Términos | Privacidad | Soporte
+Section Cerrar sesión (destructivo)
+```
+
+- PATCH `/api/auth/profile` — actualizar nombre
+- POST `/api/auth/change-password`
+- Guardar preferencia de tema en `DataStore`
+
+### 5.9 Notificaciones
+
+- `GET /api/notifications?page=` (paginado)
+- `POST /api/notifications/read` body: `{ "notificationIds": ["id1"] }`
+- Registro FCM token: `POST /api/notifications/push-token` body: `{ "token": "fcm_token", "platform": "android" }`
+- Filas: no leídas = fondo naranja 5% + borde naranja 20% | leídas = `CardBackground`
+
+---
+
+## 6. MODELOS DE DATOS (Kotlin)
+
+```kotlin
+// data/models/User.kt
+data class AuthUser(
+    val id: String,
+    val email: String,
+    val nombre: String?,
+    val role: String,      // "cliente"
+    val avatar: String?
+)
+
+// data/models/Artist.kt
+data class Artist(
+    val id: String,
+    val name: String,
+    val bio: String?,
+    val city: String?,
+    val state: String?,
+    val country: String?,
+    val averageRating: Double?,
+    val totalReviews: Int,
+    val totalBookings: Int,
+    val mainServicePrice: Int?,
+    val mainServiceName: String?,
+    val isVerified: Boolean,
+    val isActive: Boolean,
+    val isAvailable: Boolean,
+    val specialties: List<String>?,
+    val baseLocationLat: Double?,
+    val baseLocationLng: Double?
+) {
+    val artistName: String get() = name
+    val rating: Double? get() = averageRating
+}
+
+// data/models/ArtistService.kt
+data class ArtistService(
+    val id: String,
+    val artistId: String,
+    val name: String,
+    val description: String?,
+    val pricingType: String?,   // "FIXED" | "HOURLY" | "PACKAGE"
+    val basePrice: Int,
+    val currency: String,
+    val durationMin: Int?,
+    val durationMax: Int?,
+    val status: String?,
+    val isAvailable: Boolean?,
+    val isMainService: Boolean?,
+    val whatIsIncluded: List<String>?
+) {
+    val price: Int get() = basePrice
+    val duration: Int get() = durationMin ?: 60
+}
+
+// data/models/Booking.kt
+data class Booking(
+    val id: String,
+    val code: String?,
+    val clientId: String,
+    val artistId: String,
+    val serviceId: String,
+    val status: BookingStatus,
+    val paymentStatus: PaymentStatus,
+    val totalPrice: Int,
+    val scheduledDate: String,
+    val scheduledTime: String?,
+    val duration: Int?,
+    val notes: String?,
+    val location: String?,
+    val eventId: String?,
+    val createdAt: String
+)
+
+enum class BookingStatus(val raw: String, val displayName: String) {
+    PENDING("PENDING", "Pendiente"),
+    CONFIRMED("CONFIRMED", "Confirmada"),
+    PAYMENT_PENDING("PAYMENT_PENDING", "Pago pendiente"),
+    PAYMENT_COMPLETED("PAYMENT_COMPLETED", "Pago completado"),
+    IN_PROGRESS("IN_PROGRESS", "En progreso"),
+    COMPLETED("COMPLETED", "Completada"),
+    RESCHEDULED("RESCHEDULED", "Reprogramada"),
+    CANCELLED_CLIENT("CANCELLED_CLIENT", "Cancelada por ti"),
+    CANCELLED_ARTIST("CANCELLED_ARTIST", "Cancelada por artista"),
+    REJECTED("REJECTED", "Rechazada"),
+    NO_SHOW("NO_SHOW", "No se presentó");
+
+    companion object {
+        fun from(raw: String) = values().firstOrNull { it.raw == raw } ?: PENDING
+    }
+}
+
+// data/models/Event.kt
+data class EventSummary(
+    val id: String,
+    val code: String,
+    val clientId: String,
+    val name: String,
+    val description: String?,
+    val location: String?,
+    val notes: String?,
+    val eventDate: String?,
+    val status: EventStatus,
+    val createdAt: String,
+    val bookings: List<EventBooking>?
+)
+
+enum class EventStatus(val raw: String) {
+    DRAFT("DRAFT"), ACTIVE("ACTIVE"), CANCELLED("CANCELLED");
+    companion object { fun from(raw: String) = values().first { it.raw == raw } }
+}
+
+// data/models/Dispute.kt
+data class Dispute(
+    val id: String,
+    val bookingId: String,
+    val reportedBy: String,
+    val disputeType: String,
+    val subject: String,
+    val description: String,
+    val status: DisputeStatus,
+    val priority: Int?,
+    val createdAt: String,
+    val messages: List<DisputeMessage>?
+)
+
+enum class DisputeStatus(val raw: String, val displayName: String) {
+    OPEN("OPEN", "Abierta"),
+    IN_REVIEW("IN_REVIEW", "En revisión"),
+    AWAITING_INFO("AWAITING_INFO", "Esperando info"),
+    RESOLVED("RESOLVED", "Resuelta"),
+    CLOSED("CLOSED", "Cerrada"),
+    ESCALATED("ESCALATED", "Escalada");
+    companion object { fun from(raw: String) = values().firstOrNull { it.raw == raw } ?: OPEN }
+}
+
+// data/models/Chat.kt
+data class Conversation(
+    val id: String,
+    val userId: String,
+    val artistId: String,
+    val bookingId: String?,
+    val status: String,
+    val lastMessageAt: String?,
+    val unreadCount: Int?,
+    val createdAt: String
+)
+
+data class ChatMessage(
+    val id: String,
+    val conversationId: String,
+    val senderId: String,
+    val senderType: String,  // "client" | "artist"
+    val content: String,
+    val type: String,        // "text"
+    val read: Boolean,
+    val createdAt: String
+)
+
+// data/models/Notification.kt
+data class PiumsNotification(
+    val id: String,
+    val title: String,
+    val message: String,
+    val type: String,        // "BOOKING_CONFIRMED" | "PAYMENT_COMPLETED" | etc.
+    val readAt: String?,
+    val createdAt: String
+) {
+    val isRead: Boolean get() = readAt != null
+}
+```
+
+---
+
+## 7. API ENDPOINTS COMPLETOS
+
+### Base URL
+```
+DEV:  http://localhost:3005
+PROD: https://api.piums.com
+
+Headers siempre:
+  Content-Type: application/json
+  Authorization: Bearer {JWT}   ← solo en endpoints requiresAuth=true
+```
+
+### Auth (no requieren token excepto los marcados)
+```
+POST /api/auth/login                   body: {email, password}
+POST /api/auth/register/client         body: {nombre, email, password}
+POST /api/auth/firebase                body: {idToken, role: "cliente"}
+POST /api/auth/refresh                 body: {refreshToken}
+POST /api/auth/logout                  [auth]
+GET  /api/auth/me                      [auth]
+POST /api/auth/forgot-password         body: {email}
+PATCH /api/auth/profile                [auth] body: {nombre}
+POST /api/auth/change-password         [auth] body: {currentPassword, newPassword}
+POST /api/auth/complete-onboarding     [auth]
+```
+
+### Artists & Search
+```
+GET /api/search/artists?page=1&limit=20&q=&specialty=&city=&minPrice=&maxPrice=&minRating=&isVerified=&sortBy=&sortOrder=
+GET /api/search/smart?q=&page=1&limit=20&lat=&lng=&city=&specialty=&minPrice=&maxPrice=&minRating=&isVerified=
+GET /api/artists/{id}
+GET /api/artists/{id}/portfolio
+GET /api/catalog/services?artistId={id}
+```
+
+### Availability & Pricing
+```
+GET  /api/availability/time-slots?artistId={id}&date=2026-05-10
+GET  /api/availability/calendar?artistId={id}&year=2026&month=5
+POST /api/catalog/pricing/calculate
+     body: {serviceId, scheduledDate (ISO), duration, locationLat, locationLng, numDays}
+```
+
+### Bookings
+```
+POST /api/bookings                              [auth] body: ver abajo
+GET  /api/bookings?page=1&limit=20&status=      [auth]
+GET  /api/bookings/{id}                         [auth]
+POST /api/bookings/{id}/cancel                  [auth]
+```
+
+**Create booking body**:
+```json
+{
+  "artistId": "xxx",
+  "serviceId": "yyy",
+  "scheduledDate": "2026-05-10T15:00:00.000Z",
+  "duration": 60,
+  "location": "Salón XYZ",
+  "locationLat": 14.64,
+  "locationLng": -90.51,
+  "notes": "...",
+  "numDays": 1,
+  "eventId": null
+}
+```
+
+### Events
+```
+GET    /api/events                              [auth]
+POST   /api/events                             [auth] body: {name, eventDate, location, notes, description}
+PATCH  /api/events/{id}                        [auth] body: {name, eventDate, location, notes, description}
+DELETE /api/events/{id}                        [auth]
+POST   /api/events/{eventId}/bookings/{bookingId}  [auth]
+```
+
+### Favorites
+```
+GET    /api/users/me/favorites?page=1&limit=50&entityType=ARTIST   [auth]
+POST   /api/users/me/favorites                 [auth] body: {entityType: "ARTIST", entityId, notes}
+DELETE /api/users/me/favorites/{id}            [auth]
+GET    /api/users/me/favorites/check?entityType=ARTIST&entityId=   [auth]
+```
+
+### Reviews
+```
+GET  /api/reviews?artistId={id}&page=1&limit=10
+POST /api/reviews   [auth] body: {artistId, bookingId, rating (1-5), comment}
+```
+
+### Payments
+```
+POST /api/payments/intent   [auth] body: {bookingId}
+GET  /api/payments?page=1   [auth]
+GET  /api/payments/{id}     [auth]
+```
+
+### Disputes
+```
+GET  /api/disputes/me         [auth]
+POST /api/disputes            [auth] body: {bookingId, disputeType, subject, description}
+GET  /api/disputes/{id}       [auth]
+POST /api/disputes/{id}/messages  [auth] body: {message}
+```
+
+### Chat
+```
+GET   /api/chat/conversations?page=1&limit=20         [auth]
+GET   /api/chat/conversations/{id}                    [auth]
+PATCH /api/chat/conversations/{id}/read               [auth]
+GET   /api/chat/messages/{conversationId}?page=1&limit=50  [auth]
+POST  /api/chat/messages  [auth] body: {conversationId, content, type: "text"}
+GET   /api/chat/messages/unread-count                 [auth]
+WS    /api/chat/ws  + header Authorization: Bearer {JWT}
+```
+
+### Notifications
+```
+GET  /api/notifications?page=1&limit=20               [auth]
+POST /api/notifications/read   [auth] body: {notificationIds: ["id1", "id2"]}
+POST /api/notifications/push-token  [auth] body: {token, platform: "android"}
+```
+
+---
+
+## 8. COMPONENTES REUTILIZABLES (Compose)
+
+```kotlin
+// PiumsButton.kt
+@Composable
+fun PiumsButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    isLoading: Boolean = false
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled && !isLoading,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = PiumsOrange,
+            disabledContainerColor = PiumsOrange.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.fillMaxWidth().height(54.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(if (isLoading) "Cargando..." else text, fontWeight = FontWeight.Bold)
+    }
+}
+
+// PiumsCard.kt — equivalente a los .background(tertiarySystemGroupedBackground)
+@Composable
+fun PiumsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(16.dp),
+        content = content
+    )
+}
+
+// PiumsTextField.kt
+@Composable
+fun PiumsTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None
+) {
+    Column(modifier = modifier) {
+        Text(label, style = MaterialTheme.typography.labelSmall,
+             color = MaterialTheme.colorScheme.onSurface.copy(0.6f))
+        Spacer(Modifier.height(6.dp))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            keyboardOptions = keyboardOptions,
+            visualTransformation = visualTransformation,
+            decorationBox = { inner ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        if (value.isEmpty()) Text(placeholder, color = Color.Gray)
+                        inner()
+                    }
+                    trailingIcon?.invoke()
+                }
+            }
+        )
+    }
+}
+
+// PiumsStatusBadge.kt — equivalente a las Capsule() con color de estado
+@Composable
+fun PiumsStatusBadge(text: String, color: Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    )
+}
+
+// ArtistCard.kt — card vertical (Home recomendados)
+@Composable
+fun ArtistCard(artist: Artist, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(160.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick)
+    ) {
+        // Cover gradient + iniciales
+        Box(modifier = Modifier.fillMaxWidth().height(120.dp)
+                .background(piumsGradientForArtist(artist.id))) {
+            // TOP RATED badge si rating >= 4.8
+            // Avatar iniciales superpuesto
+        }
+        Column(Modifier.padding(horizontal = 6.dp, vertical = 4.dp)) {
+            Spacer(Modifier.height(18.dp)) // space for overlapping avatar
+            Text(artist.artistName, style = MaterialTheme.typography.titleMedium,
+                 maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${artist.specialties?.firstOrNull() ?: "Artista"} · ${artist.city ?: ""}",
+                 style = MaterialTheme.typography.bodyMedium,
+                 color = MaterialTheme.colorScheme.onSurface.copy(0.6f),
+                 maxLines = 1)
+            artist.mainServicePrice?.let {
+                Text(it.piumsFormatted(), color = PiumsOrange,
+                     style = MaterialTheme.typography.labelSmall,
+                     fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+```
+
+---
+
+## 9. ARQUITECTURA ANDROID
+
+```
+app/src/main/java/com/piums/cliente/
+├── MainActivity.kt                 ← Single Activity, NavHost
+├── di/
+│   ├── NetworkModule.kt            ← Retrofit + OkHttp + Hilt
+│   └── RepositoryModule.kt
+├── data/
+│   ├── remote/
+│   │   ├── PiumsApiService.kt      ← todas las llamadas Retrofit
+│   │   ├── AuthInterceptor.kt      ← agrega Bearer token automáticamente
+│   │   └── dto/                    ← DTOs de respuesta
+│   ├── local/
+│   │   ├── TokenStorage.kt         ← EncryptedSharedPreferences
+│   │   └── PiumsDataStore.kt       ← DataStore (tema, onboarding)
+│   └── repository/
+│       ├── AuthRepository.kt
+│       ├── ArtistRepository.kt
+│       ├── BookingRepository.kt
+│       ├── EventRepository.kt
+│       ├── ChatRepository.kt
+│       └── NotificationRepository.kt
+├── domain/
+│   └── models/                     ← modelos de dominio (ver sección 6)
+├── ui/
+│   ├── theme/
+│   │   ├── Color.kt
+│   │   ├── Type.kt
+│   │   └── PiumsTheme.kt
+│   ├── components/                 ← componentes reutilizables (sección 8)
+│   └── screens/
+│       ├── auth/                   ← Login, Register, ForgotPassword
+│       ├── onboarding/
+│       ├── home/
+│       ├── search/
+│       ├── artist_profile/
+│       ├── booking/
+│       ├── my_space/               ← tabs: Reservas, Eventos, Favoritos
+│       ├── inbox/                  ← tabs: Mensajes, Quejas
+│       ├── profile/
+│       └── notifications/
+└── utils/
+    ├── PiumsFormatter.kt           ← formatPrice, formatDate
+    └── WebSocketManager.kt         ← chat en tiempo real
+```
+
+### Networking Retrofit
+
+```kotlin
+// di/NetworkModule.kt
+@Module @InstallIn(SingletonComponent::class)
+object NetworkModule {
+    @Provides @Singleton
+    fun provideOkHttp(tokenStorage: TokenStorage): OkHttpClient =
+        OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(tokenStorage))
+            .addInterceptor(HttpLoggingInterceptor().apply { level = BODY })
+            .build()
+
+    @Provides @Singleton
+    fun provideRetrofit(client: OkHttpClient): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://api.piums.com")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+}
+
+// data/remote/AuthInterceptor.kt
+class AuthInterceptor(private val tokenStorage: TokenStorage) : Interceptor {
+    override fun intercept(chain: Chain): Response {
+        val token = tokenStorage.getToken() ?: return chain.proceed(chain.request())
+        val req = chain.request().newBuilder()
+            .addHeader("Authorization", "Bearer $token")
+            .build()
+        return chain.proceed(req)
+    }
+}
+```
+
+### Token Storage
+
+```kotlin
+// data/local/TokenStorage.kt
+class TokenStorage @Inject constructor(@ApplicationContext ctx: Context) {
+    private val prefs = EncryptedSharedPreferences.create(
+        ctx, "piums_secure", MasterKey.Builder(ctx).setKeyScheme(AES256_GCM).build(),
+        AES256_SIV, AES256_GCM
+    )
+    fun saveToken(token: String) = prefs.edit().putString("jwt", token).apply()
+    fun getToken(): String? = prefs.getString("jwt", null)
+    fun saveRefreshToken(t: String) = prefs.edit().putString("refresh", t).apply()
+    fun getRefreshToken(): String? = prefs.getString("refresh", null)
+    fun clear() = prefs.edit().clear().apply()
+}
+```
+
+---
+
+## 10. FORMATO DE PRECIOS
+
+```kotlin
+// utils/PiumsFormatter.kt
+fun Int.piumsFormatted(): String {
+    // Backend envía precios en unidades GTQ (no centavos para montos de reserva)
+    // Ejemplo: 15000 = Q150.00 (verificar con backend)
+    return "Q${String.format("%,.2f", this / 100.0)}"
+}
+```
+
+---
+
+## 11. WEBSOCKET (Chat)
+
+```kotlin
+// utils/WebSocketManager.kt
+class WebSocketManager @Inject constructor(private val tokenStorage: TokenStorage) {
+    private val client = OkHttpClient()
+    private var ws: WebSocket? = null
+
+    fun connect(onMessage: (String) -> Unit) {
+        val token = tokenStorage.getToken() ?: return
+        val req = Request.Builder()
+            .url("wss://api.piums.com/api/chat/ws")
+            .addHeader("Authorization", "Bearer $token")
+            .build()
+        ws = client.newWebSocket(req, object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) = onMessage(text)
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                // reconectar con backoff exponencial
+            }
+        })
+    }
+
+    fun send(message: String) = ws?.send(message)
+    fun disconnect() = ws?.close(1000, null)
+}
+```
+
+---
+
+## 12. DEPENDENCIAS (build.gradle.kts)
+
+```kotlin
+dependencies {
+    // Compose
+    implementation(platform("androidx.compose:compose-bom:2024.04.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // Lifecycle & ViewModel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+    // Hilt
+    implementation("com.google.dagger:hilt-android:2.51")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    kapt("com.google.dagger:hilt-compiler:2.51")
+
+    // Networking
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Storage
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Images
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Google Auth
+    implementation("com.google.android.gms:play-services-auth:21.1.0")
+    implementation("com.google.firebase:firebase-auth:22.3.1")
+
+    // Pull-to-refresh
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.34.0")
+
+    // Maps & Location
+    implementation("com.google.android.gms:play-services-location:21.2.0")
+}
+```
+
+---
+
+## 13. CHECKLIST DE IMPLEMENTACIÓN
+
+### Fase 1 — MVP
+- [ ] Proyecto Android + Compose + Hilt configurado
+- [ ] PiumsTheme (colores, tipografía, dark/light)
+- [ ] NetworkModule + AuthInterceptor + TokenStorage
+- [ ] LoginScreen (igual al diseño de referencia)
+- [ ] RegisterScreen
+- [ ] RootActivity con NavHost (Splash → Onboarding → Auth → Main)
+- [ ] BottomNavigation con 5 tabs
+- [ ] HomeScreen (saludo + calendario + artistas sugeridos)
+- [ ] SearchScreen con categorías y búsqueda
+- [ ] ArtistProfileScreen
+- [ ] BookingFlow (4 pasos)
+- [ ] ProfileScreen
+
+### Fase 2 — Core
+- [ ] MySpaceScreen (Reservas + Eventos + Favoritos)
+- [ ] BookingDetail con acciones
+- [ ] ChatInbox + ChatDetail + WebSocket
+- [ ] NotificationsScreen + FCM push tokens
+- [ ] FavoritesSystem (add/remove/check)
+- [ ] ReviewsScreen
+
+### Fase 3 — Advanced
+- [ ] SmartSearch con geolocalización
+- [ ] EventsSystem (CRUD + vincular reservas)
+- [ ] DisputesSystem
+- [ ] Google Pay
+- [ ] Biometric auth
+- [ ] Adaptive icons
+
+---
+
+> **Notas críticas**:
+> 1. El backend devuelve precios como `Int` pero algunas respuestas los mezclan con `Double`. Usar un TypeAdapter tolerante en Gson (igual que el `decodeFlexibleInt` de iOS).
+> 2. El campo de artistas en Search es `name`, no `artistName`. En el detalle de artista el shape puede ser diferente.
+> 3. Disputes responde `{ asReporter: [], asReported: [], total: 0 }` — combinar y ordenar por `createdAt` DESC.
+> 4. Chat WebSocket envía eventos JSON — parsear tipo de evento antes de procesar.
+> 5. El `role` en el token Firebase debe ser `"cliente"` (minúscula).

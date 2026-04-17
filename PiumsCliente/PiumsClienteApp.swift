@@ -11,22 +11,23 @@ import GoogleSignIn
 @main
 struct PiumsClienteApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject private var themeManager = ThemeManager.shared
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environment(\.colorScheme, .light)
+                .preferredColorScheme(themeManager.colorScheme)
+                .environmentObject(themeManager)
                 .environment(\.locationStore, LocationStore.shared)
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
                 }
                 .onAppear {
-                    // Forzar modo claro en todos los windows
-                    UIApplication.shared.connectedScenes
-                        .compactMap { $0 as? UIWindowScene }
-                        .flatMap { $0.windows }
-                        .forEach { $0.overrideUserInterfaceStyle = .light }
+                    themeManager.applyToWindows()
                     LocationStore.shared.requestIfNeeded()
+                }
+                .onChange(of: themeManager.storedScheme) { _, _ in
+                    themeManager.applyToWindows()
                 }
         }
     }

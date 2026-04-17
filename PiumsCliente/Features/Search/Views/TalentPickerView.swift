@@ -285,7 +285,7 @@ private struct TalentGroupRow: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(Color(.secondarySystemBackground))
+                .background(Color(.tertiarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 0 : 12,
                                             style: .continuous))
             }
@@ -336,7 +336,7 @@ private struct TalentChip: View {
             Text(label)
                 .font(.caption.weight(.medium))
                 .padding(.horizontal, 12).padding(.vertical, 7)
-                .background(isSelected ? Color.piumsOrange : Color(.secondarySystemBackground))
+                .background(isSelected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
                 .foregroundStyle(isSelected ? .white : .primary)
                 .clipShape(Capsule())
                 .overlay(

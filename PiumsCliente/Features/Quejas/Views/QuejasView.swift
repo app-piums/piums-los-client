@@ -41,9 +41,11 @@ struct QuejasView: View {
                 .refreshable { await viewModel.loadInitial() }
             }
         }
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Mis Quejas")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .task { await viewModel.loadInitial() }
         .navigationDestination(item: $selectedDispute) { DisputeDetailView(dispute: $0) }
     }
@@ -95,7 +97,7 @@ struct DisputeRowView: View {
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 

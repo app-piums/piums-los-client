@@ -130,6 +130,7 @@ struct SearchView: View {
         }
         .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 searchBar.padding(.horizontal).padding(.vertical, 10)
@@ -140,7 +141,8 @@ struct SearchView: View {
         }
         .navigationTitle("Explorar")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
         .sheet(isPresented: $showFilters) {
             SearchFiltersSheet(viewModel: viewModel) { Task { await viewModel.search() } }
@@ -170,12 +172,15 @@ struct SearchView: View {
                             viewModel.smartResults = []
                             viewModel.expandedTerms = []
                             viewModel.hasSearched = false
-                            viewModel.selectedTalentId = nil
                         }
                     }
                 if !viewModel.query.isEmpty {
                     Button {
-                        viewModel.clearTalent()
+                        viewModel.query = ""
+                        viewModel.results = []
+                        viewModel.smartResults = []
+                        viewModel.expandedTerms = []
+                        viewModel.hasSearched = false
                         searchFocused = false
                     } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -183,7 +188,7 @@ struct SearchView: View {
                 }
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.tertiarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Button { searchFocused = false; showFilters = true } label: {
@@ -192,7 +197,7 @@ struct SearchView: View {
                         .font(.title3).padding(12)
                         .background(viewModel.hasActiveFilters
                                     ? Color.piumsOrange.opacity(0.15)
-                                    : Color(.secondarySystemBackground))
+                                    : Color(.tertiarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     if viewModel.hasActiveFilters {
                         Circle().fill(Color.piumsOrange)
@@ -220,12 +225,12 @@ struct SearchView: View {
                     }
                 }
                 if viewModel.minPrice > 0 {
-                    FilterChip(label: "Desde Q\(Int(viewModel.minPrice))") {
+                    FilterChip(label: "Desde \(Int(viewModel.minPrice).piumsFormatted)") {
                         viewModel.minPrice = 0; Task { await viewModel.search() }
                     }
                 }
                 if viewModel.maxPrice < 50000 {
-                    FilterChip(label: "Hasta Q\(Int(viewModel.maxPrice))") {
+                    FilterChip(label: "Hasta \(Int(viewModel.maxPrice).piumsFormatted)") {
                         viewModel.maxPrice = 50000; Task { await viewModel.search() }
                     }
                 }
@@ -316,7 +321,7 @@ private struct ClientExploreInitialView: View {
                                         .foregroundStyle(.primary)
                                 }
                                 .padding(.horizontal, 14).padding(.vertical, 9)
-                                .background(Color(.secondarySystemBackground))
+                                .background(Color(.tertiarySystemGroupedBackground))
                                 .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
@@ -370,7 +375,7 @@ struct SearchFiltersSheet: View {
                                     .frame(maxWidth: .infinity).padding(.vertical, 10)
                                     .background(viewModel.selectedSpecialty == sp
                                                 ? Color.piumsOrange
-                                                : Color(.tertiarySystemBackground))
+                                                : Color(.tertiarySystemGroupedBackground))
                                     .foregroundStyle(viewModel.selectedSpecialty == sp ? .white : .primary)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
@@ -379,13 +384,13 @@ struct SearchFiltersSheet: View {
                         }
                     }
                     Divider()
-                    filterSection(title: "Rango de precio (Q)") {
+                    filterSection(title: "Rango de precio") {
                         VStack(spacing: 12) {
                             HStack {
-                                Text("Mínimo: Q\(Int(viewModel.minPrice))")
+                                Text("Mínimo: \(Int(viewModel.minPrice).piumsFormatted)")
                                     .font(.subheadline).foregroundStyle(.secondary)
                                 Spacer()
-                                Text("Máximo: Q\(viewModel.maxPrice >= 50000 ? "Sin límite" : String(Int(viewModel.maxPrice)))")
+                                Text("Máximo: \(viewModel.maxPrice >= 50000 ? "Sin límite" : Int(viewModel.maxPrice).piumsFormatted)")
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }
                             Slider(value: $viewModel.minPrice, in: 0...49000, step: 100).tint(.piumsOrange)
@@ -404,7 +409,7 @@ struct SearchFiltersSheet: View {
                                         .padding(.horizontal, 10).padding(.vertical, 7)
                                         .background(viewModel.minRating == r
                                                     ? Color.piumsOrange
-                                                    : Color(.tertiarySystemBackground))
+                                                    : Color(.tertiarySystemGroupedBackground))
                                         .foregroundStyle(viewModel.minRating == r ? .white : .primary)
                                         .clipShape(Capsule())
                                 }
@@ -423,7 +428,7 @@ struct SearchFiltersSheet: View {
                                         .frame(maxWidth: .infinity).padding(.vertical, 9)
                                         .background(viewModel.selectedCity == city
                                                     ? Color.piumsOrange
-                                                    : Color(.tertiarySystemBackground))
+                                                    : Color(.tertiarySystemGroupedBackground))
                                         .foregroundStyle(viewModel.selectedCity == city ? .white : .primary)
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
@@ -459,7 +464,7 @@ struct SearchFiltersSheet: View {
                         Text("Limpiar todos los filtros")
                             .font(.subheadline.weight(.medium))
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
-                            .background(Color(.tertiarySystemBackground))
+                            .background(Color(.tertiarySystemGroupedBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }

@@ -30,7 +30,7 @@ struct ArtistProfileView: View {
                     StatCell(value: artist.isVerified ? "✓" : "—", label: "Verificado")
                 }
                 .padding(.vertical, 16)
-                .background(Color(.secondarySystemBackground))
+                .background(Color(.tertiarySystemGroupedBackground))
 
                 // Bio
                 if let bio = artist.bio {
@@ -114,7 +114,7 @@ struct ArtistProfileView: View {
                                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                         case .failure, .empty:
                                             RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color(.secondarySystemBackground))
+                                                .fill(Color(.tertiarySystemGroupedBackground))
                                                 .frame(width: 140, height: 140)
                                                 .overlay(
                                                     Image(systemName: "photo")
@@ -137,6 +137,7 @@ struct ArtistProfileView: View {
                 Spacer().frame(height: 100)
             }
         }
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .navigationTitle(artist.artistName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -270,7 +271,7 @@ private struct ServiceRowView: View {
                 }
             }
             .padding(14)
-            .background(isSelected ? Color.piumsOrange.opacity(0.08) : Color(.secondarySystemBackground))
+            .background(isSelected ? Color.piumsOrange.opacity(0.08) : Color(.tertiarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -298,7 +299,7 @@ private struct ReviewRowView: View {
             }
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }

@@ -88,7 +88,7 @@ private struct EventRow: View {
             }
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
     
@@ -270,9 +270,11 @@ private struct EventDetailView: View {
             .padding(.top, 16)
         }
         .scrollIndicators(.hidden)
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Evento")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .confirmationDialog("¿Eliminar este evento?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Eliminar", role: .destructive) {
                 Task { await viewModel.deleteEvent(event) }
@@ -385,7 +387,7 @@ private struct EventDetailCard<Content: View>: View {
             content()
         }
         .padding(18)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .padding(.horizontal, 20)
     }
@@ -620,7 +622,7 @@ private struct ExistingBookingRow: View {
                 }
             }
             .padding(14)
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.tertiarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
@@ -685,7 +687,7 @@ private struct CreateNewBookingView: View {
                 }
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground))
+            .background(Color(.tertiarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding()
             

@@ -50,6 +50,7 @@ struct MyBookingsView: View {
             }
         }
         // Barra de filtros pegada bajo la navbar — no interfiere con el ScrollView
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -140,7 +141,7 @@ struct BookingRowView: View {
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
@@ -184,7 +185,7 @@ private struct StatusFilterChip: View {
             Text(title)
                 .font(.subheadline.weight(.medium))
                 .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(isSelected ? Color.piumsOrange : Color(.secondarySystemBackground))
+                .background(isSelected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
                 .foregroundStyle(isSelected ? .white : .primary)
                 .clipShape(Capsule())
         }
@@ -366,9 +367,11 @@ struct BookingDetailView: View {
             .padding(.top, 16)
         }
         .scrollIndicators(.hidden)
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .navigationTitle(booking.code ?? "Detalle de Reserva")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showReview) { ReviewView(booking: booking) }
         .sheet(isPresented: $showQueja)  { CreateQuejaView(booking: booking) }
         .sheet(isPresented: $showShareSheet) {
@@ -445,7 +448,7 @@ private struct DetailCard<Content: View>: View {
             content()
         }
         .padding(18)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .padding(.horizontal, 20)
     }
@@ -537,9 +540,11 @@ struct MySpaceView: View {
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: selected)
         }
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Mi Espacio")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
     }
 }
 
@@ -585,7 +590,7 @@ struct PiumsSegmentedPicker<T: Hashable & CaseIterable>: View {
             }
         }
         .padding(4)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(Capsule())
     }
 }

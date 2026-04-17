@@ -56,7 +56,8 @@ struct DisputeDetailView: View {
         }
         .navigationTitle("Queja")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
     }
 
     // MARK: - Header card
@@ -85,7 +86,7 @@ struct DisputeDetailView: View {
             .foregroundStyle(.secondary)
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
@@ -150,7 +151,7 @@ struct DisputeDetailView: View {
                 TextField("Escribe un mensaje...", text: $viewModel.newMessage, axis: .vertical)
                     .lineLimit(1...4)
                     .padding(10)
-                    .background(Color(.secondarySystemBackground))
+                    .background(Color(.tertiarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .focused($messageFocused)
 
@@ -207,7 +208,7 @@ private struct MessageBubble: View {
                     .font(.subheadline)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(isOwn ? Color.piumsOrange : Color(.secondarySystemBackground))
+                    .background(isOwn ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
                     .foregroundStyle(isOwn ? .white : .primary)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 Text(message.createdAt.shortDate)

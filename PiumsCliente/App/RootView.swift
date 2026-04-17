@@ -18,7 +18,7 @@ struct RootView: View {
                         Image("PiumsLogo")
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(height: 60)
+                            .frame(height: 140)
                             .foregroundStyle(.white)
                         
                         ProgressView()

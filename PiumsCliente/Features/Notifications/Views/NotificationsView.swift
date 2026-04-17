@@ -98,7 +98,7 @@ struct NotificationRowView: View {
             }
         }
         .padding(14)
-        .background(notification.isRead ? Color(.secondarySystemBackground) : Color.piumsOrange.opacity(0.05))
+        .background(notification.isRead ? Color(.tertiarySystemGroupedBackground) : Color.piumsOrange.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -180,7 +180,8 @@ struct InboxView: View {
         }
         .navigationTitle("Mensajes")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .task { unreadStore.startIfNeeded() }
         .onReceive(NotificationCenter.default.publisher(for: .chatUnreadNeedsRefresh)) { _ in
             Task { await unreadStore.refreshUnread() }

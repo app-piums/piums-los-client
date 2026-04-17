@@ -49,11 +49,13 @@ struct HomeView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .refreshable { await viewModel.loadInitial() }
         .task { await viewModel.loadInitial() }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { topBar }
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
         .navigationDestination(isPresented: $showArtistSearch) {
             if let date = selectedDate {
@@ -238,7 +240,7 @@ struct HomeCalendarView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color(.tertiarySystemGroupedBackground))
         )
     }
 
@@ -396,7 +398,7 @@ struct RecommendedArtistCard: View {
             .padding(.bottom, 8)
         }
         .frame(width: 160)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
     }

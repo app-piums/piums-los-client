@@ -138,7 +138,8 @@ struct BookingFlowView: View {
         .navigationTitle("Reservar Servicio")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { if vm.step == .service { dismiss() } else { vm.back() } } label: {
@@ -289,7 +290,7 @@ struct BookingFlowView: View {
             header("Selecciona un Servicio", sub: "Elige el servicio para tu evento.")
             if vm.isLoading {
                 ForEach(0..<3, id:\.self) { _ in
-                    RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground))
+                    RoundedRectangle(cornerRadius: 16).fill(Color(.tertiarySystemGroupedBackground))
                         .frame(height: 90).redacted(reason: .placeholder)
                 }
             } else {
@@ -316,7 +317,7 @@ struct BookingFlowView: View {
                         ForEach(vm.slots) { s in
                             Button { vm.context.selectedSlot = s } label: {
                                 Text(s.time).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 10)
-                                    .background(vm.context.selectedSlot?.time == s.time ? Color.piumsOrange : Color(.secondarySystemBackground))
+                                    .background(vm.context.selectedSlot?.time == s.time ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
                                     .foregroundStyle(vm.context.selectedSlot?.time == s.time ? .white : .primary)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                             }.buttonStyle(.plain)
@@ -336,7 +337,7 @@ struct BookingFlowView: View {
                         Stepper("Días: \(vm.context.numDays)", value: $vm.context.numDays, in: 1...30).font(.subheadline)
                     }
                 }
-                .padding(14).background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(14).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
             }
         }
     }
@@ -349,7 +350,7 @@ struct BookingFlowView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label("Ubicación del Evento", systemImage: "mappin.circle.fill").font(.headline)
                 TextField("Ej. Salón Los Jardines, Zona 15", text: $vm.context.location)
-                    .padding(12).background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(12).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
                 Button {
                     if let coord = locationStore.coordinate {
                         vm.context.locationLat = coord.latitude
@@ -362,7 +363,7 @@ struct BookingFlowView: View {
                     Label(vm.context.locationLat != nil ? "Ubicación detectada ✓" : "Usar mi ubicación",
                           systemImage: vm.context.locationLat != nil ? "location.fill" : "location")
                         .font(.subheadline).frame(maxWidth: .infinity).padding(.vertical, 11)
-                        .background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
+                        .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
                         .foregroundStyle(vm.context.locationLat != nil ? .green : Color.piumsOrange)
                 }.buttonStyle(.plain)
                 .onChange(of: locationStore.coordinate?.latitude) { _, _ in
@@ -378,7 +379,7 @@ struct BookingFlowView: View {
                 Label("Notas para el artista", systemImage: "note.text").font(.headline)
                 TextEditor(text: $vm.context.clientNotes)
                     .frame(minHeight: 90).padding(10)
-                    .background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -399,7 +400,7 @@ struct BookingFlowView: View {
                 }
                 Spacer()
             }
-            .padding(14).background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(14).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
 
             detailRows
 
@@ -423,7 +424,7 @@ struct BookingFlowView: View {
             if !vm.context.location.isEmpty { reviewRow("mappin.circle", "Lugar", vm.context.location) }
             if !vm.context.clientNotes.isEmpty { reviewRow("note.text", "Notas", vm.context.clientNotes) }
         }
-        .background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func buildDateFormatter() -> DateFormatter {
@@ -515,7 +516,7 @@ struct BookingFlowView: View {
                     Text(q.totalCents.piumsFormatted).font(.title3.bold()).foregroundStyle(Color.piumsOrange)
                 }
             }
-            .padding(14).background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(14).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
 
             if q.hasTravel {
                 HStack(spacing: 8) {
@@ -567,7 +568,7 @@ private struct BFSvcCard: View {
                 }
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground))
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color(.tertiarySystemGroupedBackground))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(isSelected ? Color.piumsOrange : Color.clear, lineWidth: 2)))
         }
         .buttonStyle(.plain)
@@ -620,7 +621,7 @@ private struct BFCalendarView: View {
                 }
             }
         }
-        .padding(14).background(Color(.secondarySystemBackground)).clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(14).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     private var monthLabel: String {
@@ -701,7 +702,7 @@ struct BookingConfirmModalView: View {
                         confirmRow(icon: "banknote", label: "Total", value: q.totalCents.piumsFormatted, highlight: true)
                     }
                 }
-                .background(Color(.secondarySystemBackground))
+                .background(Color(.tertiarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
                 // Aviso legal
@@ -874,7 +875,7 @@ struct BookingSuccessView: View {
                         }
                     }
                     .padding(18)
-                    .background(Color(.secondarySystemBackground))
+                    .background(Color(.tertiarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 18))
                     .padding(.horizontal, 20)
 
@@ -902,7 +903,7 @@ struct BookingSuccessView: View {
                         }
                     }
                     .padding(18)
-                    .background(Color(.secondarySystemBackground))
+                    .background(Color(.tertiarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 18))
                     .padding(.horizontal, 20)
 

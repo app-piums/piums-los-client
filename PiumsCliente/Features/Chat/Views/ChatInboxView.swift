@@ -89,7 +89,7 @@ private struct ConversationRow: View {
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 

@@ -225,7 +225,7 @@ GET  /api/auth/me
 ### **Search & Artists**
 ```http
 GET  /api/search/artists?q=&page=&limit=&specialty=&city=&minPrice=&maxPrice=
-POST /api/search/smart                    # SmartSearch con ubicación
+GET  /api/search/smart?q=&limit=&lat=&lng=  # SmartSearch (query params)
 GET  /api/artists/{id}
 GET  /api/artists/{id}/portfolio
 ```

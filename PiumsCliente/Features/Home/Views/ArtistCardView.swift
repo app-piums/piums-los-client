@@ -179,7 +179,7 @@ struct ArtistCardView: View {
             .padding(.horizontal, 14)
             .padding(.bottom, 14)
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
     }

@@ -168,7 +168,11 @@ final class ArtistSearchByDateViewModel {
             let loc = artists.first?.distance != nil ? extractLocation() : nil
             let res: SmartSearchResponse = try await APIClient.request(
                 .smartSearch(q: searchQuery.trimmingCharacters(in: .whitespaces),
-                             city: nil, lat: loc?.lat, lng: loc?.lng, limit: 40)
+                             city: nil, lat: loc?.lat, lng: loc?.lng,
+                             page: 1, limit: 40,
+                             specialty: nil, minPrice: nil, maxPrice: nil,
+                             minRating: nil, isVerified: nil,
+                             sortBy: nil, sortOrder: nil)
             )
             // Build match map (service price override per artist)
             var matchMap: [String: MatchedService] = [:]
@@ -308,7 +312,7 @@ struct ArtistSearchByDateView: View {
                             }
                         }
                         .padding(.horizontal, 10).padding(.vertical, 7)
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color(.tertiarySystemGroupedBackground))
                         .clipShape(Capsule())
                     }
                     .padding(.horizontal, 16)
@@ -391,7 +395,8 @@ struct ArtistSearchByDateView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Artistas Disponibles")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         // ── Strip de fecha + ubicación como header sticky ──────────
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
@@ -462,7 +467,7 @@ struct ArtistSearchByDateView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .padding(14)
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color(.tertiarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain)
@@ -577,7 +582,7 @@ private struct ArtistSearchResultCard: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
         .opacity(item.available ? 1.0 : 0.65)

@@ -73,7 +73,7 @@ private struct MessageBubble: View {
                 Text(message.content)
                     .font(.subheadline)
                     .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(isOwn ? Color.piumsOrange : Color(.secondarySystemBackground))
+                    .background(isOwn ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
                     .foregroundStyle(isOwn ? .white : .primary)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 if !isOwn { Spacer(minLength: 60) }

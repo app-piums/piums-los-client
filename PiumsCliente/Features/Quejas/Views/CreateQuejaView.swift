@@ -56,7 +56,7 @@ struct CreateQuejaView: View {
                         TextEditor(text: $viewModel.description)
                             .frame(minHeight: 140)
                             .padding(12)
-                            .background(Color(.secondarySystemBackground))
+                            .background(Color(.tertiarySystemGroupedBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -146,7 +146,7 @@ private struct TypeCard: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(isSelected ? Color.piumsOrange : Color(.secondarySystemBackground))
+            .background(isSelected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

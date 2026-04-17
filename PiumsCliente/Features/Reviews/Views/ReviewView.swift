@@ -46,7 +46,7 @@ struct ReviewView: View {
                         TextEditor(text: $viewModel.comment)
                             .frame(minHeight: 120)
                             .padding(12)
-                            .background(Color(.secondarySystemBackground))
+                            .background(Color(.tertiarySystemGroupedBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)

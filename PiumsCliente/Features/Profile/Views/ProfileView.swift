@@ -4,6 +4,7 @@ import SwiftUI
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showLogoutConfirm = false
+    @EnvironmentObject private var themeManager: ThemeManager
 
     var body: some View {
         List {
@@ -33,15 +34,16 @@ struct ProfileView: View {
                     }
                 }
                 .padding(.vertical, 8)
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
 
             // Mensajes
             if let msg = viewModel.successMessage {
-                Section { SuccessBannerView(message: msg) }
+                Section { SuccessBannerView(message: msg).listRowBackground(Color.clear) }
                     .listRowSeparator(.hidden)
             }
             if let msg = viewModel.errorMessage {
-                Section { ErrorBannerView(message: msg) }
+                Section { ErrorBannerView(message: msg).listRowBackground(Color.clear) }
                     .listRowSeparator(.hidden)
             }
 
@@ -53,15 +55,30 @@ struct ProfileView: View {
                 } label: {
                     Label("Editar perfil", systemImage: "person.circle")
                 }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
                 Button {
                     viewModel.showPasswordSheet = true
                     viewModel.clearMessages()
                 } label: {
                     Label("Cambiar contraseña", systemImage: "lock.rotation")
                 }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
                 NavigationLink(destination: PaymentsView()) {
                     Label("Mis pagos", systemImage: "creditcard")
                 }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
+            }
+
+            // Apariencia
+            Section("Apariencia") {
+                Toggle(isOn: Binding(
+                    get: { themeManager.storedScheme == "dark" },
+                    set: { themeManager.storedScheme = $0 ? "dark" : "light" }
+                )) {
+                    Label("Modo oscuro", systemImage: "moon.fill")
+                }
+                .tint(Color.piumsOrange)
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
 
             // Ayuda y soporte
@@ -69,9 +86,13 @@ struct ProfileView: View {
                 NavigationLink(destination: QuejasView()) {
                     Label("Mis quejas", systemImage: "exclamationmark.bubble")
                 }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
                 Label("Términos y condiciones", systemImage: "doc.text")
+                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
                 Label("Política de privacidad", systemImage: "hand.raised")
+                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
                 Label("Contactar soporte", systemImage: "message")
+                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
             .foregroundStyle(.primary)
 
@@ -87,9 +108,17 @@ struct ProfileView: View {
                         Spacer()
                     }
                 }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Mi Perfil")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .preferredColorScheme(themeManager.colorScheme)
         .confirmationDialog("¿Cerrar sesión?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
             Button("Cerrar sesión", role: .destructive) { Task { await viewModel.logout() } }
             Button("Cancelar", role: .cancel) {}
@@ -189,4 +218,5 @@ private struct ChangePasswordSheet: View {
 
 #Preview {
     NavigationStack { ProfileView() }
+        .environmentObject(ThemeManager.shared)
 }

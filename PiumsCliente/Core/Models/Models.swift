@@ -6,6 +6,25 @@ import Foundation
 /// Respuesta vacía o irrelevante del backend
 struct VoidResponse: Codable {}
 
+/// El backend puede devolver precios como Int o Double (e.g. 3.5 vs 8000).
+/// Estos helpers toleran ambos, redondeando Double → Int.
+fileprivate extension KeyedDecodingContainer {
+    func decodeFlexibleInt(forKey key: Key) throws -> Int {
+        if let v = try? decode(Int.self, forKey: key) { return v }
+        if let v = try? decode(Double.self, forKey: key) { return Int(v.rounded()) }
+        throw DecodingError.typeMismatch(Int.self, .init(
+            codingPath: codingPath + [key],
+            debugDescription: "Expected Int or Double"
+        ))
+    }
+    func decodeFlexibleIntIfPresent(forKey key: Key) throws -> Int? {
+        guard contains(key), (try? decodeNil(forKey: key)) != true else { return nil }
+        if let v = try? decode(Int.self, forKey: key) { return v }
+        if let v = try? decode(Double.self, forKey: key) { return Int(v.rounded()) }
+        return nil
+    }
+}
+
 // MARK: - Auth
 
 struct AuthUser: Codable, Identifiable {
@@ -84,6 +103,20 @@ struct MatchedService: Codable {
     let currency: String
     let pricingType: String?
     let isExactMatch: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, price, currency, pricingType, isExactMatch
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        price = try c.decodeFlexibleInt(forKey: .price)
+        currency = try c.decode(String.self, forKey: .currency)
+        pricingType = try c.decodeIfPresent(String.self, forKey: .pricingType)
+        isExactMatch = try c.decodeIfPresent(Bool.self, forKey: .isExactMatch)
+    }
 }
 
 struct SmartArtist: Codable, Identifiable {
@@ -131,7 +164,88 @@ struct SmartArtist: Codable, Identifiable {
 struct SmartSearchResponse: Codable {
     let artists: [SmartArtist]
     let expandedTerms: [String]?
-    let totalFound: Int?
+    let pagination: SearchPagination?
+}
+
+// Decoders tolerantes: el backend envía algunos precios como Double (e.g. 3.5).
+// Declarados en extension para preservar el memberwise init sintetizado.
+extension Artist {
+    enum CodingKeys: String, CodingKey {
+        case id, name, bio, city, state, country, averageRating,
+             totalReviews, totalBookings, hourlyRateMin, hourlyRateMax,
+             mainServicePrice, mainServiceName, isVerified, isActive,
+             isAvailable, servicesCount, serviceIds, serviceTitles,
+             specialties, createdAt, baseLocationLat, baseLocationLng
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try c.decode(String.self, forKey: .id),
+            name: try c.decode(String.self, forKey: .name),
+            bio: try c.decodeIfPresent(String.self, forKey: .bio),
+            city: try c.decodeIfPresent(String.self, forKey: .city),
+            state: try c.decodeIfPresent(String.self, forKey: .state),
+            country: try c.decodeIfPresent(String.self, forKey: .country),
+            averageRating: try c.decodeIfPresent(Double.self, forKey: .averageRating),
+            totalReviews: try c.decode(Int.self, forKey: .totalReviews),
+            totalBookings: try c.decode(Int.self, forKey: .totalBookings),
+            hourlyRateMin: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMin),
+            hourlyRateMax: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMax),
+            mainServicePrice: try c.decodeFlexibleIntIfPresent(forKey: .mainServicePrice),
+            mainServiceName: try c.decodeIfPresent(String.self, forKey: .mainServiceName),
+            isVerified: try c.decode(Bool.self, forKey: .isVerified),
+            isActive: try c.decode(Bool.self, forKey: .isActive),
+            isAvailable: try c.decode(Bool.self, forKey: .isAvailable),
+            servicesCount: try c.decode(Int.self, forKey: .servicesCount),
+            serviceIds: try c.decodeIfPresent([String].self, forKey: .serviceIds),
+            serviceTitles: try c.decodeIfPresent([String].self, forKey: .serviceTitles),
+            specialties: try c.decodeIfPresent([String].self, forKey: .specialties),
+            createdAt: try c.decodeIfPresent(String.self, forKey: .createdAt),
+            baseLocationLat: try c.decodeIfPresent(Double.self, forKey: .baseLocationLat),
+            baseLocationLng: try c.decodeIfPresent(Double.self, forKey: .baseLocationLng)
+        )
+    }
+}
+
+extension SmartArtist {
+    enum CodingKeys: String, CodingKey {
+        case id, name, bio, city, state, country, averageRating,
+             totalReviews, totalBookings, hourlyRateMin, hourlyRateMax,
+             mainServicePrice, mainServiceName, isVerified, isActive,
+             isAvailable, servicesCount, serviceIds, serviceTitles,
+             specialties, matchedService, score, createdAt,
+             baseLocationLat, baseLocationLng
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try c.decode(String.self, forKey: .id),
+            name: try c.decode(String.self, forKey: .name),
+            bio: try c.decodeIfPresent(String.self, forKey: .bio),
+            city: try c.decodeIfPresent(String.self, forKey: .city),
+            state: try c.decodeIfPresent(String.self, forKey: .state),
+            country: try c.decodeIfPresent(String.self, forKey: .country),
+            averageRating: try c.decodeIfPresent(Double.self, forKey: .averageRating),
+            totalReviews: try c.decode(Int.self, forKey: .totalReviews),
+            totalBookings: try c.decode(Int.self, forKey: .totalBookings),
+            hourlyRateMin: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMin),
+            hourlyRateMax: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMax),
+            mainServicePrice: try c.decodeFlexibleIntIfPresent(forKey: .mainServicePrice),
+            mainServiceName: try c.decodeIfPresent(String.self, forKey: .mainServiceName),
+            isVerified: try c.decode(Bool.self, forKey: .isVerified),
+            isActive: try c.decode(Bool.self, forKey: .isActive),
+            isAvailable: try c.decode(Bool.self, forKey: .isAvailable),
+            servicesCount: try c.decode(Int.self, forKey: .servicesCount),
+            serviceIds: try c.decodeIfPresent([String].self, forKey: .serviceIds),
+            serviceTitles: try c.decodeIfPresent([String].self, forKey: .serviceTitles),
+            specialties: try c.decodeIfPresent([String].self, forKey: .specialties),
+            matchedService: try c.decodeIfPresent(MatchedService.self, forKey: .matchedService),
+            score: try c.decodeIfPresent(Double.self, forKey: .score),
+            createdAt: try c.decodeIfPresent(String.self, forKey: .createdAt),
+            baseLocationLat: try c.decodeIfPresent(Double.self, forKey: .baseLocationLat),
+            baseLocationLng: try c.decodeIfPresent(Double.self, forKey: .baseLocationLng)
+        )
+    }
 }
 
 // MARK: - ArtistCategory (categorías locales para filtros UI — no vienen del backend en search)

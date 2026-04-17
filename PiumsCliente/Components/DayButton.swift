@@ -29,7 +29,7 @@ struct DayButton: View {
             .frame(width: 48, height: 60)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.piumsOrange : Color(.secondarySystemBackground))
+                    .fill(isSelected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)

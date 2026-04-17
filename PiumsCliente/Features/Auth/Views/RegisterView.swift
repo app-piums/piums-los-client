@@ -132,7 +132,7 @@ struct RegisterView: View {
             Image("PiumsLogo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(height: 32)
+                .frame(height: 56)
                 .padding(.top, geo.safeAreaInsets.top + 16)
                 .padding(.leading, 28)
         }

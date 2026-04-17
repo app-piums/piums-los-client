@@ -58,7 +58,7 @@ private struct OnboardingWelcomeStep: View {
                         Image("PiumsLogo")
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(height: 24)
+                            .frame(height: 40)
                     }
                     Spacer()
                     Button("Omitir") { Task { await vm.skip() } }
@@ -292,7 +292,7 @@ private struct OnboardingTopBar: View {
         HStack {
             Button(action: onBack) {
                 Image(systemName: "chevron.left").font(.title3.bold()).foregroundStyle(.primary)
-                    .padding(10).background(Color(.secondarySystemBackground)).clipShape(Circle())
+                    .padding(10).background(Color(.tertiarySystemGroupedBackground)).clipShape(Circle())
             }
             Spacer()
             Text(step).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
@@ -313,7 +313,7 @@ private struct CategoryCard: View {
                 HStack(alignment: .top) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(isSelected ? Color.piumsOrange : Color(.secondarySystemBackground))
+                            .fill(isSelected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
                             .frame(width: 40, height: 40)
                         Image(systemName: category.systemImage)
                             .font(.system(size: 18))
@@ -335,7 +335,7 @@ private struct CategoryCard: View {
             .padding(14).frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? Color.piumsOrange.opacity(0.08) : Color(.secondarySystemBackground))
+                    .fill(isSelected ? Color.piumsOrange.opacity(0.08) : Color(.tertiarySystemGroupedBackground))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(isSelected ? Color.piumsOrange : Color.clear, lineWidth: 2))
             )
         }
@@ -380,7 +380,7 @@ private struct SubcategorySection: View {
                         Text(tag).font(.subheadline.weight(.medium))
                             .foregroundStyle(active ? .white : .primary)
                             .padding(.horizontal, 14).padding(.vertical, 8)
-                            .background(Capsule().fill(active ? Color.piumsOrange : Color(.secondarySystemBackground)))
+                            .background(Capsule().fill(active ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground)))
                             .overlay(Capsule().stroke(active ? Color.clear : Color(.systemGray4), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
@@ -390,7 +390,7 @@ private struct SubcategorySection: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemBackground).opacity(0.5))
+                .fill(Color(.tertiarySystemGroupedBackground).opacity(0.5))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(.systemGray5), lineWidth: 1))
         )
         .animation(.easeInOut(duration: 0.18), value: tagCount)
@@ -448,7 +448,7 @@ private struct ArtistFloatingCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color(.tertiarySystemGroupedBackground))
                 .shadow(color: .black.opacity(0.06), radius: 16, y: 6)
         )
     }

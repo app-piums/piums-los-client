@@ -24,7 +24,7 @@ struct PiumsTextField: View {
                 .textInputAutocapitalization(keyboardType == .emailAddress ? .never : .words)
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -64,7 +64,7 @@ struct PiumsSecureField: View {
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
