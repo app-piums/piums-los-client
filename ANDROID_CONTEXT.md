@@ -558,6 +558,16 @@ Modifier.shadow(if (isEmpty) 0.dp else 14.dp, RoundedCornerShape(14.dp),
     ambientColor = PiumsOrange, spotColor = PiumsOrange)
 ```
 
+### RegisterScreen
+
+Mismo fondo/estilo que LoginScreen (dark, glow naranja, card oscura). Campos: Nombre, Email, Contraseña (con show/hide), Confirmar contraseña (borde rojo si no coincide). Extras:
+
+- **PasswordStrengthBar**: 5 cápsulas de colores (rojo→verde) según complejidad (longitud ≥8/12, mayúscula, número, símbolo). Aparece al escribir la contraseña.
+- **Checkbox términos**: obligatorio antes de enviar. Borde naranja al marcar. Texto: "Acepto los **Términos y condiciones** y la **Política de privacidad** de Piums."
+- **Botón "Crear cuenta"**: deshabilitado si algún campo vacío o términos no aceptados (opacity 35%).
+- `POST /api/auth/register/client` body: `{nombre, email, password}`
+- Al completar, el backend devuelve `AuthResponse` con token → login automático.
+
 ---
 
 ## 4. NAVEGACIÓN PRINCIPAL
