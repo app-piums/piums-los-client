@@ -19,6 +19,7 @@ final class ChatSocketManager {
     private var currentToken: String?
 
     var isConnected = false
+    private(set) var activeConversationId: String?
 
     func connect() {
         let token = TokenStorage.shared.accessToken ?? ""
@@ -30,7 +31,11 @@ final class ChatSocketManager {
             .log(false),
             .compress,
             .forceWebsockets(true),
-            .forcePolling(false)
+            .forcePolling(false),
+            .reconnects(true),
+            .reconnectAttempts(10),
+            .reconnectWait(3),
+            .reconnectWaitMax(30)
         ])
         self.manager = manager
         let socket = manager.defaultSocket
@@ -38,10 +43,19 @@ final class ChatSocketManager {
         currentToken = token
 
         socket.on(clientEvent: .connect) { [weak self] _, _ in
-            Task { @MainActor in self?.isConnected = true }
+            Task { @MainActor in
+                self?.isConnected = true
+                // Re-unirse a conversación activa tras reconexión
+                if let convId = self?.activeConversationId {
+                    self?.joinConversation(convId)
+                }
+            }
         }
         socket.on(clientEvent: .disconnect) { [weak self] _, _ in
             Task { @MainActor in self?.isConnected = false }
+        }
+        socket.on(clientEvent: .reconnect) { [weak self] _, _ in
+            Task { @MainActor in self?.isConnected = true }
         }
 
         socket.on("message:received") { data, _ in
@@ -72,10 +86,12 @@ final class ChatSocketManager {
     }
 
     func joinConversation(_ id: String) {
+        activeConversationId = id
         socket?.emit("conversation:join", ["conversationId": id])
     }
 
     func leaveConversation(_ id: String) {
+        if activeConversationId == id { activeConversationId = nil }
         socket?.emit("conversation:leave", ["conversationId": id])
     }
 

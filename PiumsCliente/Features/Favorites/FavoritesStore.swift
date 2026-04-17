@@ -21,8 +21,18 @@ final class FavoritesStore {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let res: FavoritesResponse = try await APIClient.request(.listFavorites(page: 1, entityType: "ARTIST"))
-            favorites = res.data
+            var allFavorites: [FavoriteRecord] = []
+            var page = 1
+            var totalPages = 1
+            repeat {
+                let res: FavoritesResponse = try await APIClient.request(
+                    .listFavorites(page: page, entityType: "ARTIST")
+                )
+                allFavorites.append(contentsOf: res.data)
+                totalPages = res.totalPages
+                page += 1
+            } while page <= totalPages
+            favorites = allFavorites
             await loadArtistsForFavorites()
         } catch {
             errorMessage = AppError(from: error).errorDescription

@@ -58,7 +58,6 @@ final class HomeViewModel {
             hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {
-            if artists.isEmpty { artists = Artist.mockList }
             errorMessage = AppError(from: error).errorDescription
         }
     }

@@ -64,9 +64,6 @@ final class NotificationsViewModel {
             hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {
-            if notifications.isEmpty {
-                notifications = PiumsNotification.mockList
-            }
             errorMessage = AppError(from: error).errorDescription
         }
     }
