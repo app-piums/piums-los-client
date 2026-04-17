@@ -7,6 +7,8 @@ struct MainTabView: View {
     @State private var bookingsPath = NavigationPath()
     @State private var showFABMenu = false
     @State private var chatStore = ChatRealtimeStore.shared
+    @AppStorage("hasSeenHowItWorks") private var hasSeenHowItWorks = false
+    @State private var showHowItWorks = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -55,6 +57,18 @@ struct MainTabView: View {
             chatStore.setActive(newPhase == .active)
         }
         .task { chatStore.startIfNeeded() }
+        .task {
+            if !hasSeenHowItWorks {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                showHowItWorks = true
+            }
+        }
+        .sheet(isPresented: $showHowItWorks) {
+            HowItWorksView {
+                hasSeenHowItWorks = true
+                showHowItWorks = false
+            }
+        }
     }
 }
 

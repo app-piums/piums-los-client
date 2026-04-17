@@ -594,6 +594,23 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 
 - Guardar `hasSeenOnboarding` en `DataStore<Preferences>`
 
+### 5.1b Tutorial "¿Cómo funciona Piums?"
+
+Pantalla con 5 pasos tipo pager (BottomSheet o FullScreen). Se muestra automáticamente la primera vez que el usuario entra a la app principal (0.8s delay). También accesible desde Perfil → Ayuda.
+
+| Paso | Ícono (MD) | Título | Descripción |
+|------|-----------|--------|-------------|
+| 1 | `Search` | Explora el talento | Busca artistas por especialidad, ciudad y precio. Filtra por disponibilidad y calificación. |
+| 2 | `CalendarMonth` | Elige tu fecha | Selecciona día y hora. Verás la disponibilidad en tiempo real. |
+| 3 | `VerifiedUser` | Reserva en segundos | Envía tu solicitud. El artista la confirmará a la brevedad. |
+| 4 | `Forum` | Chatea y coordina | Habla directamente con el artista para afinar los detalles. |
+| 5 | `Star` | Disfruta y califica | Al finalizar, comparte tu opinión para ayudar a otros usuarios. |
+
+- Guardar `hasSeenHowItWorks` en `DataStore<Preferences>`
+- Botón "Siguiente →" / "¡Empezar ahora!" en el último paso
+- Botón "Omitir tutorial" en pasos 1-4
+- Barra de progreso naranja + dots animados
+
 ### 5.2 Home
 
 ```
@@ -714,7 +731,7 @@ POST /api/catalog/pricing/calculate
 Section Avatar + nombre + email + badge "Cliente"
 Section Cuenta: Editar perfil | Cambiar contraseña | Mis pagos
 Section Apariencia: Toggle dark/light mode
-Section Ayuda: Mis quejas | Términos | Privacidad | Soporte
+Section Ayuda: ¿Cómo funciona Piums? | Mis quejas | Términos | Privacidad | Soporte
 Section Cerrar sesión (destructivo)
 ```
 

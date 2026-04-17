@@ -4,6 +4,7 @@ import SwiftUI
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showLogoutConfirm = false
+    @State private var showHowItWorks = false
     @EnvironmentObject private var themeManager: ThemeManager
     @Environment(\.openURL) private var openURL
 
@@ -84,6 +85,10 @@ struct ProfileView: View {
 
             // Ayuda y soporte
             Section("Ayuda y soporte") {
+                Button { showHowItWorks = true } label: {
+                    Label("¿Cómo funciona Piums?", systemImage: "questionmark.circle")
+                }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
                 NavigationLink(destination: QuejasView()) {
                     Label("Mis quejas", systemImage: "exclamationmark.bubble")
                 }
@@ -130,6 +135,7 @@ struct ProfileView: View {
         .sheet(isPresented: $viewModel.showPasswordSheet) {
             ChangePasswordSheet(viewModel: viewModel)
         }
+        .sheet(isPresented: $showHowItWorks) { HowItWorksView() }
         .alert("¿Cerrar sesión?", isPresented: $showLogoutConfirm) {
             Button("Cancelar", role: .cancel) {}
             Button("Cerrar sesión", role: .destructive) {
