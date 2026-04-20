@@ -59,6 +59,8 @@ final class SearchViewModel {
     // MARK: - Filtros
     var query          = ""
     var selectedSpecialty: SpecialtyOption? = nil
+    var selectedTalentId: String? = nil
+    var selectedTalentLabel: String? = nil
     var minPrice: Double = 0        // en quetzales (se convierte a centavos para API)
     var maxPrice: Double = 50000    // Q500.00 max (en centavos)
     var minRating: Double = 0
@@ -98,7 +100,10 @@ final class SearchViewModel {
         expandedTerms = []
         hasMore = true
         hasSearched = true
-        isSmartSearch = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        let effectiveQuery = query.trimmingCharacters(in: .whitespaces).isEmpty
+            ? (selectedTalentLabel ?? "")
+            : query.trimmingCharacters(in: .whitespaces)
+        isSmartSearch = !effectiveQuery.isEmpty
         if isSmartSearch {
             await loadSmart()
         } else {
@@ -117,6 +122,8 @@ final class SearchViewModel {
 
     func clearFilters() {
         selectedSpecialty = nil
+        selectedTalentId = nil
+        selectedTalentLabel = nil
         minPrice = 0
         maxPrice = 50000
         minRating = 0
@@ -126,7 +133,7 @@ final class SearchViewModel {
     }
 
     var hasActiveFilters: Bool {
-        selectedSpecialty != nil || minPrice > 0 || maxPrice < 50000 ||
+        selectedSpecialty != nil || selectedTalentId != nil || minPrice > 0 || maxPrice < 50000 ||
         minRating > 0 || selectedCity != nil || isVerified || sortOption != .relevance
     }
 
@@ -140,7 +147,7 @@ final class SearchViewModel {
         do {
             let res: SmartSearchResponse = try await APIClient.request(
                 .smartSearch(
-                    q: query.trimmingCharacters(in: .whitespaces),
+                    q: query.trimmingCharacters(in: .whitespaces).isEmpty ? (selectedTalentLabel ?? "") : query.trimmingCharacters(in: .whitespaces),
                     city: selectedCity,
                     lat: userLocation?.latitude,
                     lng: userLocation?.longitude,

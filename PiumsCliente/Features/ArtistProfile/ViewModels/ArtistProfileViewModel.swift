@@ -49,7 +49,7 @@ final class ArtistProfileViewModel {
             let res: CatalogServicesResponse = try await APIClient.request(.listServices(artistId: artist.id))
             services = res.services.filter { $0.isActive }
         } catch {
-            services = ArtistService.mockList(artistId: artist.id)
+            errorMessage = AppError(from: error).errorDescription
         }
     }
 
@@ -60,7 +60,7 @@ final class ArtistProfileViewModel {
             let res: ReviewsResponse = try await APIClient.request(.listReviews(artistId: artist.id, page: 1))
             reviews = res.allReviews
         } catch {
-            reviews = Review.mockList(artistId: artist.id)
+            errorMessage = AppError(from: error).errorDescription
         }
     }
 

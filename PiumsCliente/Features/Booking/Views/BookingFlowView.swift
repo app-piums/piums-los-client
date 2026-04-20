@@ -54,7 +54,7 @@ final class BookingFlowViewModel {
                 .getAvailableSlots(artistId: context.artist.id, date: f.string(from: date)))
             slots = res.slots.filter { $0.available }
         } catch {
-            slots = ["09:00","11:00","14:00","17:00"].map { TimeSlot(time: $0, available: true, startTime: nil, endTime: nil) }
+            errorMessage = AppError(from: error).errorDescription
         }
     }
 

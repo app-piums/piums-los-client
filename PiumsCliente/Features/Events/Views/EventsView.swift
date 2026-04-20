@@ -566,6 +566,27 @@ private struct ExistingBookingsView: View {
         }
         .task { await viewModel.loadAvailableBookings() }
         .refreshable { await viewModel.loadAvailableBookings() }
+        .safeAreaInset(edge: .top) {
+            VStack(spacing: 6) {
+                if let msg = viewModel.successMessage {
+                    SuccessBannerView(message: msg)
+                        .padding(.horizontal, 16)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                withAnimation { viewModel.successMessage = nil }
+                            }
+                        }
+                }
+                if let err = viewModel.errorMessage {
+                    ErrorBannerView(message: err)
+                        .padding(.horizontal, 16)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: viewModel.successMessage)
+            .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
+        }
     }
 }
 
@@ -777,6 +798,7 @@ final class ExistingBookingsViewModel {
     var availableBookings: [Booking] = []
     var isLoading = false
     var errorMessage: String?
+    var successMessage: String?
     
     func loadAvailableBookings() async {
         isLoading = true
@@ -799,13 +821,10 @@ final class ExistingBookingsViewModel {
     func addBookingToEvent(_ booking: Booking, eventId: String) async {
         do {
             let _: EmptyResponse = try await APIClient.request(.addBookingToEvent(eventId: eventId, bookingId: booking.id))
-            
-            // Remover de la lista local si se vinculó exitosamente
             if let index = availableBookings.firstIndex(where: { $0.id == booking.id }) {
                 availableBookings.remove(at: index)
             }
-            
-            // TODO: Opcional - mostrar toast de éxito
+            successMessage = "Reserva vinculada al evento correctamente"
         } catch {
             errorMessage = AppError(from: error).errorDescription
         }
