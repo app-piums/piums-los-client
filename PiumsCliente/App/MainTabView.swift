@@ -10,6 +10,7 @@ struct MainTabView: View {
     @AppStorage("hasSeenHowItWorks") private var hasSeenHowItWorks = false
     @State private var showHowItWorks = false
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var tutorial = TutorialManager.shared
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -64,9 +65,38 @@ struct MainTabView: View {
             }
         }
         .sheet(isPresented: $showHowItWorks) {
-            HowItWorksView {
-                hasSeenHowItWorks = true
-                showHowItWorks = false
+            HowItWorksView(
+                onDismiss: {
+                    hasSeenHowItWorks = true
+                    showHowItWorks = false
+                },
+                onNavigate: { tab in
+                    hasSeenHowItWorks = true
+                    showHowItWorks = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        selectedTab = tab
+                    }
+                }
+            )
+        }
+        // ── Tour interactivo overlay ──
+        .overlay {
+            if tutorial.isActive {
+                TourOverlayView()
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .zIndex(100)
+                    .ignoresSafeArea()
+            }
+        }
+        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: tutorial.isActive)
+        .onChange(of: tutorial.currentTabTarget) { _, newTab in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { selectedTab = newTab }
+        }
+        .onChange(of: tutorial.isActive) { _, active in
+            if active {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    selectedTab = tutorial.currentTabTarget
+                }
             }
         }
     }

@@ -646,8 +646,8 @@ struct EventResponse: Codable {
 
 struct Conversation: Codable, Identifiable, Hashable {
     let id: String
-    let userId: String
-    let artistId: String
+    let userId: String      // mapped from participant1Id
+    let artistId: String    // mapped from participant2Id
     let bookingId: String?
     let status: String
     let lastMessageAt: String?
@@ -655,6 +655,12 @@ struct Conversation: Codable, Identifiable, Hashable {
     let updatedAt: String
     let unreadCount: Int?
     let messages: [ChatMessage]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, bookingId, status, lastMessageAt, createdAt, updatedAt, unreadCount, messages
+        case userId   = "participant1Id"
+        case artistId = "participant2Id"
+    }
 
     static func == (lhs: Conversation, rhs: Conversation) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -664,13 +670,14 @@ struct ChatMessage: Codable, Identifiable, Hashable {
     let id: String
     let conversationId: String
     let senderId: String
-    let senderType: String
     let content: String
     let type: String
-    let read: Bool
-    let readAt: String?          // backend usa readAt, no always present
+    let status: String      // SENT / DELIVERED / READ
+    let readAt: String?
     let createdAt: String
-    let updatedAt: String?       // optional — backend may omit it
+    let updatedAt: String?
+
+    var read: Bool { status == "READ" }
 
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

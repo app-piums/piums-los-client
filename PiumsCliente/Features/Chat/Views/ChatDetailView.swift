@@ -13,7 +13,7 @@ struct ChatDetailView: View {
                 ScrollView {
                     LazyVStack(spacing: 4) {
                         ForEach(viewModel.messages) { msg in
-                            MessageBubble(message: msg, isOwn: msg.senderType == "user")
+                            MessageBubble(message: msg, isOwn: msg.senderId == AuthManager.shared.currentUser?.id)
                                 .id(msg.id)
                         }
                         Color.clear.frame(height: 8).id("bottom")

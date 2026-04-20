@@ -42,7 +42,7 @@ struct HomeView: View {
                     .padding(.bottom, 28)
 
                 // ── Banner promocional ──────────────────────
-                PromoBannerView()
+                PromoBannerView(showArtistSearch: $showArtistSearch)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
 
@@ -440,6 +440,7 @@ private struct ArtistCardSkeletonView: View {
 // ══════════════════════════════════════════════════════════════
 
 struct PromoBannerView: View {
+    @Binding var showArtistSearch: Bool
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             // Fondo naranja

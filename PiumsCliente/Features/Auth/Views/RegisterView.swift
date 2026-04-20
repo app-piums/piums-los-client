@@ -232,17 +232,17 @@ struct RegisterView: View {
     // MARK: - Fields
 
     private var fieldName: some View {
-        fieldBlock(label: "NOMBRE COMPLETO") {
+        fieldBlock(label: "NOMBRE COMPLETO", isFocused: focused == .name) {
             TextField("Tu nombre completo", text: $viewModel.name)
                 .textContentType(.name)
                 .focused($focused, equals: .name)
                 .submitLabel(.next)
                 .onSubmit { focused = .email }
-        }(focused: focused == .name)
+        }
     }
 
     private var fieldEmail: some View {
-        fieldBlock(label: "CORREO ELECTRÓNICO") {
+        fieldBlock(label: "CORREO ELECTRÓNICO", isFocused: focused == .email) {
             TextField("nombre@ejemplo.com", text: $viewModel.email)
                 .keyboardType(.emailAddress)
                 .textContentType(.emailAddress)
@@ -251,7 +251,7 @@ struct RegisterView: View {
                 .focused($focused, equals: .email)
                 .submitLabel(.next)
                 .onSubmit { focused = .password }
-        }(focused: focused == .email)
+        }
     }
 
     private var fieldPassword: some View {
@@ -343,27 +343,27 @@ struct RegisterView: View {
         }
     }
 
-    // Función de orden superior para campos genéricos
+    // Función helper para campos genéricos
+    @ViewBuilder
     private func fieldBlock<F: View>(
         label: String,
-        @ViewBuilder content: @escaping () -> F
-    ) -> (focused: Bool) -> some View {
-        { isFocused in
-            VStack(alignment: .leading, spacing: 7) {
-                Text(label)
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-                    .tracking(1.2)
-                content()
-                    .padding(.horizontal, 16).padding(.vertical, 15)
-                    .background(Color.piumsBackgroundElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 13)
-                            .strokeBorder(isFocused ? Color.piumsOrange.opacity(0.7) : Color.clear, lineWidth: 1.5)
-                    )
-                    .animation(.easeInOut(duration: 0.2), value: isFocused)
-            }
+        isFocused: Bool,
+        @ViewBuilder content: () -> F
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+                .tracking(1.2)
+            content()
+                .padding(.horizontal, 16).padding(.vertical, 15)
+                .background(Color.piumsBackgroundElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 13))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13)
+                        .strokeBorder(isFocused ? Color.piumsOrange.opacity(0.7) : Color.clear, lineWidth: 1.5)
+                )
+                .animation(.easeInOut(duration: 0.2), value: isFocused)
         }
     }
 }

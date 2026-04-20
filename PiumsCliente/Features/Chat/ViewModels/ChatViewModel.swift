@@ -25,7 +25,7 @@ final class ChatViewModel {
             guard let id = note.object as? String else { return }
             self?.messages = self?.messages.map {
                 $0.id == id
-                ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, senderType: $0.senderType, content: $0.content, type: $0.type, read: true, readAt: $0.readAt, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
+                ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, content: $0.content, type: $0.type, status: "READ", readAt: $0.readAt, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
                 : $0
             } ?? []
         }
@@ -113,7 +113,8 @@ final class ChatViewModel {
         }
         if let idx = conversations.firstIndex(where: { $0.id == msg.conversationId }) {
             var conv = conversations[idx]
-            let unread = (conv.unreadCount ?? 0) + (msg.senderType == "user" ? 0 : 1)
+            let myId = AuthManager.shared.currentUser?.id ?? ""
+            let unread = (conv.unreadCount ?? 0) + (msg.senderId == myId ? 0 : 1)
             conv = Conversation(
                 id: conv.id, userId: conv.userId, artistId: conv.artistId, bookingId: conv.bookingId,
                 status: conv.status, lastMessageAt: msg.createdAt, createdAt: conv.createdAt,
