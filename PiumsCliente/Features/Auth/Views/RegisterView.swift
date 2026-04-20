@@ -161,6 +161,7 @@ struct RegisterView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("register_terms")
 
                     // Error
                     if let msg = viewModel.errorMessage {
@@ -197,6 +198,7 @@ struct RegisterView: View {
                         .shadow(color: canSubmit ? Color.piumsOrange.opacity(0.38) : .clear, radius: 8, y: 4)
                     }
                     .disabled(viewModel.isLoading || !canSubmit)
+                    .accessibilityIdentifier("register_submit")
 
                     // Ya tengo cuenta
                     HStack(spacing: 4) {
@@ -207,6 +209,7 @@ struct RegisterView: View {
                             viewModel.activeScreen = .login
                         }
                         .fontWeight(.semibold)
+                        .accessibilityIdentifier("register_login_link")
                         .foregroundStyle(Color.piumsOrange)
                     }
                     .font(.subheadline)
@@ -238,6 +241,7 @@ struct RegisterView: View {
                 .focused($focused, equals: .name)
                 .submitLabel(.next)
                 .onSubmit { focused = .email }
+                .accessibilityIdentifier("register_name")
         }
     }
 
@@ -251,6 +255,7 @@ struct RegisterView: View {
                 .focused($focused, equals: .email)
                 .submitLabel(.next)
                 .onSubmit { focused = .password }
+                .accessibilityIdentifier("register_email")
         }
     }
 
@@ -265,8 +270,10 @@ struct RegisterView: View {
                 Group {
                     if showPassword {
                         TextField("••••••••", text: $viewModel.password)
+                            .accessibilityIdentifier("register_password")
                     } else {
                         SecureField("••••••••", text: $viewModel.password)
+                            .accessibilityIdentifier("register_password")
                     }
                 }
                 .textContentType(.newPassword)
@@ -303,8 +310,10 @@ struct RegisterView: View {
                 Group {
                     if showConfirm {
                         TextField("••••••••", text: $viewModel.confirmPass)
+                            .accessibilityIdentifier("register_confirm")
                     } else {
                         SecureField("••••••••", text: $viewModel.confirmPass)
+                            .accessibilityIdentifier("register_confirm")
                     }
                 }
                 .textContentType(.newPassword)

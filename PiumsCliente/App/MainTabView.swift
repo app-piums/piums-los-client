@@ -59,7 +59,8 @@ struct MainTabView: View {
         }
         .task { chatStore.startIfNeeded() }
         .task {
-            if !hasSeenHowItWorks {
+            let skipTutorial = CommandLine.arguments.contains("UI_TESTING_SKIP_TUTORIAL")
+            if !hasSeenHowItWorks && !skipTutorial {
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 showHowItWorks = true
             }

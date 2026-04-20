@@ -7,9 +7,16 @@ struct RootView: View {
     @State private var deepLinkBookingId: String?
     @State private var isLoading = true
 
+    private var isUITestingAuth: Bool { CommandLine.arguments.contains("UI_TESTING_AUTH") }
+    private var isUITestingLoggedIn: Bool { CommandLine.arguments.contains("UI_TESTING_LOGGED_IN") }
+
     var body: some View {
         Group {
-            if isLoading {
+            if isUITestingAuth {
+                AuthFlowView()
+            } else if isUITestingLoggedIn {
+                MainTabView(deepLinkBookingId: .constant(nil))
+            } else if isLoading {
                 // Splash screen con logo
                 ZStack {
                     Color.piumsOrange.ignoresSafeArea()

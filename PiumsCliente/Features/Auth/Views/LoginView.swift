@@ -168,6 +168,7 @@ struct LoginView: View {
                         }
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.piumsOrange)
+                        .accessibilityIdentifier("login_register_link")
                     }
                     .font(.subheadline)
                     .frame(maxWidth: .infinity)
@@ -213,6 +214,7 @@ struct LoginView: View {
                         )
                 )
                 .animation(.easeInOut(duration: 0.2), value: focused == .email)
+                .accessibilityIdentifier("login_email")
         }
     }
 
@@ -227,8 +229,10 @@ struct LoginView: View {
                 Group {
                     if showPassword {
                         TextField("••••••••", text: $viewModel.password)
+                            .accessibilityIdentifier("login_password")
                     } else {
                         SecureField("••••••••", text: $viewModel.password)
+                            .accessibilityIdentifier("login_password")
                     }
                 }
                 .textContentType(.password)
@@ -244,6 +248,7 @@ struct LoginView: View {
                         .foregroundStyle(focused == .password ? Color.piumsOrange.opacity(0.8) : .secondary)
                         .padding(.trailing, 2)
                 }
+                .accessibilityIdentifier("login_toggle_password")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
@@ -266,6 +271,7 @@ struct LoginView: View {
                 }
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(Color.piumsOrange)
+                .accessibilityIdentifier("login_forgot_password")
             }
             .padding(.top, 2)
         }
@@ -308,6 +314,7 @@ struct LoginView: View {
         }
         .disabled(viewModel.isLoading || empty)
         .animation(.easeInOut(duration: 0.2), value: empty)
+        .accessibilityIdentifier("login_button")
     }
 
     // MARK: - Divisor

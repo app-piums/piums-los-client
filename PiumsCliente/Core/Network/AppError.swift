@@ -16,6 +16,8 @@ enum AppError: LocalizedError, Equatable {
         case (.notFound, .notFound): return true
         case (.serverError, .serverError): return true
         case (.http(let a, _), .http(let b, _)): return a == b
+        case (.network(let a), .network(let b)): return a.code == b.code
+        case (.decoding, .decoding): return true
         default: return false
         }
     }
