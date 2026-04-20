@@ -1421,3 +1421,87 @@ dependencies {
 > 3. Disputes responde `{ asReporter: [], asReported: [], total: 0 }` — combinar y ordenar por `createdAt` DESC.
 > 4. Chat WebSocket envía eventos JSON — parsear tipo de evento antes de procesar.
 > 5. El `role` en el token Firebase debe ser `"cliente"` (minúscula).
+
+---
+
+## 14. FIXES CRÍTICOS APLICADOS EN iOS (Abril 2026) — Replicar en Android
+
+### 14.1 Modelo de Conversación — Campo mapping incorrecto
+
+El backend (Prisma) usa `participant1Id` / `participant2Id`, NO `userId` / `artistId`.
+Si se deserializa con los nombres incorrectos, la lista de conversaciones queda vacía silenciosamente.
+
+```kotlin
+// data/remote/dto/ConversationDto.kt
+data class ConversationDto(
+    val id: String,
+    @SerializedName("participant1Id") val userId: String,    // ← clave real del backend
+    @SerializedName("participant2Id") val artistId: String,  // ← clave real del backend
+    val bookingId: String?,
+    val status: String,
+    val lastMessageAt: String?,
+    val unreadCount: Int = 0,
+    val messages: List<ChatMessageDto> = emptyList()
+)
+```
+
+### 14.2 Modelo de ChatMessage — Campo `status` en lugar de `read`
+
+El backend envía `status: "SENT" | "DELIVERED" | "READ"` — no envía `read: Boolean` ni `senderType`.
+Para determinar si un mensaje es propio, comparar `senderId` con el `currentUserId` del usuario autenticado.
+
+```kotlin
+data class ChatMessageDto(
+    val id: String,
+    val conversationId: String,
+    val senderId: String,
+    val content: String,
+    val status: String,   // "SENT" | "DELIVERED" | "READ"
+    val createdAt: String
+) {
+    val isRead: Boolean get() = status == "READ"
+}
+
+// En el ViewModel o Composable:
+val isOwn = message.senderId == authManager.currentUserId
+```
+
+### 14.3 No usar datos mock como fallback
+
+Los ViewModels de ArtistProfile, BookingFlow y Search deben mostrar error real cuando la API falla — nunca datos inventados.
+
+```kotlin
+// INCORRECTO — oculta errores reales
+} catch (e: Exception) {
+    _services.value = ArtistService.mockList()  // ← ELIMINAR
+}
+
+// CORRECTO
+} catch (e: Exception) {
+    _errorMessage.value = e.toUserMessage()
+}
+```
+
+### 14.4 Tutorial interactivo (TourOverlay)
+
+El tour interactivo debe funcionar como overlay sobre la app real (no una pantalla separada):
+- `TutorialManager` singleton con `isActive`, `currentStep`, `currentTabTarget`
+- Overlay semitransparente con backdrop (`#8C000000`), flecha apuntando al tab activo
+- 6 pasos que auto-navegan al tab correcto al avanzar
+- Botones: atrás / siguiente / cerrar (✕) / "Ir a [Sección]"
+- `AppStorage("hasSeenHowItWorks")` evita que reaparezca automáticamente
+
+### 14.5 SuccessBannerView / ErrorBannerView en EventsView
+
+Al vincular una reserva a un evento, mostrar banner no-intrusivo en la parte superior (no dialog):
+- Éxito: fondo verde oscuro, texto "Reserva vinculada al evento correctamente", auto-dismiss 3s
+- Error: fondo rojo oscuro con mensaje de error de la API
+- Implementar como `Snackbar` personalizado o `AnimatedVisibility` en `safeAreaInset` superior
+
+### 14.6 TalentPickerView conectado a SearchFiltersSheet
+
+El picker de talentos específicos ya existe en iOS y está conectado a los filtros de búsqueda:
+- Filtro "Talento específico" abre `TalentPickerView` (lista de talentos del backend)
+- Al seleccionar un talento: chip activo aparece en la barra, se limpia la especialidad
+- El chip tiene botón ✕ para limpiar el filtro
+- `clearFilters()` también limpia `selectedTalentId` y `selectedTalentLabel`
