@@ -111,7 +111,7 @@ final class ChatSocketManager {
         if let url = Bundle.main.infoDictionary?["CHAT_SOCKET_URL"] as? String {
             return url
         }
-        return "http://localhost:4010"
+        return "https://backend.piums.io"
     }
 
     // MARK: - Decoding helper

@@ -91,7 +91,7 @@ enum APIEndpoint {
 
 extension APIEndpoint {
     private static var base: String {
-        Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "http://localhost:3005"
+        Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://backend.piums.io"
     }
 
     var url: URL {
