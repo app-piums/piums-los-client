@@ -108,52 +108,63 @@ val paddingCard  = 16.dp
 
 ## 3. PANTALLA DE LOGIN (Referencia visual exacta)
 
-### Diseño (replicar pixel-perfect del artista iOS)
+### Flujo de 3 pasos — `LoginStep`
+
+La card central cambia de contenido según el paso con animación spring. Los 3 pasos son:
+- **Paso 1 — email**: campo email + botón "Continuar →" + botón colapsado para social
+- **Paso 2 — password**: flecha back + email en header + campo contraseña + "Iniciar sesión"
+- **Paso 3 — social**: 3 botones sociales (Google, Facebook, TikTok) + link a email/password
 
 ```
 ┌────────────────────────────────┐
 │  (fondo oscuro degradado)      │
+│         [PiumsLogo]            │  ← logo, height: 38dp
+│    ⬤ (ícono ticket)           │  ← círculo naranja, 100dp
+│    "Panel de Clientes"         │  ← headline bold, blanco
+│  "Reserva el mejor talento"    │  ← body, white 50%
 │                                │
-│         [PiumsLogo]            │  ← logo centrado, height: 44dp
+├────────────────────────────────┤  ← card R=28dp, desliza desde abajo
+│  ——— (drag indicator)          │
 │                                │
-│    ┌──────────────────────┐    │
-│    │  ⬤ (ícono ticket)   │    │  ← círculo doble, 110dp
-│    └──────────────────────┘    │
+│  PASO 1 (email):               │
+│  Bienvenido de nuevo           │
+│  CORREO ELECTRÓNICO            │
+│  [nombre@ejemplo.com       ]   │
+│  [    Continuar →    ]         │  ← naranja, deshabilitado si email inválido
+│  ── ● ──                       │  ← divider con punto central
+│  [Continúa con Google, FB o TT]│  ← botón al paso social
+│  ¿Aún no tienes cuenta?        │
 │                                │
-│    "Panel de Clientes"         │  ← title2.bold, blanco
-│  "Reserva el mejor talento"    │  ← subheadline, white 50%
-│                                │
-├────────────────────────────────┤  ← card oscura R=32dp desliza arriba
-│  ———  (drag indicator)         │
-│                                │
-│  Bienvenido de nuevo           │  ← headline bold
-│  Accede a tu panel...          │  ← body, secondary
-│                                │
-│  CORREO                        │  ← caption bold, tracking
-│  [nombre@ejemplo.com       ]   │  ← input R=12dp
-│                                │
+│  PASO 2 (password):            │
+│  ← (circle) · correo@...       │  ← back orange circle + email
 │  CONTRASEÑA                    │
 │  [••••••••          👁]        │
-│         ¿Olvidaste tu...?      │  ← naranja, trailing
-│                                │
-│  [    Iniciar sesión    ]       │  ← naranja R=14dp, h=54dp
-│                                │
-│  ─────  O CONTINUAR CON  ───── │
-│                                │
-│  [G Continuar con Google] [🍎] │
-│                                │
+│  [    Iniciar sesión    ]       │
+│            ¿Olvidaste tu...?   │
 │  ¿Aún no tienes cuenta?        │
-│  Regístrate gratis             │  ← naranja
+│                                │
+│  PASO 3 (social):              │
+│  Ingresar o crear cuenta con:  │
+│  [G  Continuar con Google    ] │
+│  [f  Continuar con Facebook  ] │
+│  [♪  Continuar con TikTok    ] │
+│  ── ● ──                       │
+│  [Continúa con correo y pass ] │
+│  ¿Aún no tienes cuenta?        │
+│  términos y política           │
 └────────────────────────────────┘
 ```
 
 ```kotlin
 // screens/auth/LoginScreen.kt
+
+enum class LoginStep { EMAIL, PASSWORD, SOCIAL }
+
 @Composable
 fun LoginScreen(viewModel: AuthViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var animateIn by remember { mutableStateOf(false) }
-    // Pulso infinito para orbes de luz ambiental
+    var loginStep by remember { mutableStateOf(LoginStep.EMAIL) }
     val infiniteTransition = rememberInfiniteTransition(label = "glow")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.10f, targetValue = 0.20f,
@@ -162,23 +173,25 @@ fun LoginScreen(viewModel: AuthViewModel = hiltViewModel()) {
             repeatMode = RepeatMode.Reverse
         ), label = "glowAlpha"
     )
-
     LaunchedEffect(Unit) { animateIn = true }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LoginBackground(animateIn = animateIn, glowAlpha = glowAlpha)
-
         val offsetY by animateDpAsState(
             targetValue = if (animateIn) 0.dp else 600.dp,
             animationSpec = spring(dampingRatio = 0.85f, stiffness = 190f),
             label = "sheet"
         )
-        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
             LoginSheet(
                 modifier = Modifier.offset(y = offsetY),
+                loginStep = loginStep,
                 uiState = uiState,
+                onStepChange = { loginStep = it },
                 onLoginClick = { viewModel.login() },
                 onGoogleClick = { viewModel.loginWithGoogle() },
+                onFacebookClick = { viewModel.loginWithFacebook() },
+                onTikTokClick = { viewModel.loginWithTikTok() },
                 onForgotClick = { /* navigate */ },
                 onRegisterClick = { /* navigate */ }
             )
@@ -187,291 +200,191 @@ fun LoginScreen(viewModel: AuthViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun LoginBackground(animateIn: Boolean, glowAlpha: Float) {
-    Box(modifier = Modifier.fillMaxSize()) {
-
-        // Gradiente base — cálido oscuro marrón/negro, igual que app de artistas
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF0F0A08),  // marrón muy oscuro arriba
-                        Color(0xFF170E09),  // marrón ligeramente más cálido
-                        Color(0xFF0F0A08)   // igual abajo
-                    )
-                )
-            )
-        )
-
-        // Glow naranja central detrás del ícono — produce el tono marrón cálido
-        Box(modifier = Modifier
-            .size(320.dp)
-            .align(Alignment.TopCenter)
-            .offset(y = (-80).dp)
-            .blur(80.dp)
-            .background(PiumsOrange.copy(alpha = glowAlpha), CircleShape)
-        )
-        // Glow naranja sutil abajo
-        Box(modifier = Modifier
-            .size(220.dp)
-            .align(Alignment.TopCenter)
-            .offset(x = 60.dp, y = 100.dp)
-            .blur(70.dp)
-            .background(PiumsOrange.copy(alpha = glowAlpha * 0.4f), CircleShape)
-        )
-
-        // Contenido superior centrado
-        val logoAlpha by animateFloatAsState(if (animateIn) 1f else 0f,
-            animationSpec = tween(500, delayMillis = 50), label = "logo")
-        val iconScale by animateFloatAsState(if (animateIn) 1f else 0.5f,
-            animationSpec = spring(dampingRatio = 0.68f, stiffness = 220f), label = "icon")
-        val textAlpha by animateFloatAsState(if (animateIn) 1f else 0f,
-            animationSpec = tween(600, delayMillis = 220), label = "text")
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(top = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Logo
-            Image(
-                painter = painterResource(R.drawable.piums_logo),
-                contentDescription = null,
-                modifier = Modifier.height(38.dp).alpha(logoAlpha)
-            )
-
-            Spacer(Modifier.height(32.dp))
-
-            // Ícono — círculo marrón cálido oscuro + ícono naranja (igual que artistas)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .scale(iconScale)
-                    .alpha(iconScale)
-            ) {
-                // Halo glow naranja difuso detrás
-                Box(Modifier
-                    .size(130.dp)
-                    .blur(18.dp)
-                    .background(PiumsOrange.copy(alpha = glowAlpha), CircleShape)
-                )
-                // Círculo principal — marrón cálido oscuro (#381E0F)
-                Box(Modifier
-                    .size(100.dp)
-                    .background(Color(0xFF381E0F), CircleShape)
-                )
-                Icon(
-                    Icons.Default.ConfirmationNumber, null,
-                    tint = PiumsOrange,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            // Título con glow sutil
-            Text(
-                "Panel de Clientes",
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.alpha(textAlpha)
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Reserva el mejor talento\npara tu evento",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(0.45f),
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp,
-                modifier = Modifier.alpha(textAlpha)
-            )
-        }
-    }
-}
-
-@Composable
 private fun LoginSheet(
     modifier: Modifier = Modifier,
+    loginStep: LoginStep,
     uiState: AuthUiState,
+    onStepChange: (LoginStep) -> Unit,
     onLoginClick: () -> Unit,
     onGoogleClick: () -> Unit,
+    onFacebookClick: () -> Unit,
+    onTikTokClick: () -> Unit,
     onForgotClick: () -> Unit,
     onRegisterClick: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
-    var emailFocused by remember { mutableStateOf(false) }
-    var passwordFocused by remember { mutableStateOf(false) }
 
-    val isEmpty = email.isBlank() || password.isBlank()
+    fun isValidEmail(e: String) = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+\$").matches(e)
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                listOf(PiumsOrange.copy(0.35f), Color.Transparent),
-                endY = 200f
-            )
-        )
+        tonalElevation = 0.dp
     ) {
         Column {
-            // Handle
+            // Drag indicator
             Box(Modifier.fillMaxWidth().padding(top = 14.dp), Alignment.Center) {
                 Box(Modifier.size(width = 36.dp, height = 4.dp)
                     .background(Color.White.copy(0.18f), RoundedCornerShape(2.dp)))
             }
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(24.dp))
 
-            LazyColumn(
-                contentPadding = PaddingValues(horizontal = 26.dp, bottom = 50.dp),
-                verticalArrangement = Arrangement.spacedBy(28.dp)
-            ) {
-                item {
-                    Text("Bienvenido de nuevo",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text("Accede a tu panel de control.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
-                }
-                item {
-                    // Campo Email
-                    PiumsAuthField(
-                        label = "CORREO",
-                        value = email,
-                        onValueChange = { email = it },
-                        placeholder = "nombre@ejemplo.com",
-                        isFocused = emailFocused,
-                        onFocusChange = { emailFocused = it },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next
+            // Contenido animado entre pasos
+            AnimatedContent(
+                targetState = loginStep,
+                transitionSpec = {
+                    val slideIn = when (targetState) {
+                        LoginStep.EMAIL   -> slideInHorizontally { -it }
+                        LoginStep.PASSWORD -> slideInHorizontally { it }
+                        LoginStep.SOCIAL  -> slideInHorizontally { it }
+                    }
+                    val slideOut = when (initialState) {
+                        LoginStep.EMAIL   -> slideOutHorizontally { -it }
+                        LoginStep.PASSWORD -> slideOutHorizontally { it }
+                        LoginStep.SOCIAL  -> slideOutHorizontally { it }
+                    }
+                    (slideIn + fadeIn(tween(220))) togetherWith (slideOut + fadeOut(tween(180)))
+                },
+                modifier = Modifier.padding(horizontal = 26.dp),
+                label = "loginStep"
+            ) { step ->
+                when (step) {
+
+                    // ── Paso 1: Email ──────────────────────────────────────
+                    LoginStep.EMAIL -> Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                        Text("Bienvenido de nuevo",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold)
+
+                        PiumsAuthField(label = "CORREO ELECTRÓNICO", value = email,
+                            onValueChange = { email = it },
+                            placeholder = "nombre@ejemplo.com",
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Email,
+                                imeAction = ImeAction.Next),
+                            onDone = { if (isValidEmail(email)) onStepChange(LoginStep.PASSWORD) })
+
+                        uiState.error?.let { ErrorBanner(it) }
+
+                        // Botón Continuar — deshabilitado si email inválido
+                        ContinueButton(
+                            title = "Continuar",
+                            enabled = isValidEmail(email),
+                            onClick = { onStepChange(LoginStep.PASSWORD) }
                         )
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    // Campo Password
-                    PiumsAuthField(
-                        label = "CONTRASEÑA",
-                        value = password,
-                        onValueChange = { password = it },
-                        placeholder = "••••••••",
-                        isFocused = passwordFocused,
-                        onFocusChange = { passwordFocused = it },
-                        isPassword = true,
-                        showPassword = showPassword,
-                        onTogglePassword = { showPassword = !showPassword },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        onDone = onLoginClick
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
-                        TextButton(onClick = onForgotClick) {
-                            Text("¿Olvidaste tu contraseña?",
-                                color = PiumsOrange,
-                                style = MaterialTheme.typography.labelMedium)
-                        }
+
+                        PiumsDivider()
+
+                        // Botón colapsado social
+                        OutlinedAuthButton(
+                            text = "Continúa con Google, Facebook o TikTok",
+                            onClick = { onStepChange(LoginStep.SOCIAL) }
+                        )
+
+                        RegisterLink(onRegisterClick)
+                        Spacer(Modifier.height(26.dp))
                     }
-                }
-                if (uiState.error != null) {
-                    item { ErrorBanner(uiState.error) }
-                }
-                item {
-                    // Botón login con gradiente y sombra naranja
-                    val gradient = if (isEmpty)
-                        SolidColor(PiumsOrange.copy(0.45f))
-                    else
-                        Brush.linearGradient(listOf(PiumsOrange, Color(0xFF FF8438)))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp)
-                            .shadow(if (isEmpty) 0.dp else 14.dp, RoundedCornerShape(14.dp),
-                                ambientColor = PiumsOrange, spotColor = PiumsOrange)
-                            .background(gradient, RoundedCornerShape(14.dp))
-                            .clickable(enabled = !isEmpty && !uiState.isLoading) { onLoginClick() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (uiState.isLoading) {
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                CircularProgressIndicator(color = Color.White,
-                                    modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Text("Iniciando sesión…", color = Color.White,
-                                    fontWeight = FontWeight.Bold)
+
+                    // ── Paso 2: Contraseña ─────────────────────────────────
+                    LoginStep.PASSWORD -> Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                        // Header: back + email
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            IconButton(
+                                onClick = { onStepChange(LoginStep.EMAIL) },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                            ) {
+                                Icon(Icons.Default.ArrowBack, null,
+                                    tint = PiumsOrange, modifier = Modifier.size(18.dp))
                             }
-                        } else {
-                            Text("Iniciar sesión", color = Color.White, fontWeight = FontWeight.Bold)
+                            Column {
+                                Text("Bienvenido", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                Text(email, style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                            }
                         }
+
+                        PiumsAuthField(label = "CONTRASEÑA", value = password,
+                            onValueChange = { password = it },
+                            placeholder = "••••••••",
+                            isPassword = true, showPassword = showPassword,
+                            onTogglePassword = { showPassword = !showPassword },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done),
+                            onDone = onLoginClick)
+
+                        uiState.error?.let { ErrorBanner(it) }
+
+                        // Botón login
+                        LoginButton(isLoading = uiState.isLoading,
+                            enabled = password.isNotBlank(),
+                            onClick = onLoginClick)
+
+                        Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
+                            TextButton(onClick = onForgotClick) {
+                                Text("¿Olvidaste tu contraseña?",
+                                    color = PiumsOrange,
+                                    style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+
+                        RegisterLink(onRegisterClick)
+                        Spacer(Modifier.height(26.dp))
                     }
-                }
-                item {
-                    // Divisor
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Divider(Modifier.weight(1f), color = Color.Gray.copy(0.2f))
-                        Text("O CONTINUAR CON", style = MaterialTheme.typography.labelSmall,
-                            color = Color.Gray, letterSpacing = 0.8.sp)
-                        Divider(Modifier.weight(1f), color = Color.Gray.copy(0.2f))
-                    }
-                }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        // Google
-                        Surface(
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = RoundedCornerShape(13.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            onClick = onGoogleClick
-                        ) {
-                            Row(Modifier.padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center) {
-                                Box(Modifier.size(30.dp)
-                                    .background(Color.Gray.copy(0.2f), RoundedCornerShape(7.dp)),
-                                    Alignment.Center) {
-                                    Text("G", fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF4285F4), fontSize = 15.sp)
+
+                    // ── Paso 3: Social ─────────────────────────────────────
+                    LoginStep.SOCIAL -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Text("Ingresar o crear cuenta con:",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold)
+
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SocialSignInButton(provider = SocialProvider.GOOGLE,
+                                onClick = onGoogleClick, enabled = !uiState.isLoading)
+                            SocialSignInButton(provider = SocialProvider.FACEBOOK,
+                                onClick = onFacebookClick, enabled = !uiState.isLoading)
+                            SocialSignInButton(provider = SocialProvider.TIKTOK,
+                                onClick = onTikTokClick, enabled = !uiState.isLoading)
+                        }
+
+                        uiState.error?.let { ErrorBanner(it) }
+
+                        PiumsDivider()
+
+                        OutlinedAuthButton(
+                            text = "Continúa con correo y contraseña",
+                            onClick = { onStepChange(LoginStep.EMAIL) }
+                        )
+
+                        RegisterLink(onRegisterClick)
+
+                        // Términos
+                        Text(
+                            buildAnnotatedString {
+                                append("Al crear una cuenta en Piums, aceptas los ")
+                                withStyle(SpanStyle(color = PiumsOrange,
+                                    fontWeight = FontWeight.Medium)) {
+                                    append("Términos de Servicio")
                                 }
-                                Spacer(Modifier.width(10.dp))
-                                Text("Continuar con Google",
-                                    style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
-                        // Apple
-                        Surface(
-                            modifier = Modifier.size(52.dp),
-                            shape = RoundedCornerShape(13.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            onClick = { /* próximamente */ }
-                        ) {
-                            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                                Icon(Icons.Default.Apple, null)
-                            }
-                        }
-                    }
-                }
-                item {
-                    Row(Modifier.fillMaxWidth(), Arrangement.Center) {
-                        Text("¿Aún no tienes cuenta? ",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
-                        Text("Regístrate gratis",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PiumsOrange, fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.clickable { onRegisterClick() })
+                                append(" y ")
+                                withStyle(SpanStyle(color = PiumsOrange,
+                                    fontWeight = FontWeight.Medium)) {
+                                    append("Política de Privacidad.")
+                                }
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(0.45f)
+                        )
+
+                        Spacer(Modifier.height(26.dp))
                     }
                 }
             }
@@ -479,21 +392,178 @@ private fun LoginSheet(
     }
 }
 
-// Campo reutilizable con borde naranja al enfocar
+// ── Divider con punto central ──────────────────────────────────────────────
+
+@Composable
+fun PiumsDivider() {
+    Row(verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider(Modifier.weight(1f), color = Color.White.copy(0.12f))
+        Box(Modifier.size(5.dp).background(Color.White.copy(0.20f), CircleShape))
+        HorizontalDivider(Modifier.weight(1f), color = Color.White.copy(0.12f))
+    }
+}
+
+// ── Botón social (full-width, icono a la izquierda, texto centrado-izquierdo, Spacer) ──
+
+enum class SocialProvider(val label: String) {
+    GOOGLE("Google"), FACEBOOK("Facebook"), TIKTOK("TikTok")
+}
+
+@Composable
+fun SocialSignInButton(provider: SocialProvider, onClick: () -> Unit, enabled: Boolean = true) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.5f)
+        ),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color.White.copy(0.12f)),
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            SocialProviderIcon(provider)
+            Text("Continuar con ${provider.label}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun SocialProviderIcon(provider: SocialProvider) {
+    when (provider) {
+        SocialProvider.GOOGLE -> Box(
+            Modifier.size(26.dp).background(Color.White, CircleShape),
+            Alignment.Center
+        ) {
+            Text("G", fontWeight = FontWeight.Bold,
+                color = Color(0xFF4285F4), fontSize = 15.sp)
+        }
+        SocialProvider.FACEBOOK -> Box(
+            Modifier.size(26.dp).background(Color(0xFF3A5999), CircleShape),
+            Alignment.Center
+        ) {
+            Text("f", fontWeight = FontWeight.Bold,
+                color = Color.White, fontSize = 16.sp)
+        }
+        SocialProvider.TIKTOK -> Box(
+            Modifier.size(26.dp).background(Color.Black, CircleShape),
+            Alignment.Center
+        ) {
+            Icon(Icons.Default.MusicNote, null,
+                tint = Color.White, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+// ── Botón contorno (para social colapsado y back-to-email) ─────────────────
+
+@Composable
+fun OutlinedAuthButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color.White.copy(0.10f)),
+        modifier = Modifier.fillMaxWidth().height(52.dp)
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface.copy(0.85f))
+    }
+}
+
+// ── Botón Continuar (con gradiente, deshabilitado si !enabled) ────────────
+
+@Composable
+fun ContinueButton(title: String, enabled: Boolean, onClick: () -> Unit) {
+    val gradient = if (enabled)
+        Brush.linearGradient(listOf(Color(0xFFD96120), Color(0xFFB84712)))
+    else
+        SolidColor(PiumsOrange.copy(0.40f))
+    Box(
+        Modifier.fillMaxWidth().height(54.dp)
+            .background(gradient, RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        Alignment.Center
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.ArrowForward, null,
+                tint = Color.White, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+// ── Botón Iniciar sesión ───────────────────────────────────────────────────
+
+@Composable
+fun LoginButton(isLoading: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val gradient = if (enabled)
+        Brush.linearGradient(listOf(Color(0xFFD96120), Color(0xFFB84712)))
+    else
+        SolidColor(PiumsOrange.copy(0.40f))
+    Box(
+        Modifier.fillMaxWidth().height(54.dp)
+            .background(gradient, RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled && !isLoading, onClick = onClick),
+        Alignment.Center
+    ) {
+        if (isLoading) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(color = Color.White,
+                    modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text("Iniciando sesión…", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            Text("Iniciar sesión", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// ── Link de registro ──────────────────────────────────────────────────────
+
+@Composable
+fun RegisterLink(onRegisterClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), Arrangement.Center) {
+        Text("¿Aún no tienes cuenta? ",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+        Text("Regístrate gratis",
+            style = MaterialTheme.typography.bodySmall,
+            color = PiumsOrange, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable(onClick = onRegisterClick))
+    }
+}
+```
+
+### Campo de auth reutilizable
+
+```kotlin
 @Composable
 fun PiumsAuthField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    isFocused: Boolean,
-    onFocusChange: (Boolean) -> Unit,
     isPassword: Boolean = false,
     showPassword: Boolean = false,
     onTogglePassword: (() -> Unit)? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     onDone: (() -> Unit)? = null
 ) {
+    var isFocused by remember { mutableStateOf(false) }
     val borderColor by animateColorAsState(
         if (isFocused) PiumsOrange.copy(0.7f) else Color.Transparent,
         animationSpec = tween(200), label = "border"
@@ -510,17 +580,15 @@ fun PiumsAuthField(
                 .padding(horizontal = 16.dp, vertical = 15.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val visual = if (isPassword && !showPassword) PasswordVisualTransformation()
-                         else VisualTransformation.None
             BasicTextField(
                 value = value, onValueChange = onValueChange,
-                modifier = Modifier.weight(1f).onFocusChanged { onFocusChange(it.isFocused) },
-                visualTransformation = visual,
+                modifier = Modifier.weight(1f).onFocusChanged { isFocused = it.isFocused },
+                visualTransformation = if (isPassword && !showPassword)
+                    PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = keyboardOptions,
                 keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                ),
+                    color = MaterialTheme.colorScheme.onSurface),
                 decorationBox = { inner ->
                     if (value.isEmpty()) Text(placeholder,
                         style = MaterialTheme.typography.bodyLarge,
@@ -541,21 +609,6 @@ fun PiumsAuthField(
         }
     }
 }
-```
-
-### Reglas críticas del botón de login
-
-```kotlin
-// Botón: gradiente naranja cuando activo, semitransparente cuando vacío, sombra naranja
-val isEmpty = email.isBlank() || password.isBlank()
-val gradient = if (isEmpty)
-    SolidColor(PiumsOrange.copy(alpha = 0.45f))
-else
-    Brush.linearGradient(listOf(PiumsOrange, Color(0xFFFF8438)))
-
-// Sombra naranja solo cuando habilitado:
-Modifier.shadow(if (isEmpty) 0.dp else 14.dp, RoundedCornerShape(14.dp),
-    ambientColor = PiumsOrange, spotColor = PiumsOrange)
 ```
 
 ### RegisterScreen
@@ -762,13 +815,19 @@ Section Cerrar sesión (destructivo)
 
 ```kotlin
 // data/models/User.kt
+// Backend devuelve _id e id — usar "id". avatar puede ser URL de Google completa.
 data class AuthUser(
     val id: String,
     val email: String,
-    val nombre: String?,
-    val role: String,      // "cliente"
-    val avatar: String?
-)
+    val nombre: String?,           // null en cuentas nuevas de Google
+    val role: String,              // "cliente"
+    val avatar: String?,           // URL Google: lh3.googleusercontent.com/...=s400-c
+    val emailVerified: Boolean = false,
+    val status: String = "ACTIVE"  // "ACTIVE" | "BANNED" | "SUSPENDED"
+) {
+    val displayName: String get() = nombre ?: email
+    val isActive: Boolean get() = status == "ACTIVE"
+}
 
 // data/models/Artist.kt
 data class Artist(
@@ -1025,9 +1084,9 @@ POST /api/reviews   [auth] body: {artistId, bookingId, rating (1-5), comment}
 
 ### Payments
 ```
-POST /api/payments/intent   [auth] body: {bookingId}
-GET  /api/payments?page=1   [auth]
-GET  /api/payments/{id}     [auth]
+POST /api/payments/payment-intents          [auth] body: {bookingId}
+GET  /api/payments/payments?page=1&limit=20 [auth]
+GET  /api/payments/payments/{id}            [auth]
 ```
 
 ### Disputes
@@ -1505,3 +1564,222 @@ El picker de talentos específicos ya existe en iOS y está conectado a los filt
 - Al seleccionar un talento: chip activo aparece en la barra, se limpia la especialidad
 - El chip tiene botón ✕ para limpiar el filtro
 - `clearFilters()` también limpia `selectedTalentId` y `selectedTalentLabel`
+
+---
+
+## 15. AUTENTICACIÓN SOCIAL (Google, Facebook, TikTok)
+
+### 15.1 AuthResponse — campos completos del backend
+
+El backend devuelve `refreshToken` en **todos** los flujos (email, Google). El campo `isNewUser`
+indica si es la primera vez que el usuario se registra (útil para mostrar onboarding).
+
+```kotlin
+data class AuthResponse(
+    val token: String,
+    val refreshToken: String,
+    val user: AuthUser,
+    val isNewUser: Boolean = false   // true si es registro nuevo por Google/social
+)
+
+// El backend devuelve AMBOS _id e id para compatibilidad. Usar "id".
+data class AuthUser(
+    val id: String,
+    @SerializedName("_id") val mongoId: String? = null,  // alias — ignorar, usar id
+    val email: String,
+    val nombre: String?,         // puede ser null en cuentas nuevas
+    val role: String,            // "cliente" | "artista"
+    val avatar: String?,         // URL completa de Google (lh3.googleusercontent.com)
+    val emailVerified: Boolean = false,
+    val status: String = "ACTIVE"  // "ACTIVE" | "BANNED" | "SUSPENDED"
+) {
+    val displayName: String get() = nombre ?: email
+    val isActive: Boolean get() = status == "ACTIVE"
+}
+```
+
+### 15.2 Google Login — Firebase idToken
+
+El flujo es: **GoogleSignIn SDK → Firebase idToken → POST /auth/firebase**
+
+```kotlin
+// data/repository/AuthRepository.kt
+suspend fun loginWithGoogle(context: Context): AuthResponse {
+    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken(context.getString(R.string.default_web_client_id))
+        .requestEmail()
+        .build()
+    val account = GoogleSignIn.getSignedInAccountFromIntent(/* intent */).await()
+    val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+    val result = FirebaseAuth.getInstance().signInWithCredential(credential).await()
+    val idToken = result.user?.getIdToken(false)?.await()?.token
+        ?: throw Exception("No se obtuvo idToken de Firebase")
+    return apiService.firebaseAuth(FirebaseAuthRequest(idToken = idToken, role = "cliente"))
+}
+```
+
+**Firebase Project**: `piums-artista` (compartido con la app de artista)
+- `BUNDLE_ID` iOS: `PIUMS.PiumsCliente`
+- `APPLICATION_ID` Android: agregar la app Android en Firebase Console del proyecto `piums-artista`
+- `google-services.json`: descargar desde Firebase Console → proyecto `piums-artista` → app Android
+
+```kotlin
+// build.gradle.kts (app)
+apply(plugin = "com.google.gms.google-services")
+
+// strings.xml — se llena automáticamente con google-services.json
+// <string name="default_web_client_id">967320828042-...</string>
+```
+
+El body que se manda al backend:
+```json
+POST /auth/firebase
+{ "idToken": "eyJhbGc...", "role": "cliente" }
+```
+
+**Verificación en el backend**: El backend usa la **Google Identity Toolkit REST API**
+(`https://identitytoolkit.googleapis.com/v1/accounts:lookup`) con `FIREBASE_API_KEY`
+— no usa Firebase Admin SDK. La verificación es criptográficamente equivalente.
+`FIREBASE_API_KEY` es la clave pública del proyecto `piums-artista`.
+
+**Errores controlados del endpoint:**
+- `400` → `idToken` faltante o `role` inválido (valores permitidos: `"cliente"`, `"artista"`)
+- `401` → token de Google inválido o expirado
+- `403` → cuenta `BANNED` o `SUSPENDED`
+
+### 15.3 Facebook y TikTok — OAuth via Custom Tab + Deep Link
+
+**Diferencia clave con iOS**: iOS 17.4+ usa `ASWebAuthenticationSession.Callback.https` que intercepta
+redirects HTTPS sin backend changes. Android NO tiene esta capacidad nativa — necesita un
+**custom scheme** registrado en el AndroidManifest para capturar el callback.
+
+**Flujo Android**:
+1. App abre `CustomTabsIntent` con `https://api.piums.com/api/auth/facebook`
+2. Backend Passport.js ejecuta OAuth con Facebook/TikTok
+3. Backend redirige a `piums://auth/callback?token=JWT` (custom scheme)
+4. Android intercepta el intent en `MainActivity`
+5. App extrae `?token=JWT` y llama a `GET /api/auth/me`
+
+**Requerimiento de backend**: el backend debe soportar redirect al custom scheme `piums://auth/callback`
+además del HTTPS redirect que usa iOS. Confirmar con el equipo de backend antes de implementar.
+
+```xml
+<!-- AndroidManifest.xml -->
+<activity android:name=".MainActivity" ...>
+    <intent-filter android:autoVerify="false">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="piums" android:host="auth" android:pathPrefix="/callback" />
+    </intent-filter>
+</activity>
+```
+
+```kotlin
+// utils/SocialAuthManager.kt
+class SocialAuthManager @Inject constructor(
+    private val tokenStorage: TokenStorage,
+    private val apiService: PiumsApiService
+) {
+    fun launchFacebookAuth(context: Context) {
+        val url = "https://api.piums.com/api/auth/facebook"
+        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+    }
+
+    fun launchTikTokAuth(context: Context) {
+        val url = "https://api.piums.com/api/auth/tiktok"
+        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+    }
+
+    // Llamar desde MainActivity.onNewIntent o desde el NavHost
+    suspend fun handleCallback(uri: Uri): AuthUser? {
+        val error = uri.getQueryParameter("error")
+        if (error != null) throw Exception(describeOAuthError(error))
+
+        val token = uri.getQueryParameter("token")
+            ?: throw Exception("No se recibió token")
+
+        tokenStorage.saveToken(token)
+        return apiService.getMe().user   // GET /api/auth/me
+    }
+
+    private fun describeOAuthError(code: String) = when (code) {
+        "facebook_auth_failed"  -> "Error al autenticar con Facebook"
+        "tiktok_auth_failed"    -> "Error al autenticar con TikTok"
+        "tiktok_not_configured" -> "TikTok no está configurado en el servidor"
+        "tiktok_denied"         -> "Acceso denegado por TikTok"
+        else                    -> "Error de autenticación"
+    }
+}
+```
+
+```kotlin
+// MainActivity.kt — interceptar el deep link
+override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    intent.data?.let { uri ->
+        if (uri.scheme == "piums" && uri.host == "auth") {
+            // Emitir al ViewModel o al NavController
+            authViewModel.handleOAuthCallback(uri)
+        }
+    }
+}
+```
+
+### 15.4 AuthViewModel — métodos sociales
+
+```kotlin
+// ui/screens/auth/AuthViewModel.kt
+fun loginWithGoogle() {
+    viewModelScope.launch {
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        try {
+            // ver sección 15.2 — launcher de Google Sign-In
+            _uiState.update { it.copy(isLoading = false) }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(isLoading = false, error = e.message) }
+        }
+    }
+}
+
+fun loginWithFacebook(context: Context) {
+    viewModelScope.launch {
+        socialAuthManager.launchFacebookAuth(context)
+        // el resultado llega por handleOAuthCallback vía onNewIntent
+    }
+}
+
+fun loginWithTikTok(context: Context) {
+    viewModelScope.launch {
+        socialAuthManager.launchTikTokAuth(context)
+    }
+}
+
+fun handleOAuthCallback(uri: Uri) {
+    viewModelScope.launch {
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        try {
+            val user = socialAuthManager.handleCallback(uri)
+            authRepository.setCurrentUser(user)
+            _uiState.update { it.copy(isLoading = false) }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(isLoading = false, error = e.message) }
+        }
+    }
+}
+```
+
+### 15.5 Dependencias adicionales para social auth
+
+```kotlin
+// build.gradle.kts
+// Firebase
+implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
+implementation("com.google.firebase:firebase-auth")
+
+// Google Sign-In
+implementation("com.google.android.gms:play-services-auth:21.1.0")
+
+// Custom Tabs (para Facebook/TikTok)
+implementation("androidx.browser:browser:1.8.0")
+```

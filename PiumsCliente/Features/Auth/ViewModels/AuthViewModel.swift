@@ -75,6 +75,32 @@ final class AuthViewModel {
         }
     }
 
+    func loginWithFacebook() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            try await AuthManager.shared.loginWithFacebook()
+        } catch let e as AppError {
+            errorMessage = e.errorDescription
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loginWithTikTok() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            try await AuthManager.shared.loginWithTikTok()
+        } catch let e as AppError {
+            errorMessage = e.errorDescription
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func forgotPassword() async {
         guard !email.isEmpty else { errorMessage = "Ingresa tu correo electrónico"; return }
         isLoading = true

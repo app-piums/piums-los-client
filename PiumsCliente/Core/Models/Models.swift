@@ -31,11 +31,14 @@ struct AuthUser: Codable, Identifiable {
     let id: String
     let email: String
     let nombre: String?
-    let role: String      // "cliente" | "artista" | "admin"
+    let role: String           // "cliente" | "artista" | "admin"
     let avatar: String?
+    let emailVerified: Bool?
+    let status: String?        // "ACTIVE" | "BANNED" | "SUSPENDED"
 
     var avatarUrl: String? { avatar }
     var displayName: String { nombre ?? email }
+    var isActive: Bool { status == nil || status == "ACTIVE" }
 }
 
 // MARK: - Artist  (shape: GET /api/search/artists)

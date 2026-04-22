@@ -35,6 +35,53 @@ final class AuthManager {
         store(response)
     }
 
+    /// Facebook OAuth — backend maneja Passport.js y redirige a:
+    ///   https://piums.com/auth/callback?token=JWT&provider=facebook
+    func loginWithFacebook() async throws {
+        try await loginWithBackendOAuth(path: "/api/auth/facebook", provider: "Facebook")
+    }
+
+    /// TikTok OAuth (PKCE server-side) — backend redirige a:
+    ///   https://piums.com/auth/callback?token=JWT&provider=tiktok
+    func loginWithTikTok() async throws {
+        try await loginWithBackendOAuth(path: "/api/auth/tiktok", provider: "TikTok")
+    }
+
+    /// Flujo genérico: abre el OAuth del backend en SFAuthenticationSession,
+    /// captura el ?token=JWT del callback HTTPS y verifica la sesión.
+    /// El JWT del OAuth social dura 7 días (sin refreshToken).
+    private func loginWithBackendOAuth(path: String, provider: String) async throws {
+        let base = "https://\(OAuthWebLogin.callbackHost)"
+        guard let url = URL(string: "\(base)/api/auth\(path.hasPrefix("/") ? path : "/\(path)")") else {
+            throw AppError.http(statusCode: 0, message: "URL de autenticación inválida")
+        }
+        let callbackURL = try await OAuthWebLogin.shared.start(url: url)
+        let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
+        if let errorParam = components?.queryItems?.first(where: { $0.name == "error" })?.value {
+            throw AppError.http(statusCode: 401, message: errorDescriptionFor(errorParam, provider: provider))
+        }
+        guard let token = components?.queryItems?.first(where: { $0.name == "token" })?.value else {
+            throw AppError.http(statusCode: 401, message: "No se recibió token de \(provider)")
+        }
+        TokenStorage.shared.accessToken = token
+        await verify()
+        guard currentUser != nil else {
+            TokenStorage.shared.clearAll()
+            throw AppError.http(statusCode: 401, message: "No se pudo verificar la sesión de \(provider)")
+        }
+    }
+
+    private func errorDescriptionFor(_ code: String, provider: String) -> String {
+        switch code {
+        case "google_auth_failed":    return "Error al autenticar con Google"
+        case "facebook_auth_failed":  return "Error al autenticar con Facebook"
+        case "tiktok_auth_failed":    return "Error al autenticar con TikTok"
+        case "tiktok_not_configured": return "TikTok no está configurado en el servidor"
+        case "tiktok_denied":         return "Acceso denegado por TikTok"
+        default:                      return "Error al autenticar con \(provider)"
+        }
+    }
+
     func forgotPassword(email: String) async throws {
         let _: EmptyResponse = try await APIClient.request(.forgotPassword(email: email))
     }
@@ -81,9 +128,10 @@ final class AuthManager {
 
 struct AuthResponse: Decodable {
     let token: String
-    let refreshToken: String
+    let refreshToken: String?
     let redirectUrl: String?
     let user: AuthUser
+    let isNewUser: Bool?
 }
 
 struct MeResponse: Decodable {

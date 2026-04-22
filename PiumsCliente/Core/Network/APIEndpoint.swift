@@ -265,9 +265,9 @@ extension APIEndpoint {
             return "/api/users/me/favorites/check?entityType=\(type)&entityId=\(entityId)"
 
         // Payments
-        case .createPaymentIntent:             return "/api/payments/intent"
-        case .listPayments(let pg):            return "/api/payments?page=\(pg)&limit=20"
-        case .getPayment(let id):              return "/api/payments/\(id)"
+        case .createPaymentIntent:             return "/api/payments/payment-intents"
+        case .listPayments(let pg):            return "/api/payments/payments?page=\(pg)&limit=20"
+        case .getPayment(let id):              return "/api/payments/payments/\(id)"
 
         // Events
         case .listEvents:                      return "/api/events"
