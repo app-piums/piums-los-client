@@ -10,8 +10,9 @@ final class OAuthWebLogin: NSObject, ASWebAuthenticationPresentationContextProvi
     static let shared = OAuthWebLogin()
     private override init() {}
 
-    // Host y path del callback — deben coincidir con FRONTEND_URL del backend
-    static let callbackHost = "piums.com"
+    // Host y path del callback — debe coincidir con FRONTEND_URL del backend
+    // Producción: client.piums.io  (FRONTEND_URL del auth-service)
+    static let callbackHost = "client.piums.io"
     static let callbackPath = "/auth/callback"
 
     // MARK: - ASWebAuthenticationPresentationContextProviding

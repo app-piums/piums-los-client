@@ -51,8 +51,10 @@ final class AuthManager {
     /// captura el ?token=JWT del callback HTTPS y verifica la sesión.
     /// El JWT del OAuth social dura 7 días (sin refreshToken).
     private func loginWithBackendOAuth(path: String, provider: String) async throws {
-        let base = "https://\(OAuthWebLogin.callbackHost)"
-        guard let url = URL(string: "\(base)/api/auth\(path.hasPrefix("/") ? path : "/\(path)")") else {
+        // Initiation URL usa API_BASE_URL (backend), no el host del callback (frontend)
+        let apiBase = Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://backend.piums.io"
+        let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
+        guard let url = URL(string: "\(apiBase)\(cleanPath)") else {
             throw AppError.http(statusCode: 0, message: "URL de autenticación inválida")
         }
         let callbackURL = try await OAuthWebLogin.shared.start(url: url)
