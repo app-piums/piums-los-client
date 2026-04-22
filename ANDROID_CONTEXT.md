@@ -829,6 +829,25 @@ data class AuthUser(
     val isActive: Boolean get() = status == "ACTIVE"
 }
 
+// ── CRÍTICO: el backend envía precios como Int O Double sin consistencia ────────
+// Registrar este TypeAdapter en Gson antes de construir Retrofit:
+//
+// object FlexibleIntAdapter : TypeAdapter<Int?>() {
+//     override fun write(out: JsonWriter, value: Int?) { ... }
+//     override fun read(input: JsonReader): Int? {
+//         return when (input.peek()) {
+//             JsonToken.NULL   -> { input.nextNull(); null }
+//             JsonToken.NUMBER -> { val raw = input.nextString(); raw.toIntOrNull() ?: raw.toDoubleOrNull()?.toInt() }
+//             else -> { input.skipValue(); null }
+//         }
+//     }
+// }
+// GsonBuilder()
+//     .registerTypeAdapter(Int::class.java, FlexibleIntAdapter)
+//     .registerTypeAdapter(Int?::class.java, FlexibleIntAdapter)
+//     .create()
+// ────────────────────────────────────────────────────────────────────────────────
+
 // data/models/Artist.kt
 data class Artist(
     val id: String,
@@ -840,17 +859,84 @@ data class Artist(
     val averageRating: Double?,
     val totalReviews: Int,
     val totalBookings: Int,
+    val hourlyRateMin: Int?,       // puede venir como Double del backend
+    val hourlyRateMax: Int?,
     val mainServicePrice: Int?,
     val mainServiceName: String?,
     val isVerified: Boolean,
     val isActive: Boolean,
     val isAvailable: Boolean,
+    val servicesCount: Int = 0,
+    val serviceIds: List<String>?,
+    val serviceTitles: List<String>?,
     val specialties: List<String>?,
+    val createdAt: String?,
     val baseLocationLat: Double?,
     val baseLocationLng: Double?
 ) {
     val artistName: String get() = name
     val rating: Double? get() = averageRating
+    val basePrice: Int? get() = mainServicePrice
+}
+
+// SmartSearch → usa SmartArtist (incluye matchedService + score de relevancia)
+data class MatchedService(
+    val id: String,
+    val name: String,
+    val price: Int,           // puede venir como Double — usar FlexibleIntAdapter
+    val currency: String,
+    val pricingType: String?,
+    val isExactMatch: Boolean?
+)
+
+data class SmartArtist(
+    val id: String,
+    val name: String,
+    val bio: String?,
+    val city: String?,
+    val state: String?,
+    val country: String?,
+    val averageRating: Double?,
+    val totalReviews: Int,
+    val totalBookings: Int,
+    val hourlyRateMin: Int?,
+    val hourlyRateMax: Int?,
+    val mainServicePrice: Int?,
+    val mainServiceName: String?,
+    val isVerified: Boolean,
+    val isActive: Boolean,
+    val isAvailable: Boolean,
+    val servicesCount: Int = 0,
+    val serviceIds: List<String>?,
+    val serviceTitles: List<String>?,
+    val specialties: List<String>?,
+    val matchedService: MatchedService?,
+    val score: Double?,
+    val createdAt: String?,
+    val baseLocationLat: Double?,
+    val baseLocationLng: Double?
+) {
+    fun toArtist() = Artist(
+        id = id, name = name, bio = bio, city = city, state = state, country = country,
+        averageRating = averageRating, totalReviews = totalReviews, totalBookings = totalBookings,
+        hourlyRateMin = hourlyRateMin, hourlyRateMax = hourlyRateMax,
+        mainServicePrice = matchedService?.price ?: mainServicePrice,
+        mainServiceName = matchedService?.name ?: mainServiceName,
+        isVerified = isVerified, isActive = isActive, isAvailable = isAvailable,
+        servicesCount = servicesCount, serviceIds = serviceIds, serviceTitles = serviceTitles,
+        specialties = specialties, createdAt = createdAt,
+        baseLocationLat = baseLocationLat, baseLocationLng = baseLocationLng
+    )
+}
+
+data class SearchArtistsResponse(val artists: List<Artist>, val pagination: SearchPagination)
+data class SmartSearchResponse(
+    val artists: List<SmartArtist>,
+    val expandedTerms: List<String>?,
+    val pagination: SearchPagination?
+)
+data class SearchPagination(val page: Int, val limit: Int, val total: Int, val totalPages: Int) {
+    val hasMore: Boolean get() = page < totalPages
 }
 
 // data/models/ArtistService.kt
@@ -859,19 +945,26 @@ data class ArtistService(
     val artistId: String,
     val name: String,
     val description: String?,
-    val pricingType: String?,   // "FIXED" | "HOURLY" | "PACKAGE"
+    val pricingType: String?,    // "FIXED" | "HOURLY" | "PACKAGE"
     val basePrice: Int,
     val currency: String,
     val durationMin: Int?,
     val durationMax: Int?,
-    val status: String?,
+    val status: String?,         // "ACTIVE" | "INACTIVE"
     val isAvailable: Boolean?,
+    val isFeatured: Boolean?,
     val isMainService: Boolean?,
-    val whatIsIncluded: List<String>?
+    val whatIsIncluded: List<String>?,
+    val thumbnail: String?,
+    val tags: List<String>?,
+    val createdAt: String?
 ) {
     val price: Int get() = basePrice
     val duration: Int get() = durationMin ?: 60
+    val isActive: Boolean get() = status == "ACTIVE"
 }
+
+data class CatalogServicesResponse(val services: List<ArtistService>)
 
 // data/models/Booking.kt
 data class Booking(
@@ -922,7 +1015,23 @@ data class EventSummary(
     val eventDate: String?,
     val status: EventStatus,
     val createdAt: String,
+    val updatedAt: String?,
     val bookings: List<EventBooking>?
+)
+
+// Las respuestas de eventos vienen envueltas en { success, data }
+data class EventsResponse(val success: Boolean, val data: List<EventSummary>)
+data class EventResponse(val success: Boolean, val data: EventSummary)
+
+data class EventBooking(
+    val id: String,
+    val code: String?,
+    val artistId: String,
+    val serviceId: String,
+    val scheduledDate: String,
+    val status: BookingStatus,
+    val totalPrice: Int,
+    val currency: String?
 )
 
 enum class EventStatus(val raw: String) {
@@ -935,13 +1044,41 @@ data class Dispute(
     val id: String,
     val bookingId: String,
     val reportedBy: String,
+    val reportedAgainst: String?,
     val disputeType: String,
     val subject: String,
     val description: String,
     val status: DisputeStatus,
     val priority: Int?,
+    val resolution: String?,
+    val resolutionNotes: String?,
+    val refundAmount: Double?,
     val createdAt: String,
+    val updatedAt: String?,
     val messages: List<DisputeMessage>?
+)
+
+// El endpoint GET /api/disputes/me devuelve:
+// { asReporter: [...], asReported: [...], total: 0 }
+data class DisputesResponse(
+    val asReporter: List<Dispute>,
+    val asReported: List<Dispute>,
+    val total: Int
+) {
+    val allDisputes: List<Dispute> get() =
+        (asReporter + asReported).sortedByDescending { it.createdAt }
+}
+
+data class DisputeMessage(
+    val id: String,
+    val disputeId: String,
+    val senderId: String,
+    val senderType: String,     // "client" | "artist" | "admin"
+    val message: String,
+    val isStatusUpdate: Boolean?,
+    val oldStatus: String?,
+    val newStatus: String?,
+    val createdAt: String
 )
 
 enum class DisputeStatus(val raw: String, val displayName: String) {
@@ -955,38 +1092,193 @@ enum class DisputeStatus(val raw: String, val displayName: String) {
 }
 
 // data/models/Chat.kt
+// CRÍTICO: el backend usa participant1Id / participant2Id, NO userId / artistId
 data class Conversation(
+    @SerializedName("participant1Id") val userId: String,
+    @SerializedName("participant2Id") val artistId: String,
     val id: String,
-    val userId: String,
-    val artistId: String,
     val bookingId: String?,
     val status: String,
     val lastMessageAt: String?,
     val unreadCount: Int?,
-    val createdAt: String
+    val createdAt: String,
+    val updatedAt: String,
+    val messages: List<ChatMessage>?
 )
 
+// CRÍTICO: el backend envía status: "SENT"|"DELIVERED"|"READ", NO un campo read: Boolean
+// Para saber si un mensaje es propio: comparar senderId con el currentUserId del usuario autenticado
 data class ChatMessage(
     val id: String,
     val conversationId: String,
     val senderId: String,
-    val senderType: String,  // "client" | "artist"
     val content: String,
     val type: String,        // "text"
-    val read: Boolean,
-    val createdAt: String
+    val status: String,      // "SENT" | "DELIVERED" | "READ"
+    val readAt: String?,
+    val createdAt: String,
+    val updatedAt: String?
+) {
+    val isRead: Boolean get() = status == "READ"
+}
+
+data class ConversationsResponse(
+    val conversations: List<Conversation>,
+    val total: Int,
+    val page: Int,
+    val totalPages: Int
 )
+data class MessagesResponse(val messages: List<ChatMessage>, val total: Int, val page: Int, val totalPages: Int)
+data class UnreadCountResponse(val unreadCount: Int)
 
 // data/models/Notification.kt
 data class PiumsNotification(
     val id: String,
     val title: String,
-    val message: String,
+    val message: String,     // el backend usa "message" NO "body"
     val type: String,        // "BOOKING_CONFIRMED" | "PAYMENT_COMPLETED" | etc.
-    val readAt: String?,
+    val readAt: String?,     // null = no leída
+    val data: NotificationData?,
     val createdAt: String
 ) {
     val isRead: Boolean get() = readAt != null
+}
+
+data class NotificationData(
+    val bookingId: String?,
+    val artistId: String?,
+    val reviewId: String?,
+    val rating: Int?,
+    val disputeId: String?,
+    val amount: Double?
+)
+
+// CRÍTICO: la paginación de notificaciones usa "pages" NO "totalPages"
+data class NotificationsResponse(
+    val notifications: List<PiumsNotification>,
+    val pagination: NotificationsPagination
+) {
+    data class NotificationsPagination(
+        val page: Int,
+        val limit: Int,
+        val total: Int,
+        val pages: Int          // ← "pages", NO "totalPages"
+    ) {
+        val hasMore: Boolean get() = page < pages
+    }
+}
+
+// data/models/Booking.kt — Respuesta puede venir en dos shapes:
+data class BookingsResponse(
+    val bookings: List<Booking>?,   // shape principal
+    val data: List<Booking>?,       // shape alternativo que puede devolver el backend
+    val pagination: SearchPagination?,
+    val total: Int?,
+    val page: Int?,
+    val totalPages: Int?
+) {
+    val allBookings: List<Booking> get() =
+        if (!bookings.isNullOrEmpty()) bookings else data ?: emptyList()
+}
+
+// data/models/Review.kt
+data class Review(
+    val id: String,
+    val artistId: String,
+    val clientId: String,
+    val bookingId: String,
+    val rating: Int,
+    val comment: String?,
+    val createdAt: String,
+    val clientName: String?,
+    val clientAvatar: String?
+)
+
+// Respuesta puede venir como { reviews: [] } o { data: [] }
+data class ReviewsResponse(
+    val reviews: List<Review>?,
+    val data: List<Review>?,
+    val pagination: SearchPagination?
+) {
+    val allReviews: List<Review> get() =
+        if (!reviews.isNullOrEmpty()) reviews else data ?: emptyList()
+}
+
+// data/models/Favorites.kt
+data class FavoriteRecord(
+    val id: String,
+    val entityType: String,  // "ARTIST"
+    val entityId: String,
+    val notes: String?,
+    val createdAt: String,
+    val deletedAt: String?
+)
+
+data class FavoritesResponse(val data: List<FavoriteRecord>, val total: Int, val page: Int, val totalPages: Int)
+data class FavoriteCheckResponse(val isFavorite: Boolean, val favoriteId: String?)
+
+// data/models/BookingFlow.kt — Modelos para el flujo de reserva
+data class TimeSlot(
+    val time: String,       // "09:00"
+    val available: Boolean,
+    val startTime: String?, // ISO
+    val endTime: String?    // ISO
+)
+
+data class TimeSlotsResponse(val artistId: String?, val date: String?, val slots: List<TimeSlot>)
+
+data class ArtistCalendar(
+    val artistId: String?,
+    val year: Int?,
+    val month: Int?,
+    val occupiedDates: List<String>,  // ["2026-04-07", ...]
+    val blockedDates: List<String>
+)
+
+data class PriceQuoteItem(
+    val type: String,             // "BASE" | "ADDON" | "TRAVEL"
+    val name: String,
+    val qty: Int?,
+    val unitPriceCents: Int?,
+    val totalPriceCents: Int
+)
+
+data class PriceQuoteBreakdown(
+    val baseCents: Int,
+    val addonsCents: Int,
+    val travelCents: Int,
+    val discountsCents: Int?
+)
+
+data class PriceQuote(
+    val serviceId: String?,
+    val currency: String,
+    val items: List<PriceQuoteItem>,
+    val subtotalCents: Int,
+    val totalCents: Int,
+    val breakdown: PriceQuoteBreakdown?
+) {
+    val totalInUnits: Double get() = totalCents / 100.0
+    val hasTravel: Boolean get() = (breakdown?.travelCents ?: 0) > 0
+}
+
+// data/models/ArtistCategory.kt — categorías locales para UI (no vienen del backend en search)
+enum class ArtistCategory(val raw: String, val displayName: String, val icon: String) {
+    MUSICO("MUSICO", "Músico", "music.note"),
+    BAILARIN("BAILARIN", "Bailarín", "figure.dance"),
+    FOTOGRAFO("FOTOGRAFO", "Fotógrafo", "camera"),
+    VIDEOGRAFO("VIDEOGRAFO", "Videógrafo", "video"),
+    DISENADOR("DISENADOR", "Diseñador", "paintbrush"),
+    ESCRITOR("ESCRITOR", "Escritor", "pencil"),
+    ANIMADOR("ANIMADOR", "Animador", "face.smiling"),
+    MAGO("MAGO", "Mago", "wand.and.stars"),
+    ACROBATA("ACROBATA", "Acróbata", "figure.gymnastics"),
+    ACTOR("ACTOR", "Actor", "theatermasks"),
+    COMEDIANTE("COMEDIANTE", "Comediante", "mic"),
+    ARTE_PLASTICO("ARTE_PLASTICO", "Arte Plástico", "paintpalette"),
+    DJ("DJ", "DJ", "headphones"),
+    CHEF("CHEF", "Chef", "fork.knife"),
+    YOGA("YOGA", "Yoga", "figure.mind.and.body")
 }
 ```
 
@@ -996,8 +1288,10 @@ data class PiumsNotification(
 
 ### Base URL
 ```
-DEV:  http://localhost:3005
-PROD: https://api.piums.com
+DEV:  https://backend.piums.io   (Cloudflare tunnel — misma URL dev y prod por ahora)
+PROD: https://backend.piums.io
+
+OAuth callback host (Facebook/TikTok): client.piums.io
 
 Headers siempre:
   Content-Type: application/json
@@ -1021,10 +1315,16 @@ POST /api/auth/complete-onboarding     [auth]
 ### Artists & Search
 ```
 GET /api/search/artists?page=1&limit=20&q=&specialty=&city=&minPrice=&maxPrice=&minRating=&isVerified=&sortBy=&sortOrder=
+    → SearchArtistsResponse { artists: List<Artist>, pagination }
+
 GET /api/search/smart?q=&page=1&limit=20&lat=&lng=&city=&specialty=&minPrice=&maxPrice=&minRating=&isVerified=
+    → SmartSearchResponse { artists: List<SmartArtist>, expandedTerms, pagination }
+    Usar .toArtist() para convertir SmartArtist → Artist y reutilizar los mismos Composables
+
 GET /api/artists/{id}
 GET /api/artists/{id}/portfolio
-GET /api/catalog/services?artistId={id}
+GET /api/catalog/services?artistId={id}   → CatalogServicesResponse { services: List<ArtistService> }
+GET /api/catalog/services/{id}            → ArtistService directamente
 ```
 
 ### Availability & Pricing
