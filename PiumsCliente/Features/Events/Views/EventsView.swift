@@ -809,7 +809,7 @@ final class ExistingBookingsViewModel {
             let res: BookingsResponse = try await APIClient.request(.listMyBookings(status: nil, page: 1))
             
             // Filtrar solo las que no están vinculadas a eventos
-            availableBookings = res.bookings.filter { booking in
+            availableBookings = res.allBookings.filter { booking in
                 booking.eventId == nil && 
                 (booking.status == .confirmed || booking.status == .pending || booking.status == .paymentPending)
             }

@@ -67,11 +67,11 @@ final class HomeViewModel {
             let res: BookingsResponse = try await APIClient.request(
                 .listMyBookings(status: BookingStatus.confirmed.rawValue, page: 1)
             )
-            upcomingBookingDates = Set(res.bookings.map { $0.scheduledDate })
+            upcomingBookingDates = Set(res.allBookings.map { $0.scheduledDate })
             // Próxima reserva = la más cercana en el futuro
             let today = Date()
             let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-            nextBooking = res.bookings
+            nextBooking = res.allBookings
                 .filter { fmt.date(from: $0.scheduledDate).map { $0 >= today } ?? false }
                 .sorted { $0.scheduledDate < $1.scheduledDate }
                 .first
