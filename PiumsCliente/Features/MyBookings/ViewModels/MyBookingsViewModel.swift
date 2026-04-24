@@ -52,11 +52,14 @@ final class MyBookingsViewModel {
             let res: BookingsResponse = try await APIClient.request(
                 .listMyBookings(status: selectedStatus?.rawValue, page: currentPage)
             )
+            print("📋 Bookings cargadas: \(res.allBookings.count) — bookings:\(res.bookings?.count ?? -1) data:\(res.data?.count ?? -1) items:\(res.items?.count ?? -1)")
             bookings.append(contentsOf: res.allBookings)
             hasMore = res.hasMore
             currentPage += 1
         } catch {
-            errorMessage = AppError(from: error).errorDescription
+            let err = AppError(from: error)
+            print("❌ Error cargando bookings: \(err.errorDescription ?? error.localizedDescription)")
+            errorMessage = err.errorDescription
         }
     }
 }

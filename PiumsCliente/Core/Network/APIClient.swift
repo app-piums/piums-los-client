@@ -11,6 +11,8 @@ struct APIClient {
         do {
             return try JSONDecoder.piums.decode(T.self, from: data)
         } catch {
+            let raw = String(data: data, encoding: .utf8) ?? "(binary)"
+            print("🔴 Decode error [\(endpoint.url.path)]: \(error)\nRaw: \(raw.prefix(800))")
             throw AppError.decoding(error)
         }
     }

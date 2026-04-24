@@ -404,7 +404,7 @@ struct Booking: Codable, Identifiable, Hashable {
     let notes: String?
     let location: String?
     let eventId: String?
-    let createdAt: String
+    let createdAt: String?
 
     // Participantes — pueden venir anidados del backend
     let artist: BookingParticipant?
@@ -438,6 +438,12 @@ enum BookingStatus: String, Codable {
     case cancelledArtist   = "CANCELLED_ARTIST"
     case rejected          = "REJECTED"
     case noShow            = "NO_SHOW"
+    case unknown           = "UNKNOWN"
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = BookingStatus(rawValue: raw) ?? .unknown
+    }
 
     var displayName: String {
         switch self {
@@ -452,6 +458,7 @@ enum BookingStatus: String, Codable {
         case .cancelledArtist:  return "Cancelada por artista"
         case .rejected:         return "Rechazada"
         case .noShow:           return "No se presentó"
+        case .unknown:          return "Desconocido"
         }
     }
 }
@@ -461,20 +468,27 @@ enum PaymentStatus: String, Codable {
     case completed = "COMPLETED"
     case refunded  = "REFUNDED"
     case failed    = "FAILED"
+    case unknown   = "UNKNOWN"
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = PaymentStatus(rawValue: raw) ?? .unknown
+    }
 }
 
 // MARK: - Bookings Paginated Response
 
 struct BookingsResponse: Codable {
-    let bookings: [Booking]
-    let pagination: SearchPagination?
-    // fallback si el backend devuelve shape diferente
+    // el backend puede enviar el array bajo distintos keys
+    let bookings: [Booking]?
     let data: [Booking]?
+    let items: [Booking]?
+    let pagination: SearchPagination?
     let total: Int?
     let page: Int?
     let totalPages: Int?
 
-    var allBookings: [Booking] { bookings.isEmpty ? (data ?? []) : bookings }
+    var allBookings: [Booking] { bookings ?? data ?? items ?? [] }
     var hasMore: Bool {
         if let pag = pagination { return pag.hasMore }
         guard let p = page, let tp = totalPages else { return false }
@@ -789,7 +803,7 @@ extension Booking {
         Booking(id: "b1", code: "PMS-001", clientId: "c1", artistId: "1", serviceId: "s1",
                 status: .confirmed, paymentStatus: .completed, totalPrice: 15000,
                 scheduledDate: "2026-05-10", scheduledTime: "15:00", duration: 60,
-                notes: nil, location: "Salón Principal", eventId: nil, createdAt: "2026-04-09T10:00:00Z",
+                notes: nil, location: "Salón Principal", eventId: nil, createdAt: nil,
                 artist: nil, client: nil, artistName: nil, clientName: nil)
     }
 }
