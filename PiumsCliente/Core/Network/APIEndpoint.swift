@@ -57,6 +57,7 @@ enum APIEndpoint {
     case getMyProfile                                    // GET /api/auth/me
     case updateMyProfile(payload: [String: Any])         // PATCH /api/auth/profile
     case changePassword(current: String, new: String)    // POST /api/auth/change-password
+    case uploadAvatar                                    // POST /api/users/me/avatar (multipart)
 
     // ── Favorites ────────────────────────────────────────
     case listFavorites(page: Int, entityType: String)
@@ -253,6 +254,7 @@ extension APIEndpoint {
         case .getMyProfile:                    return "/api/auth/me"
         case .updateMyProfile:                 return "/api/auth/profile"
         case .changePassword:                  return "/api/auth/change-password"
+        case .uploadAvatar:                    return "/api/users/me/avatar"
 
         // Favorites
         case .listFavorites(let pg, let type):

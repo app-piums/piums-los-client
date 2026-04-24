@@ -19,7 +19,7 @@ struct ArtistProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 // Header
-                ArtistHeaderView(artist: artist)
+                ArtistHeaderView(artist: artist, avatarURL: viewModel.avatarURL)
 
                 // Stats rápidas
                 HStack(spacing: 0) {
@@ -186,11 +186,13 @@ struct ArtistProfileView: View {
 
 private struct ArtistHeaderView: View {
     let artist: Artist
+    var avatarURL: String? = nil
 
     var body: some View {
         HStack(spacing: 16) {
             Group {
-                if let url = artist.avatarUrl, let imageURL = URL(string: url) {
+                let url = avatarURL ?? artist.avatarUrl
+                if let url, let imageURL = URL(string: url) {
                     AsyncImage(url: imageURL) { $0.resizable().scaledToFill() } placeholder: { placeholder }
                 } else {
                     placeholder

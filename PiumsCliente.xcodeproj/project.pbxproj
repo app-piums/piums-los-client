@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7929C8502F9BC81B00732723 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 7929C84F2F9BC81B00732723 /* FirebaseAuth */; };
+		7929C8522F9BC82400732723 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7929C8512F9BC82400732723 /* FirebaseCore */; };
 		7975A8AB2F895F48003ECD57 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000001B /* GoogleSignIn */; };
 		7975A8AC2F895F48003ECD57 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000001C /* GoogleSignInSwift */; };
 		7975A8AD2F895F48003ECD57 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000001B /* GoogleSignIn */; };
@@ -37,9 +39,22 @@
 		79514C292F88589000CB7190 /* PiumsClienteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PiumsClienteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		7929C8542F9BCCB300732723 /* Exceptions for "PiumsCliente" folder in "PiumsCliente" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 79514C0F2F88588F00CB7190 /* PiumsCliente */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		79514C122F88588F00CB7190 /* PiumsCliente */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				7929C8542F9BCCB300732723 /* Exceptions for "PiumsCliente" folder in "PiumsCliente" target */,
+			);
 			path = PiumsCliente;
 			sourceTree = "<group>";
 		};
@@ -61,8 +76,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				7975A8AE2F895F48003ECD57 /* GoogleSignInSwift in Frameworks */,
+				7929C8502F9BC81B00732723 /* FirebaseAuth in Frameworks */,
 				7975A8AD2F895F48003ECD57 /* GoogleSignIn in Frameworks */,
 				7975A8AC2F895F48003ECD57 /* GoogleSignInSwift in Frameworks */,
+				7929C8522F9BC82400732723 /* FirebaseCore in Frameworks */,
 				7975A8AB2F895F48003ECD57 /* GoogleSignIn in Frameworks */,
 				7975A8AF2F895F48003ECD57 /* SocketIO in Frameworks */,
 			);
@@ -85,12 +102,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		7929C84E2F9BC81B00732723 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		79514C072F88588F00CB7190 = {
 			isa = PBXGroup;
 			children = (
 				79514C122F88588F00CB7190 /* PiumsCliente */,
 				79514C222F88589000CB7190 /* PiumsClienteTests */,
 				79514C2C2F88589000CB7190 /* PiumsClienteUITests */,
+				7929C84E2F9BC81B00732723 /* Frameworks */,
 				79514C112F88588F00CB7190 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,6 +155,8 @@
 				AA000001000000000000001B /* GoogleSignIn */,
 				AA000001000000000000001C /* GoogleSignInSwift */,
 				AA000002000000000000002B /* SocketIO */,
+				7929C84F2F9BC81B00732723 /* FirebaseAuth */,
+				7929C8512F9BC82400732723 /* FirebaseCore */,
 			);
 			productName = PiumsCliente;
 			productReference = 79514C102F88588F00CB7190 /* PiumsCliente.app */;
@@ -216,6 +243,7 @@
 			packageReferences = (
 				AA000001000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				AA000002000000000000002A /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+				7929C84D2F9BC78000732723 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 79514C112F88588F00CB7190 /* Products */;
@@ -293,6 +321,8 @@
 /* Begin XCBuildConfiguration section */
 		79514C312F88589000CB7190 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 79514C122F88588F00CB7190 /* PiumsCliente */;
+			baseConfigurationReferenceRelativePath = Resources/Debug.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -356,6 +386,8 @@
 		};
 		79514C322F88589000CB7190 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 79514C122F88588F00CB7190 /* PiumsCliente */;
+			baseConfigurationReferenceRelativePath = Resources/Release.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -417,8 +449,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LDB55TCA53;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PiumsCliente/Info.plist;
 				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -449,8 +483,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LDB55TCA53;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PiumsCliente/Info.plist;
 				INFOPLIST_KEY_CFBundleURLTypes = "com.googleusercontent.apps.967320828042-ro3iao8ol9i9tmhhjbf1uqdcjrotq4ii";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -600,6 +636,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		7929C84D2F9BC78000732723 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.12.1;
+			};
+		};
 		AA000001000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
@@ -619,6 +663,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		7929C84F2F9BC81B00732723 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7929C84D2F9BC78000732723 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		7929C8512F9BC82400732723 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7929C84D2F9BC78000732723 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
 		AA000001000000000000001B /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AA000001000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;

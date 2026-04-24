@@ -121,6 +121,13 @@ struct BookingRowView: View {
                         .font(.subheadline.bold())
                         .foregroundStyle(Color.piumsOrange)
                 }
+                if let artistName = booking.resolvedArtistName {
+                    HStack(spacing: 4) {
+                        Image(systemName: "music.microphone").font(.caption2)
+                        Text(artistName).font(.caption.weight(.medium))
+                    }
+                    .foregroundStyle(.primary)
+                }
                 Text(booking.status.displayName)
                     .font(.caption.bold())
                     .padding(.horizontal, 8).padding(.vertical, 3)
@@ -273,6 +280,39 @@ struct BookingDetailView: View {
                 .background(statusColor.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 20)
+
+                // ── Participantes ───────────────────────────
+                if booking.resolvedArtistName != nil || booking.resolvedClientName != nil {
+                    DetailCard(title: "Participantes") {
+                        VStack(spacing: 12) {
+                            if let name = booking.resolvedArtistName {
+                                ParticipantRow(
+                                    role: "Artista",
+                                    name: name,
+                                    detail: booking.artist?.specialties?.first ?? booking.artist?.email,
+                                    avatarURL: booking.resolvedArtistAvatar,
+                                    isVerified: booking.artist?.isVerified ?? false,
+                                    icon: "music.microphone",
+                                    tint: Color.piumsOrange
+                                )
+                            }
+                            if booking.resolvedArtistName != nil && booking.resolvedClientName != nil {
+                                Divider()
+                            }
+                            if let name = booking.resolvedClientName {
+                                ParticipantRow(
+                                    role: "Cliente",
+                                    name: name,
+                                    detail: booking.client?.email,
+                                    avatarURL: booking.resolvedClientAvatar,
+                                    isVerified: false,
+                                    icon: "person.circle",
+                                    tint: .blue
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // ── Código de reserva ───────────────────────
                 if let code = booking.code {
@@ -434,6 +474,75 @@ struct BookingDetailView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - ParticipantRow
+
+private struct ParticipantRow: View {
+    let role: String
+    let name: String
+    let detail: String?
+    let avatarURL: String?
+    let isVerified: Bool
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 14) {
+            // Avatar
+            Group {
+                if let url = avatarURL, let imageURL = URL(string: url) {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .success(let img): img.resizable().scaledToFill()
+                        default: avatarPlaceholder
+                        }
+                    }
+                } else {
+                    avatarPlaceholder
+                }
+            }
+            .frame(width: 46, height: 46)
+            .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(role.uppercased())
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.8)
+                HStack(spacing: 5) {
+                    Text(name).font(.subheadline.bold())
+                    if isVerified {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.piumsOrange)
+                    }
+                }
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            ZStack {
+                Circle().fill(tint.opacity(0.12)).frame(width: 34, height: 34)
+                Image(systemName: icon).font(.system(size: 14)).foregroundStyle(tint)
+            }
+        }
+    }
+
+    private var avatarPlaceholder: some View {
+        ZStack {
+            Circle().fill(tint.opacity(0.15))
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(tint)
+        }
     }
 }
 

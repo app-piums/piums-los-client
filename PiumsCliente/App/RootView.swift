@@ -17,21 +17,10 @@ struct RootView: View {
             } else if isUITestingLoggedIn {
                 MainTabView(deepLinkBookingId: .constant(nil))
             } else if isLoading {
-                // Splash screen con logo
-                ZStack {
-                    Color.piumsOrange.ignoresSafeArea()
-                    
-                    VStack(spacing: 20) {
-                        Image("PiumsLogo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(height: 140)
-                            .foregroundStyle(.white)
-                        
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    }
+                SplashVideoView {
+                    withAnimation(.easeInOut(duration: 0.5)) { isLoading = false }
                 }
+                .ignoresSafeArea()
             } else if !hasSeenOnboarding {
                 OnboardingView {
                     withAnimation { hasSeenOnboarding = true }
@@ -47,13 +36,6 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToBooking)) { notif in
             if let bookingId = notif.userInfo?["bookingId"] as? String {
                 deepLinkBookingId = bookingId
-            }
-        }
-        .task {
-            // Simular tiempo de carga inicial
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 segundos
-            withAnimation {
-                isLoading = false
             }
         }
     }

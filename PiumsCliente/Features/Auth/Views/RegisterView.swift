@@ -1,5 +1,6 @@
 // RegisterView.swift
 import SwiftUI
+import UIKit
 
 struct RegisterView: View {
     @Bindable var viewModel: AuthViewModel
@@ -9,6 +10,7 @@ struct RegisterView: View {
     @State private var animateIn    = false
     @State private var glowPulse    = false
     @State private var acceptTerms  = false
+    @State private var keyboardHeight: CGFloat = 0
 
     enum Field { case name, email, password, confirmPass }
 
@@ -19,7 +21,7 @@ struct RegisterView: View {
 
                 registerCard
                     .frame(height: geo.size.height * 0.78)
-                    .offset(y: animateIn ? 0 : geo.size.height * 0.8)
+                    .offset(y: animateIn ? -min(keyboardHeight, geo.size.height * 0.22 - 20) : geo.size.height * 0.8)
             }
             .ignoresSafeArea()
         }
@@ -32,6 +34,13 @@ struct RegisterView: View {
             withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true).delay(0.3)) {
                 glowPulse = true
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notif in
+            guard let frame = notif.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            withAnimation(.easeOut(duration: 0.25)) { keyboardHeight = frame.height }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(.easeOut(duration: 0.25)) { keyboardHeight = 0 }
         }
     }
 
@@ -109,6 +118,7 @@ struct RegisterView: View {
                 .padding(.top, 14)
                 .padding(.bottom, 22)
 
+            ScrollViewReader { scrollProxy in
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 22) {
 
@@ -124,10 +134,10 @@ struct RegisterView: View {
 
                     // Campos
                     VStack(spacing: 14) {
-                        fieldName
-                        fieldEmail
-                        fieldPassword
-                        fieldConfirmPassword
+                        fieldName.id(Field.name)
+                        fieldEmail.id(Field.email)
+                        fieldPassword.id(Field.password)
+                        fieldConfirmPassword.id(Field.confirmPass)
                     }
 
                     // Validación de contraseña
@@ -216,9 +226,18 @@ struct RegisterView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 26)
-                .padding(.bottom, 50)
+                .padding(.bottom, keyboardHeight > 0 ? keyboardHeight + 24 : 50)
             }
             .scrollDismissesKeyboard(.interactively)
+            .onChange(of: focused) { _, newFocus in
+                guard let f = newFocus else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        scrollProxy.scrollTo(f, anchor: .center)
+                    }
+                }
+            }
+            } // ScrollViewReader
         }
         .background(
             RoundedRectangle(cornerRadius: 28)

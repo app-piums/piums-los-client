@@ -1,6 +1,8 @@
 // AuthManager.swift
 import Foundation
+import UIKit
 import GoogleSignIn
+import FirebaseAuth
 
 @Observable
 @MainActor
@@ -25,13 +27,34 @@ final class AuthManager {
         store(response)
     }
 
-    /// Google Sign-In → Firebase idToken → POST /api/auth/firebase → Piums JWT
-    func loginWithGoogle(presenting viewController: UIViewController) async throws {
-        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: viewController)
-        guard let idToken = result.user.idToken?.tokenString else {
+    /// Google Sign-In → Firebase credential → Firebase ID token → POST /api/auth/firebase → Piums JWT
+    func loginWithGoogle() async throws {
+        // Obtener el view controller de presentación más alto disponible
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        guard let window = activeScene?.keyWindow
+                        ?? activeScene?.windows.first(where: { $0.isKeyWindow })
+                        ?? activeScene?.windows.first,
+              let rootVC = window.rootViewController else {
+            throw AppError.http(statusCode: 0, message: "No se pudo obtener la ventana de presentación")
+        }
+        var presentingVC = rootVC
+        while let presented = presentingVC.presentedViewController { presentingVC = presented }
+
+        // 1. Google Sign-In
+        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presentingVC)
+        guard let googleIdToken = result.user.idToken?.tokenString else {
             throw AppError.http(statusCode: 401, message: "No se obtuvo el token de Google")
         }
-        let response: AuthResponse = try await APIClient.request(.firebaseAuth(token: idToken))
+        let accessToken = result.user.accessToken.tokenString
+
+        // 2. Firebase credential → Firebase ID token
+        let credential = GoogleAuthProvider.credential(withIDToken: googleIdToken, accessToken: accessToken)
+        let firebaseResult = try await Auth.auth().signIn(with: credential)
+        let firebaseIdToken = try await firebaseResult.user.getIDToken()
+
+        // 3. Piums backend
+        let response: AuthResponse = try await APIClient.request(.firebaseAuth(token: firebaseIdToken))
         store(response)
     }
 

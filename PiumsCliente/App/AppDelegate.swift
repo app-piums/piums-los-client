@@ -2,6 +2,7 @@
 import UIKit
 import UserNotifications
 import GoogleSignIn
+import FirebaseCore
 
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
@@ -9,10 +10,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // Firebase debe configurarse primero — antes de cualquier otro SDK
+        FirebaseApp.configure()
+
         UNUserNotificationCenter.current().delegate = self
         requestPushPermission(application)
 
-        // Configurar Google Sign-In con el CLIENT_ID del GoogleService-Info.plist
+        // Google Sign-In — CLIENT_ID del GoogleService-Info.plist
         if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
            let plist = NSDictionary(contentsOfFile: path),
            let clientID = plist["CLIENT_ID"] as? String {

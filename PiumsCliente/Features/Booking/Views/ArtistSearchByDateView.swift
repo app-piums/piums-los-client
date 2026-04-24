@@ -118,8 +118,12 @@ final class ArtistSearchByDateViewModel {
             // 3. Enrich with availability + distance (exact coords preferred over city fallback)
             let enriched: [ArtistWithAvailability] = rawArtists.map { artist in
                 let artistCal = calendars[artist.id]
-                let available = artistCal == nil ||
-                    (!artistCal!.occupiedDates.contains(dateStr) && !artistCal!.blockedDates.contains(dateStr))
+                let available: Bool
+                if let cal = artistCal {
+                    available = !cal.occupiedDates.contains(dateStr) && !cal.blockedDates.contains(dateStr)
+                } else {
+                    available = true
+                }
 
                 let distance = computeDistance(artist: artist, location: location)
 

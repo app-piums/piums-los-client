@@ -118,12 +118,12 @@ La card central cambia de contenido según el paso con animación spring. Los 3 
 ```
 ┌────────────────────────────────┐
 │  (fondo oscuro degradado)      │
-│         [PiumsLogo]            │  ← logo, height: 38dp
-│    ⬤ (ícono ticket)           │  ← círculo naranja, 100dp
-│    "Panel de Clientes"         │  ← headline bold, blanco
-│  "Reserva el mejor talento"    │  ← body, white 50%
 │                                │
-├────────────────────────────────┤  ← card R=28dp, desliza desde abajo
+├────────────────────────────────┤  ← card R=28dp, desliza desde abajo (57% alto pantalla)
+│         [PiumsLogo]            │  ← logo, height: 210dp (sin ícono ticket)
+│  "¡Bienvenido a Piums!"        │  ← headline bold, blanco
+│  "El artista perfecto para     │  ← body, white 50%
+│   tu próximo evento"           │
 │  ——— (drag indicator)          │
 │                                │
 │  PASO 1 (email):               │
@@ -1771,6 +1771,78 @@ dependencies {
 - [ ] Google Pay
 - [ ] Biometric auth
 - [ ] Adaptive icons
+
+### 14.7 Splash con Video — ExoPlayer (Media3)
+
+La pantalla splash cambió de un logo estático con `ProgressView` a un video animado (`PiumsSplash.mp4`).
+iOS usa `AVPlayer` a 2x velocidad con `resizeAspect`. Android equivalente con Media3 ExoPlayer:
+
+```kotlin
+// screens/splash/SplashScreen.kt
+@Composable
+fun SplashVideoScreen(onFinished: () -> Unit) {
+    val context = LocalContext.current
+    val player = remember {
+        ExoPlayer.Builder(context).build().apply {
+            val uri = Uri.parse("android.resource://${context.packageName}/raw/piums_splash")
+            if (context.resources.getIdentifier("piums_splash", "raw", context.packageName) != 0) {
+                setMediaItem(MediaItem.fromUri(uri))
+                prepare()
+                playbackParameters = PlaybackParameters(2f)  // 2x speed — igual que iOS
+                play()
+            } else {
+                // fallback si no existe el video: esperar 1.5s
+            }
+        }
+    }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED) onFinished()
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    AndroidView(
+        factory = { PlayerView(it).apply { this.player = player; useController = false; resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT } },
+        modifier = Modifier.fillMaxSize().background(Color.Black)
+    )
+    LaunchedEffect(Unit) {
+        // fallback por si el video no existe o falla
+        delay(3000)
+        onFinished()
+    }
+}
+```
+
+**Dependencia adicional**:
+```kotlin
+implementation("androidx.media3:media3-exoplayer:1.3.1")
+implementation("androidx.media3:media3-ui:1.3.1")
+```
+
+El archivo de video va en `res/raw/piums_splash.mp4`.
+`RootActivity`: mostrar `SplashVideoScreen` mientras `isLoading = true`; al terminar el video → `isLoading = false` con animación.
+
+### 14.8 Fix de Disponibilidad en ArtistSearchByDate
+
+Artistas sin calendario registrado en el backend deben considerarse **disponibles** (no bloqueados).
+
+```kotlin
+// INCORRECTO — podría crashear con NPE o marcar disponible erróneamente
+val available = artistCal == null || (!artistCal!!.occupiedDates.contains(dateStr) && ...)
+
+// CORRECTO
+val available = if (artistCal != null) {
+    !artistCal.occupiedDates.contains(dateStr) && !artistCal.blockedDates.contains(dateStr)
+} else {
+    true  // sin calendario = sin restricciones = disponible
+}
+```
 
 ---
 

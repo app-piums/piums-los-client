@@ -235,9 +235,9 @@ struct StarRatingView: View {
 // MARK: - PriceText helper
 
 extension Int {
-    /// Convierte centavos a texto formateado, ej: 15000 → "Q 150.00"
+    /// Convierte centavos a texto formateado, ej: 15000 → "$ 150.00"
     var piumsFormatted: String {
         let value = Double(self) / 100.0
-        return String(format: "Q %.2f", value)
+        return String(format: "$ %.2f", value)
     }
 }

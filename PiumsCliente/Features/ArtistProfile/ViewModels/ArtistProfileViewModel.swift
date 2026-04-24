@@ -19,12 +19,31 @@ struct PortfolioResponse: Codable {
     var allItems: [PortfolioItem] { portfolio ?? items ?? [] }
 }
 
+// MARK: - Lightweight DTO for avatar (resilient to shape changes in /api/artists/:id)
+
+private struct ArtistAvatarResponse: Decodable {
+    // direct form: { "avatar": "...", "avatarUrl": "..." }
+    let avatar: String?
+    let avatarUrl: String?
+
+    // wrapped form: { "artist": { "avatar": "..." } }
+    struct Inner: Decodable {
+        let avatar: String?
+        let avatarUrl: String?
+        var resolved: String? { avatar ?? avatarUrl }
+    }
+    let artist: Inner?
+
+    var resolved: String? { artist?.resolved ?? avatar ?? avatarUrl }
+}
+
 // MARK: - ViewModel
 
 @Observable
 @MainActor
 final class ArtistProfileViewModel {
     var artist: Artist
+    var avatarURL: String?
     var services: [ArtistService] = []
     var reviews: [Review] = []
     var portfolio: [PortfolioItem] = []
@@ -39,7 +58,15 @@ final class ArtistProfileViewModel {
         async let s: () = loadServices()
         async let r: () = loadReviews()
         async let p: () = loadPortfolio()
-        _ = await (s, r, p)
+        async let d: () = loadArtistDetail()
+        _ = await (s, r, p, d)
+    }
+
+    func loadArtistDetail() async {
+        do {
+            let dto: ArtistAvatarResponse = try await APIClient.request(.getArtist(id: artist.id))
+            avatarURL = dto.resolved
+        } catch { }
     }
 
     func loadServices() async {

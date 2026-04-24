@@ -41,6 +41,27 @@ struct AuthUser: Codable, Identifiable {
     var isActive: Bool { status == nil || status == "ACTIVE" }
 }
 
+// MARK: - Avatar upload DTOs (backend puede responder con distintas formas)
+
+struct AvatarUploadResponseDTO: Decodable {
+    let url: String?
+    let avatar: String?
+    let avatarUrl: String?
+    let imageUrl: String?
+    var resolvedURL: String? { url ?? avatar ?? avatarUrl ?? imageUrl }
+}
+
+struct AvatarUploadUserWrapperDTO: Decodable {
+    struct UserPayload: Decodable {
+        let avatar: String?
+        let avatarUrl: String?
+        let imageUrl: String?
+        var resolvedURL: String? { avatar ?? avatarUrl ?? imageUrl }
+    }
+    let user: UserPayload?
+    var resolvedURL: String? { user?.resolvedURL }
+}
+
 // MARK: - Artist  (shape: GET /api/search/artists)
 
 struct Artist: Codable, Identifiable, Hashable {
@@ -53,9 +74,9 @@ struct Artist: Codable, Identifiable, Hashable {
     let averageRating: Double?
     let totalReviews: Int
     let totalBookings: Int
-    let hourlyRateMin: Int?    // en centavos/unidades
+    let hourlyRateMin: Int?
     let hourlyRateMax: Int?
-    let mainServicePrice: Int? // precio del servicio principal
+    let mainServicePrice: Int?
     let mainServiceName: String?
     let isVerified: Bool
     let isActive: Bool
@@ -65,13 +86,13 @@ struct Artist: Codable, Identifiable, Hashable {
     let serviceTitles: [String]?
     let specialties: [String]?
     let createdAt: String?
-    // Coordenadas exactas del artista (cuando el backend las devuelve)
     let baseLocationLat: Double?
     let baseLocationLng: Double?
+    let avatar: String?         // null in search, present in full artist detail
 
     // Computed helpers para la UI
     var artistName: String { name }
-    var avatarUrl: String? { nil }   // el backend no devuelve avatar en search
+    var avatarUrl: String? { avatar }
     var rating: Double? { averageRating }
     var reviewsCount: Int { totalReviews }
     var basePrice: Int? { mainServicePrice }
@@ -79,6 +100,10 @@ struct Artist: Codable, Identifiable, Hashable {
     // Hashable
     static func == (lhs: Artist, rhs: Artist) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct ArtistDetailResponse: Decodable {
+    let artist: Artist?
 }
 
 // MARK: - Search Response  (shape: /api/search/artists)
@@ -160,7 +185,7 @@ struct SmartArtist: Codable, Identifiable {
                isVerified: isVerified, isActive: isActive, isAvailable: isAvailable,
                servicesCount: servicesCount, serviceIds: serviceIds, serviceTitles: serviceTitles,
                specialties: specialties, createdAt: createdAt,
-               baseLocationLat: baseLocationLat, baseLocationLng: baseLocationLng)
+               baseLocationLat: baseLocationLat, baseLocationLng: baseLocationLng, avatar: nil)
     }
 }
 
@@ -178,7 +203,7 @@ extension Artist {
              totalReviews, totalBookings, hourlyRateMin, hourlyRateMax,
              mainServicePrice, mainServiceName, isVerified, isActive,
              isAvailable, servicesCount, serviceIds, serviceTitles,
-             specialties, createdAt, baseLocationLat, baseLocationLng
+             specialties, createdAt, baseLocationLat, baseLocationLng, avatar
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -205,7 +230,8 @@ extension Artist {
             specialties: try c.decodeIfPresent([String].self, forKey: .specialties),
             createdAt: try c.decodeIfPresent(String.self, forKey: .createdAt),
             baseLocationLat: try c.decodeIfPresent(Double.self, forKey: .baseLocationLat),
-            baseLocationLng: try c.decodeIfPresent(Double.self, forKey: .baseLocationLng)
+            baseLocationLng: try c.decodeIfPresent(Double.self, forKey: .baseLocationLng),
+            avatar: try c.decodeIfPresent(String.self, forKey: .avatar)
         )
     }
 }
@@ -349,6 +375,18 @@ struct CatalogServicesResponse: Codable {
     let services: [ArtistService]
 }
 
+// MARK: - BookingParticipant  (nested en respuesta de booking)
+
+struct BookingParticipant: Codable {
+    let id: String?
+    let name: String?
+    let email: String?
+    let avatar: String?
+    let phone: String?
+    let specialties: [String]?
+    let isVerified: Bool?
+}
+
 // MARK: - Booking  (shape: GET /api/bookings)
 
 struct Booking: Codable, Identifiable, Hashable {
@@ -365,8 +403,21 @@ struct Booking: Codable, Identifiable, Hashable {
     let duration: Int?
     let notes: String?
     let location: String?
-    let eventId: String?    // Nueva propiedad para vincular a eventos
+    let eventId: String?
     let createdAt: String
+
+    // Participantes — pueden venir anidados del backend
+    let artist: BookingParticipant?
+    let client: BookingParticipant?
+    // Flat fallbacks si el backend devuelve nombres a nivel raíz
+    let artistName: String?
+    let clientName: String?
+
+    // Helpers resolviendo nested > flat
+    var resolvedArtistName: String? { artist?.name ?? artistName }
+    var resolvedClientName: String? { client?.name ?? clientName }
+    var resolvedArtistAvatar: String? { artist?.avatar }
+    var resolvedClientAvatar: String? { client?.avatar }
 
     // Hashable
     static func == (lhs: Booking, rhs: Booking) -> Bool { lhs.id == rhs.id }
@@ -721,14 +772,14 @@ extension Artist {
                hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000,
                mainServiceName: "Show 1 hora", isVerified: true, isActive: true, isAvailable: true,
                servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra", "Eventos"],
-               createdAt: nil, baseLocationLat: nil, baseLocationLng: nil)
+               createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil)
     }
 
     static var mockList: [Artist] {
         [
-            Artist(id: "1", name: "Carlos Méndez", bio: nil, city: "Ciudad de Guatemala", state: nil, country: "GT", averageRating: 4.8, totalReviews: 32, totalBookings: 5, hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil),
-            Artist(id: "2", name: "Sofía Ramírez", bio: nil, city: "Antigua", state: nil, country: "GT", averageRating: 4.5, totalReviews: 18, totalBookings: 10, hourlyRateMin: 20000, hourlyRateMax: 40000, mainServicePrice: 20000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 3, serviceIds: nil, serviceTitles: nil, specialties: ["Baile"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil),
-            Artist(id: "3", name: "Javier Torres", bio: nil, city: "Quetzaltenango", state: nil, country: "GT", averageRating: 4.9, totalReviews: 55, totalBookings: 20, hourlyRateMin: 25000, hourlyRateMax: 50000, mainServicePrice: 25000, mainServiceName: "Sesión foto", isVerified: false, isActive: true, isAvailable: true, servicesCount: 4, serviceIds: nil, serviceTitles: nil, specialties: ["Fotografía"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil),
+            Artist(id: "1", name: "Carlos Méndez", bio: nil, city: "Ciudad de Guatemala", state: nil, country: "GT", averageRating: 4.8, totalReviews: 32, totalBookings: 5, hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil),
+            Artist(id: "2", name: "Sofía Ramírez", bio: nil, city: "Antigua", state: nil, country: "GT", averageRating: 4.5, totalReviews: 18, totalBookings: 10, hourlyRateMin: 20000, hourlyRateMax: 40000, mainServicePrice: 20000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 3, serviceIds: nil, serviceTitles: nil, specialties: ["Baile"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil),
+            Artist(id: "3", name: "Javier Torres", bio: nil, city: "Quetzaltenango", state: nil, country: "GT", averageRating: 4.9, totalReviews: 55, totalBookings: 20, hourlyRateMin: 25000, hourlyRateMax: 50000, mainServicePrice: 25000, mainServiceName: "Sesión foto", isVerified: false, isActive: true, isAvailable: true, servicesCount: 4, serviceIds: nil, serviceTitles: nil, specialties: ["Fotografía"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil),
         ]
     }
 }
@@ -738,15 +789,16 @@ extension Booking {
         Booking(id: "b1", code: "PMS-001", clientId: "c1", artistId: "1", serviceId: "s1",
                 status: .confirmed, paymentStatus: .completed, totalPrice: 15000,
                 scheduledDate: "2026-05-10", scheduledTime: "15:00", duration: 60,
-                notes: nil, location: "Salón Principal", eventId: nil, createdAt: "2026-04-09T10:00:00Z")
+                notes: nil, location: "Salón Principal", eventId: nil, createdAt: "2026-04-09T10:00:00Z",
+                artist: nil, client: nil, artistName: nil, clientName: nil)
     }
 }
 
 extension ArtistService {
     static func mockList(artistId: String) -> [ArtistService] {
         [
-            ArtistService(id: "s1", artistId: artistId, name: "Show 1 hora", description: "Presentación de 60 min.", pricingType: "FIXED", basePrice: 15000, currency: "GTQ", durationMin: 60, durationMax: 60, status: "ACTIVE", isAvailable: true, isFeatured: true, whatIsIncluded: ["Equipo de sonido", "1 hora de show"], thumbnail: nil, tags: nil, isMainService: true, createdAt: nil),
-            ArtistService(id: "s2", artistId: artistId, name: "Show 30 min", description: "Mini presentación.", pricingType: "FIXED", basePrice: 9000, currency: "GTQ", durationMin: 30, durationMax: 30, status: "ACTIVE", isAvailable: true, isFeatured: false, whatIsIncluded: ["30 minutos de show"], thumbnail: nil, tags: nil, isMainService: false, createdAt: nil)
+            ArtistService(id: "s1", artistId: artistId, name: "Show 1 hora", description: "Presentación de 60 min.", pricingType: "FIXED", basePrice: 15000, currency: "USD", durationMin: 60, durationMax: 60, status: "ACTIVE", isAvailable: true, isFeatured: true, whatIsIncluded: ["Equipo de sonido", "1 hora de show"], thumbnail: nil, tags: nil, isMainService: true, createdAt: nil),
+            ArtistService(id: "s2", artistId: artistId, name: "Show 30 min", description: "Mini presentación.", pricingType: "FIXED", basePrice: 9000, currency: "USD", durationMin: 30, durationMax: 30, status: "ACTIVE", isAvailable: true, isFeatured: false, whatIsIncluded: ["30 minutos de show"], thumbnail: nil, tags: nil, isMainService: false, createdAt: nil)
         ]
     }
 }

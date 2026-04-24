@@ -1,5 +1,6 @@
 // LoginView.swift
 import SwiftUI
+import UIKit
 
 struct LoginView: View {
     @Bindable var viewModel: AuthViewModel
@@ -8,6 +9,7 @@ struct LoginView: View {
     @State private var animateIn = false
     @State private var glowPulse = false
     @State private var loginStep: LoginStep = .email
+    @State private var keyboardHeight: CGFloat = 0
 
     enum Field { case email, password }
     enum LoginStep { case email, password, social }
@@ -18,13 +20,12 @@ struct LoginView: View {
                 backgroundLayer(geo: geo)
 
                 loginCard
-                    .frame(height: geo.size.height * 0.68)
-                    .offset(y: animateIn ? 0 : geo.size.height * 0.7)
+                    .frame(height: geo.size.height * 0.60)
+                    .offset(y: animateIn ? -keyboardHeight : geo.size.height * 0.7)
             }
             .ignoresSafeArea()
         }
         .navigationBarHidden(true)
-        .preferredColorScheme(.dark)
         .onAppear {
             withAnimation(.spring(response: 0.75, dampingFraction: 0.88).delay(0.05)) {
                 animateIn = true
@@ -33,6 +34,13 @@ struct LoginView: View {
                 glowPulse = true
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notif in
+            guard let frame = notif.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            withAnimation(.easeOut(duration: 0.25)) { keyboardHeight = frame.height }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(.easeOut(duration: 0.25)) { keyboardHeight = 0 }
+        }
     }
 
     // MARK: - Background
@@ -40,13 +48,13 @@ struct LoginView: View {
     @ViewBuilder
     private func backgroundLayer(geo: GeometryProxy) -> some View {
         ZStack(alignment: .top) {
-            Color.piumsBackground.ignoresSafeArea()
+            Color(.systemBackground).ignoresSafeArea()
 
             Circle()
-                .fill(Color.piumsOrange.opacity(glowPulse ? 0.30 : 0.18))
-                .frame(width: 300, height: 300)
-                .blur(radius: 55)
-                .offset(y: geo.safeAreaInsets.top + 80)
+                .fill(Color.piumsOrange.opacity(glowPulse ? 0.22 : 0.12))
+                .frame(width: 340, height: 340)
+                .blur(radius: 60)
+                .offset(y: geo.safeAreaInsets.top + 60)
 
             VStack(spacing: 0) {
                 Spacer().frame(height: geo.safeAreaInsets.top + 20)
@@ -54,38 +62,19 @@ struct LoginView: View {
                 Image("PiumsLogo")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(height: 32)
+                    .frame(height: 180)
                     .opacity(animateIn ? 1 : 0)
                     .animation(.easeOut(duration: 0.4).delay(0.0), value: animateIn)
-
-                Spacer().frame(height: 28)
-
-                ZStack {
-                    Circle()
-                        .fill(Color.piumsOrange.opacity(0.15))
-                        .frame(width: 116, height: 116)
-                        .blur(radius: 12)
-                    Circle()
-                        .fill(Color.piumsBackgroundElevated)
-                        .frame(width: 92, height: 92)
-                        .overlay(Circle().fill(Color.piumsOrange.opacity(0.22)))
-                    Image(systemName: "ticket.fill")
-                        .font(.system(size: 36, weight: .regular))
-                        .foregroundStyle(Color.piumsOrange)
-                }
-                .scaleEffect(animateIn ? 1 : 0.6)
-                .opacity(animateIn ? 1 : 0)
-                .animation(.spring(response: 0.55, dampingFraction: 0.7).delay(0.08), value: animateIn)
 
                 Spacer().frame(height: 20)
 
                 VStack(spacing: 6) {
-                    Text("Panel de Clientes")
+                    Text("¡Bienvenido a Piums!")
                         .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("Reserva el mejor talento para tu evento")
+                        .foregroundStyle(Color.primary)
+                    Text("El artista perfecto para tu próximo evento")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color.white.opacity(0.5))
+                        .foregroundStyle(Color.secondary)
                         .multilineTextAlignment(.center)
                 }
                 .opacity(animateIn ? 1 : 0)
@@ -102,43 +91,53 @@ struct LoginView: View {
     private var loginCard: some View {
         VStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color.white.opacity(0.18))
+                .fill(Color.piumsSeparator)
                 .frame(width: 36, height: 4)
                 .padding(.top, 14)
                 .padding(.bottom, 24)
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    switch loginStep {
-                    case .email:
-                        emailPanel
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .leading).combined(with: .opacity),
-                                removal:   .move(edge: .leading).combined(with: .opacity)
-                            ))
-                    case .password:
-                        passwordPanel
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal:   .move(edge: .trailing).combined(with: .opacity)
-                            ))
-                    case .social:
-                        socialPanel
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal:   .move(edge: .trailing).combined(with: .opacity)
-                            ))
+            ScrollViewReader { scrollProxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        switch loginStep {
+                        case .email:
+                            emailPanel
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .leading).combined(with: .opacity),
+                                    removal:   .move(edge: .leading).combined(with: .opacity)
+                                ))
+                        case .password:
+                            passwordPanel
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal:   .move(edge: .trailing).combined(with: .opacity)
+                                ))
+                        case .social:
+                            socialPanel
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal:   .move(edge: .trailing).combined(with: .opacity)
+                                ))
+                        }
+                    }
+                    .animation(.spring(response: 0.45, dampingFraction: 0.85), value: loginStep)
+                    .padding(.horizontal, 26)
+                    .padding(.bottom, 50)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .onChange(of: focused) { _, newFocus in
+                    guard let f = newFocus else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            scrollProxy.scrollTo(f, anchor: .center)
+                        }
                     }
                 }
-                .animation(.spring(response: 0.45, dampingFraction: 0.85), value: loginStep)
-                .padding(.horizontal, 26)
-                .padding(.bottom, 50)
             }
-            .scrollDismissesKeyboard(.interactively)
         }
         .background(
             RoundedRectangle(cornerRadius: 28)
-                .fill(Color.piumsBackgroundSecondary)
+                .fill(Color(.secondarySystemBackground))
                 .ignoresSafeArea(edges: .bottom)
         )
     }
@@ -146,10 +145,10 @@ struct LoginView: View {
     // MARK: - Paso 1: Email
 
     private var emailPanel: some View {
-        VStack(alignment: .leading, spacing: 26) {
-            Text("Bienvenido de nuevo")
+        VStack(alignment: .leading, spacing: 22) {
+            Text("Ingresar o crear cuenta")
                 .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Color.piumsLabel)
+                .foregroundStyle(Color.primary)
 
             fieldEmail
 
@@ -179,15 +178,59 @@ struct LoginView: View {
             } label: {
                 Text("Continúa con Google, Facebook o TikTok")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(Color.piumsLabel.opacity(0.85))
+                    .foregroundStyle(Color.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .background(Color.piumsBackgroundElevated)
+                    .background(Color(.systemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                            .strokeBorder(Color.piumsSeparator, lineWidth: 1)
                     )
+            }
+
+            registerLink
+        }
+    }
+
+    // MARK: - Paso 3: Redes sociales
+
+    private var socialPanel: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(spacing: 12) {
+                Button {
+                    viewModel.clearMessages()
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        loginStep = .email
+                    }
+                } label: {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.piumsOrange)
+                        .frame(width: 36, height: 36)
+                        .background(Color(.tertiarySystemFill))
+                        .clipShape(Circle())
+                }
+                Text("Ingresar o crear cuenta con:")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Color.primary)
+            }
+
+            VStack(spacing: 12) {
+                SocialSignInButton(provider: .google) {
+                    Task { await viewModel.loginWithGoogle() }
+                }
+                SocialSignInButton(provider: .facebook) {
+                    Task { await viewModel.loginWithFacebook() }
+                }
+                SocialSignInButton(provider: .tiktok) {
+                    Task { await viewModel.loginWithTikTok() }
+                }
+            }
+            .disabled(viewModel.isLoading)
+
+            if let msg = viewModel.errorMessage {
+                ErrorBannerView(message: msg)
             }
 
             registerLink
@@ -209,17 +252,17 @@ struct LoginView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.piumsOrange)
                         .frame(width: 36, height: 36)
-                        .background(Color.piumsBackgroundElevated)
+                        .background(Color(.tertiarySystemFill))
                         .clipShape(Circle())
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Bienvenido")
                         .font(.caption)
-                        .foregroundStyle(Color.piumsLabelSecondary)
+                        .foregroundStyle(Color.secondary)
                     Text(viewModel.email)
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color.piumsLabel)
+                        .foregroundStyle(Color.primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -250,65 +293,6 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - Paso 3: Social
-
-    private var socialPanel: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Ingresar o crear cuenta con:")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Color.piumsLabel)
-
-            VStack(spacing: 12) {
-                SocialSignInButton(provider: .google) {
-                    Task { await viewModel.loginWithGoogle() }
-                }
-                SocialSignInButton(provider: .facebook) {
-                    Task { await viewModel.loginWithFacebook() }
-                }
-                SocialSignInButton(provider: .tiktok) {
-                    Task { await viewModel.loginWithTikTok() }
-                }
-            }
-            .disabled(viewModel.isLoading)
-
-            divider
-
-            Button {
-                viewModel.clearMessages()
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    loginStep = .email
-                }
-            } label: {
-                Text("Continúa con correo y contraseña")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(Color.piumsLabel.opacity(0.85))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(Color.piumsBackgroundElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-                    )
-            }
-
-            registerLink
-
-            (Text("Al crear una cuenta en Piums, aceptas los ")
-                .font(.caption)
-                .foregroundStyle(Color.piumsLabelSecondary)
-            + Text("Términos de Servicio")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.piumsOrange)
-            + Text(" y ")
-                .font(.caption)
-                .foregroundStyle(Color.piumsLabelSecondary)
-            + Text("Política de Privacidad.")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.piumsOrange))
-        }
-    }
-
     // MARK: - Fields
 
     private var fieldEmail: some View {
@@ -335,18 +319,19 @@ struct LoginView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 15)
-                .background(Color.piumsBackgroundElevated)
+                .background(Color(.systemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 13))
                 .overlay(
                     RoundedRectangle(cornerRadius: 13)
                         .strokeBorder(
-                            focused == .email ? Color.piumsOrange.opacity(0.7) : Color.clear,
-                            lineWidth: 1.5
+                            focused == .email ? Color.piumsOrange.opacity(0.7) : Color.piumsSeparator,
+                            lineWidth: focused == .email ? 1.5 : 1
                         )
                 )
                 .animation(.easeInOut(duration: 0.2), value: focused == .email)
                 .accessibilityIdentifier("login_email")
         }
+        .id(Field.email)
     }
 
     private var fieldPassword: some View {
@@ -383,17 +368,18 @@ struct LoginView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
-            .background(Color.piumsBackgroundElevated)
+            .background(Color(.systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 13))
             .overlay(
                 RoundedRectangle(cornerRadius: 13)
                     .strokeBorder(
-                        focused == .password ? Color.piumsOrange.opacity(0.7) : Color.clear,
-                        lineWidth: 1.5
+                        focused == .password ? Color.piumsOrange.opacity(0.7) : Color.piumsSeparator,
+                        lineWidth: focused == .password ? 1.5 : 1
                     )
             )
             .animation(.easeInOut(duration: 0.2), value: focused == .password)
         }
+        .id(Field.password)
     }
 
     // MARK: - Buttons
@@ -411,11 +397,11 @@ struct LoginView: View {
                 LinearGradient(
                     colors: enabled
                         ? [Color(red: 0.85, green: 0.38, blue: 0.12), Color(red: 0.72, green: 0.28, blue: 0.07)]
-                        : [Color.piumsOrange.opacity(0.4), Color.piumsOrange.opacity(0.4)],
+                        : [Color(.systemFill), Color(.systemFill)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
             )
-            .foregroundStyle(.white)
+            .foregroundStyle(enabled ? .white : Color.secondary)
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .disabled(!enabled)
@@ -442,12 +428,12 @@ struct LoginView: View {
             .background(
                 LinearGradient(
                     colors: empty
-                        ? [Color.piumsOrange.opacity(0.4), Color.piumsOrange.opacity(0.4)]
+                        ? [Color(.systemFill), Color(.systemFill)]
                         : [Color(red: 0.85, green: 0.38, blue: 0.12), Color(red: 0.72, green: 0.28, blue: 0.07)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
             )
-            .foregroundStyle(.white)
+            .foregroundStyle(empty ? Color.secondary : .white)
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .disabled(viewModel.isLoading || empty)
@@ -457,9 +443,9 @@ struct LoginView: View {
 
     private var registerLink: some View {
         HStack(spacing: 4) {
-            Text("¿Aún no tienes cuenta?")
+            Text("¿No tienes cuenta?")
                 .foregroundStyle(.secondary)
-            Button("Regístrate gratis") {
+            Button("Regístrate") {
                 viewModel.clearMessages()
                 viewModel.activeScreen = .register
             }
@@ -475,9 +461,9 @@ struct LoginView: View {
 
     private var divider: some View {
         HStack(spacing: 8) {
-            Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-            Circle().fill(Color.white.opacity(0.2)).frame(width: 5, height: 5)
-            Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
+            Rectangle().fill(Color.piumsSeparator).frame(height: 1)
+            Circle().fill(Color.piumsSeparator).frame(width: 5, height: 5)
+            Rectangle().fill(Color.piumsSeparator).frame(height: 1)
         }
     }
 
@@ -514,18 +500,18 @@ private struct SocialSignInButton: View {
 
                 Text("Continuar con \(provider.displayName)")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(Color.piumsLabel)
+                    .foregroundStyle(Color.primary)
 
                 Spacer()
             }
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .padding(.horizontal, 16)
-            .background(Color.piumsBackgroundElevated)
+            .background(Color(.systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(Color.piumsSeparator, lineWidth: 1)
             )
         }
     }

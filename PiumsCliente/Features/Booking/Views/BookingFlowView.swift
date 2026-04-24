@@ -870,7 +870,7 @@ struct BookingSuccessView: View {
                             SuccessInfoCell(label: "RESUMEN DE PAGO") {
                                 Text((booking?.totalPrice ?? 0).piumsFormatted)
                                     .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
-                                Text("GTQ Total").font(.caption).foregroundStyle(.secondary)
+                                Text("USD Total").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }

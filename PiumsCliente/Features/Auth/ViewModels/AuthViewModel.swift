@@ -60,14 +60,10 @@ final class AuthViewModel {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        // Obtener el rootViewController para presentar el flujo de Google
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let root = scene.windows.first?.rootViewController else {
-            errorMessage = "No se pudo iniciar sesión con Google"
-            return
-        }
         do {
-            try await AuthManager.shared.loginWithGoogle(presenting: root)
+            try await AuthManager.shared.loginWithGoogle()
+        } catch let e as NSError where e.domain == "com.google.GIDSignIn" && e.code == -5 {
+            // usuario canceló — sin mensaje de error
         } catch let e as AppError {
             errorMessage = e.errorDescription
         } catch {

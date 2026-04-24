@@ -785,7 +785,7 @@ private struct CreateNewBookingView: View {
             )
             artists = res.artists
         } catch {
-            print("❌ Failed to load artists: \(error)")
+            // silently ignore — this artist list is supplementary to the event flow
         }
     }
 }
