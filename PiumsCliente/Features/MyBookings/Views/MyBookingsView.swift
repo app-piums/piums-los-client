@@ -222,10 +222,11 @@ struct BookingDetailView: View {
 
     init(booking: Booking, preloadedArtist: BookingArtistInfo? = nil) {
         self.booking = booking
-        _loadedArtistName      = State(initialValue: preloadedArtist?.name)
-        _loadedArtistAvatar    = State(initialValue: preloadedArtist?.avatar)
-        _loadedArtistSpecialty = State(initialValue: preloadedArtist?.specialty)
-        _loadedArtistVerified  = State(initialValue: preloadedArtist?.isVerified ?? false)
+        // Prioridad: cache pre-cargado → campos del booking → nil
+        _loadedArtistName      = State(initialValue: preloadedArtist?.name      ?? booking.resolvedArtistName)
+        _loadedArtistAvatar    = State(initialValue: preloadedArtist?.avatar    ?? booking.resolvedArtistAvatar)
+        _loadedArtistSpecialty = State(initialValue: preloadedArtist?.specialty ?? booking.artist?.specialties?.first)
+        _loadedArtistVerified  = State(initialValue: preloadedArtist?.isVerified ?? booking.artist?.isVerified ?? false)
     }
 
     // MARK: - Computed
@@ -439,28 +440,36 @@ struct BookingDetailView: View {
     // MARK: - Helpers
 
     private func loadArtist() async {
+        // Si ya tenemos nombre (del cache o del booking) solo rellenamos avatar/specialty si faltan
+        guard loadedArtistName == nil else { return }
         struct ArtistDTO: Decodable {
             let name: String?
             let avatar: String?
             let specialties: [String]?
             let isVerified: Bool?
-            struct Inner: Decodable {
+            struct Nested: Decodable {
                 let name: String?
                 let avatar: String?
                 let specialties: [String]?
                 let isVerified: Bool?
             }
-            let artist: Inner?
-            var resolvedName: String?     { artist?.name ?? name }
-            var resolvedAvatar: String?   { artist?.avatar ?? avatar }
-            var resolvedSpecialty: String? { (artist?.specialties ?? specialties)?.first }
-            var resolvedVerified: Bool    { artist?.isVerified ?? isVerified ?? false }
+            // maneja: { "artist": {} }, { "data": {} }, { "user": {} }, o campos en raíz
+            let artist: Nested?
+            let data: Nested?
+            let user: Nested?
+            var resolvedName: String?      { artist?.name ?? data?.name ?? user?.name ?? name }
+            var resolvedAvatar: String?    { artist?.avatar ?? data?.avatar ?? user?.avatar ?? avatar }
+            var resolvedSpecialty: String? { (artist?.specialties ?? data?.specialties ?? specialties)?.first }
+            var resolvedVerified: Bool     { artist?.isVerified ?? data?.isVerified ?? isVerified ?? false }
         }
         if let dto: ArtistDTO = try? await APIClient.request(.getArtist(id: booking.artistId)) {
-            loadedArtistName     = dto.resolvedName
-            loadedArtistAvatar   = dto.resolvedAvatar
-            loadedArtistSpecialty = dto.resolvedSpecialty
-            loadedArtistVerified  = dto.resolvedVerified
+            print("🎨 loadArtist \(booking.artistId) — resolvedName: \(dto.resolvedName ?? "nil")")
+            if let n = dto.resolvedName      { loadedArtistName = n }
+            if let a = dto.resolvedAvatar    { loadedArtistAvatar = a }
+            if let s = dto.resolvedSpecialty { loadedArtistSpecialty = s }
+            if dto.resolvedName != nil       { loadedArtistVerified = dto.resolvedVerified }
+        } else {
+            print("❌ loadArtist \(booking.artistId) — fetch/decode falló")
         }
     }
 

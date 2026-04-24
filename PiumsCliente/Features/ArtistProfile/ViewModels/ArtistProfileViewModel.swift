@@ -22,19 +22,22 @@ struct PortfolioResponse: Codable {
 // MARK: - Lightweight DTO for avatar (resilient to shape changes in /api/artists/:id)
 
 private struct ArtistAvatarResponse: Decodable {
-    // direct form: { "avatar": "...", "avatarUrl": "..." }
     let avatar: String?
     let avatarUrl: String?
+    let name: String?
 
-    // wrapped form: { "artist": { "avatar": "..." } }
     struct Inner: Decodable {
         let avatar: String?
         let avatarUrl: String?
-        var resolved: String? { avatar ?? avatarUrl }
+        let name: String?
+        var resolvedAvatar: String? { avatar ?? avatarUrl }
     }
+    // maneja: { "artist": {} }, { "data": {} }, o campos en raíz
     let artist: Inner?
+    let data: Inner?
 
-    var resolved: String? { artist?.resolved ?? avatar ?? avatarUrl }
+    var resolved: String? { artist?.resolvedAvatar ?? data?.resolvedAvatar ?? avatar ?? avatarUrl }
+    var resolvedName: String? { artist?.name ?? data?.name ?? name }
 }
 
 // MARK: - ViewModel
@@ -65,8 +68,11 @@ final class ArtistProfileViewModel {
     func loadArtistDetail() async {
         do {
             let dto: ArtistAvatarResponse = try await APIClient.request(.getArtist(id: artist.id))
-            avatarURL = dto.resolved
-        } catch { }
+            print("🎨 ArtistDetail \(artist.id) — avatar: \(dto.resolved ?? "nil"), name: \(dto.resolvedName ?? "nil")")
+            if let url = dto.resolved { avatarURL = url }
+        } catch {
+            print("❌ ArtistDetail \(artist.id) — \(error)")
+        }
     }
 
     func loadServices() async {

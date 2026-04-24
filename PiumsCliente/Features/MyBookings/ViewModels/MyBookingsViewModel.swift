@@ -14,17 +14,20 @@ private struct ArtistSummaryDTO: Decodable {
     let avatar: String?
     let specialties: [String]?
     let isVerified: Bool?
-    struct Inner: Decodable {
+    struct Nested: Decodable {
         let name: String?
         let avatar: String?
         let specialties: [String]?
         let isVerified: Bool?
     }
-    let artist: Inner?
-    var resolvedName: String?      { artist?.name ?? name }
-    var resolvedAvatar: String?    { artist?.avatar ?? avatar }
-    var resolvedSpecialty: String? { (artist?.specialties ?? specialties)?.first }
-    var resolvedVerified: Bool     { artist?.isVerified ?? isVerified ?? false }
+    // maneja: { "artist": {} }, { "data": {} }, { "user": {} }, o campos en raíz
+    let artist: Nested?
+    let data: Nested?
+    let user: Nested?
+    var resolvedName: String?      { artist?.name ?? data?.name ?? user?.name ?? name }
+    var resolvedAvatar: String?    { artist?.avatar ?? data?.avatar ?? user?.avatar ?? avatar }
+    var resolvedSpecialty: String? { (artist?.specialties ?? data?.specialties ?? specialties)?.first }
+    var resolvedVerified: Bool     { artist?.isVerified ?? data?.isVerified ?? isVerified ?? false }
 }
 
 @Observable
@@ -103,13 +106,17 @@ final class MyBookingsViewModel {
     }
 
     private func loadArtistInfo(id: String) async {
-        guard let dto: ArtistSummaryDTO = try? await APIClient.request(.getArtist(id: id)),
-              let name = dto.resolvedName else { return }
-        artistCache[id] = BookingArtistInfo(
-            name: name,
-            avatar: dto.resolvedAvatar,
-            specialty: dto.resolvedSpecialty,
-            isVerified: dto.resolvedVerified
-        )
+        if let dto: ArtistSummaryDTO = try? await APIClient.request(.getArtist(id: id)) {
+            print("🎨 prefetch \(id) — resolvedName: \(dto.resolvedName ?? "nil"), artist?.name: \(dto.artist?.name ?? "nil"), data?.name: \(dto.data?.name ?? "nil"), name: \(dto.name ?? "nil")")
+            guard let name = dto.resolvedName else { return }
+            artistCache[id] = BookingArtistInfo(
+                name: name,
+                avatar: dto.resolvedAvatar,
+                specialty: dto.resolvedSpecialty,
+                isVerified: dto.resolvedVerified
+            )
+        } else {
+            print("❌ prefetch \(id) — fetch/decode falló")
+        }
     }
 }
