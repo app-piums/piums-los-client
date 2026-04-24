@@ -11,23 +11,26 @@ struct BookingArtistInfo {
 // DTO privado para decodificar /api/artists/:id
 private struct ArtistSummaryDTO: Decodable {
     let name: String?
+    let nombre: String?     // backend puede usar "nombre" en vez de "name"
     let avatar: String?
     let specialties: [String]?
     let isVerified: Bool?
     struct Nested: Decodable {
         let name: String?
+        let nombre: String?
         let avatar: String?
         let specialties: [String]?
         let isVerified: Bool?
+        var resolvedName: String? { name ?? nombre }
     }
     // maneja: { "artist": {} }, { "data": {} }, { "user": {} }, o campos en raíz
     let artist: Nested?
     let data: Nested?
     let user: Nested?
-    var resolvedName: String?      { artist?.name ?? data?.name ?? user?.name ?? name }
+    var resolvedName: String?      { artist?.resolvedName ?? data?.resolvedName ?? user?.resolvedName ?? name ?? nombre }
     var resolvedAvatar: String?    { artist?.avatar ?? data?.avatar ?? user?.avatar ?? avatar }
-    var resolvedSpecialty: String? { (artist?.specialties ?? data?.specialties ?? specialties)?.first }
-    var resolvedVerified: Bool     { artist?.isVerified ?? data?.isVerified ?? isVerified ?? false }
+    var resolvedSpecialty: String? { (artist?.specialties ?? data?.specialties ?? user?.specialties ?? specialties)?.first }
+    var resolvedVerified: Bool     { artist?.isVerified ?? data?.isVerified ?? user?.isVerified ?? isVerified ?? false }
 }
 
 @Observable

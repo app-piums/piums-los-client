@@ -25,19 +25,23 @@ private struct ArtistAvatarResponse: Decodable {
     let avatar: String?
     let avatarUrl: String?
     let name: String?
+    let nombre: String?
 
     struct Inner: Decodable {
         let avatar: String?
         let avatarUrl: String?
         let name: String?
+        let nombre: String?
         var resolvedAvatar: String? { avatar ?? avatarUrl }
+        var resolvedName: String?  { name ?? nombre }
     }
-    // maneja: { "artist": {} }, { "data": {} }, o campos en raíz
+    // maneja: { "artist": {} }, { "data": {} }, { "user": {} }, o campos en raíz
     let artist: Inner?
     let data: Inner?
+    let user: Inner?
 
-    var resolved: String? { artist?.resolvedAvatar ?? data?.resolvedAvatar ?? avatar ?? avatarUrl }
-    var resolvedName: String? { artist?.name ?? data?.name ?? name }
+    var resolved: String?     { artist?.resolvedAvatar ?? data?.resolvedAvatar ?? user?.resolvedAvatar ?? avatar ?? avatarUrl }
+    var resolvedName: String? { artist?.resolvedName   ?? data?.resolvedName   ?? user?.resolvedName   ?? name ?? nombre }
 }
 
 // MARK: - ViewModel

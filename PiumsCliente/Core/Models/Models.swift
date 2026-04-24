@@ -380,11 +380,14 @@ struct CatalogServicesResponse: Codable {
 struct BookingParticipant: Codable {
     let id: String?
     let name: String?
+    let nombre: String?     // el backend usa "nombre" en endpoints de usuario
     let email: String?
     let avatar: String?
     let phone: String?
     let specialties: [String]?
     let isVerified: Bool?
+
+    var resolvedName: String? { name ?? nombre }
 }
 
 // MARK: - Booking  (shape: GET /api/bookings)
@@ -414,8 +417,8 @@ struct Booking: Codable, Identifiable, Hashable {
     let clientName: String?
 
     // Helpers resolviendo nested > flat
-    var resolvedArtistName: String? { artist?.name ?? artistName }
-    var resolvedClientName: String? { client?.name ?? clientName }
+    var resolvedArtistName: String? { artist?.resolvedName ?? artistName }
+    var resolvedClientName: String? { client?.resolvedName ?? clientName }
     var resolvedArtistAvatar: String? { artist?.avatar }
     var resolvedClientAvatar: String? { client?.avatar }
 
