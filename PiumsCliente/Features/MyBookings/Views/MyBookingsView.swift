@@ -162,6 +162,7 @@ struct BookingRowView: View {
         case .completed:        return .green
         case .cancelledClient, .cancelledArtist, .rejected, .noShow: return .red
         case .rescheduled:      return .purple
+        case .unknown:          return .secondary
         }
     }
 
@@ -176,6 +177,7 @@ struct BookingRowView: View {
         case .rejected:         return "hand.raised"
         case .noShow:           return "person.slash"
         case .rescheduled:      return "arrow.trianglehead.2.clockwise.rotate.90"
+        case .unknown:          return "questionmark.circle"
         }
     }
 }
@@ -239,6 +241,7 @@ struct BookingDetailView: View {
         case .completed:        return .green
         case .cancelledClient, .cancelledArtist, .rejected, .noShow: return .red
         case .rescheduled:      return .purple
+        case .unknown:          return .secondary
         }
     }
 
@@ -254,6 +257,7 @@ struct BookingDetailView: View {
         case .rejected:         return "hand.raised.fill"
         case .noShow:           return "person.slash.fill"
         case .rescheduled:      return "arrow.clockwise.circle.fill"
+        case .unknown:          return "questionmark.circle.fill"
         }
     }
 
