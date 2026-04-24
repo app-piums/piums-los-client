@@ -211,6 +211,12 @@ struct BookingDetailView: View {
     @State private var showShareSheet = false
     @Environment(\.dismiss) private var dismiss
 
+    // Datos del artista cargados al abrir el detalle
+    @State private var loadedArtistName: String?
+    @State private var loadedArtistAvatar: String?
+    @State private var loadedArtistSpecialty: String?
+    @State private var loadedArtistVerified: Bool = false
+
     // MARK: - Computed
 
     private var formattedDate: String {
@@ -286,35 +292,28 @@ struct BookingDetailView: View {
                 .padding(.horizontal, 20)
 
                 // ── Participantes ───────────────────────────
-                if booking.resolvedArtistName != nil || booking.resolvedClientName != nil {
-                    DetailCard(title: "Participantes") {
-                        VStack(spacing: 12) {
-                            if let name = booking.resolvedArtistName {
-                                ParticipantRow(
-                                    role: "Artista",
-                                    name: name,
-                                    detail: booking.artist?.specialties?.first ?? booking.artist?.email,
-                                    avatarURL: booking.resolvedArtistAvatar,
-                                    isVerified: booking.artist?.isVerified ?? false,
-                                    icon: "music.microphone",
-                                    tint: Color.piumsOrange
-                                )
-                            }
-                            if booking.resolvedArtistName != nil && booking.resolvedClientName != nil {
-                                Divider()
-                            }
-                            if let name = booking.resolvedClientName {
-                                ParticipantRow(
-                                    role: "Cliente",
-                                    name: name,
-                                    detail: booking.client?.email,
-                                    avatarURL: booking.resolvedClientAvatar,
-                                    isVerified: false,
-                                    icon: "person.circle",
-                                    tint: .blue
-                                )
-                            }
-                        }
+                let currentUser = AuthManager.shared.currentUser
+                DetailCard(title: "Participantes") {
+                    VStack(spacing: 12) {
+                        ParticipantRow(
+                            role: "Artista",
+                            name: loadedArtistName ?? booking.resolvedArtistName ?? "Cargando…",
+                            detail: loadedArtistSpecialty ?? booking.artist?.specialties?.first,
+                            avatarURL: loadedArtistAvatar ?? booking.resolvedArtistAvatar,
+                            isVerified: loadedArtistVerified,
+                            icon: "music.microphone",
+                            tint: Color.piumsOrange
+                        )
+                        Divider()
+                        ParticipantRow(
+                            role: "Cliente",
+                            name: currentUser?.displayName ?? booking.resolvedClientName ?? "Tú",
+                            detail: currentUser?.email ?? booking.client?.email,
+                            avatarURL: currentUser?.avatarUrl ?? booking.resolvedClientAvatar,
+                            isVerified: false,
+                            icon: "person.circle",
+                            tint: .blue
+                        )
                     }
                 }
 
@@ -416,6 +415,7 @@ struct BookingDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .task { await loadArtist() }
         .sheet(isPresented: $showReview) { ReviewView(booking: booking) }
         .sheet(isPresented: $showQueja)  { CreateQuejaView(booking: booking) }
         .sheet(isPresented: $showShareSheet) {
@@ -426,6 +426,32 @@ struct BookingDetailView: View {
     }
 
     // MARK: - Helpers
+
+    private func loadArtist() async {
+        struct ArtistDTO: Decodable {
+            let name: String?
+            let avatar: String?
+            let specialties: [String]?
+            let isVerified: Bool?
+            struct Inner: Decodable {
+                let name: String?
+                let avatar: String?
+                let specialties: [String]?
+                let isVerified: Bool?
+            }
+            let artist: Inner?
+            var resolvedName: String?     { artist?.name ?? name }
+            var resolvedAvatar: String?   { artist?.avatar ?? avatar }
+            var resolvedSpecialty: String? { (artist?.specialties ?? specialties)?.first }
+            var resolvedVerified: Bool    { artist?.isVerified ?? isVerified ?? false }
+        }
+        if let dto: ArtistDTO = try? await APIClient.request(.getArtist(id: booking.artistId)) {
+            loadedArtistName     = dto.resolvedName
+            loadedArtistAvatar   = dto.resolvedAvatar
+            loadedArtistSpecialty = dto.resolvedSpecialty
+            loadedArtistVerified  = dto.resolvedVerified
+        }
+    }
 
     private var canOpenQueja: Bool {
         switch booking.status {
