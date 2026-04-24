@@ -1,10 +1,37 @@
 // MyBookingsViewModel.swift
 import Foundation
 
+struct BookingArtistInfo {
+    let name: String
+    let avatar: String?
+    let specialty: String?
+    let isVerified: Bool
+}
+
+// DTO privado para decodificar /api/artists/:id
+private struct ArtistSummaryDTO: Decodable {
+    let name: String?
+    let avatar: String?
+    let specialties: [String]?
+    let isVerified: Bool?
+    struct Inner: Decodable {
+        let name: String?
+        let avatar: String?
+        let specialties: [String]?
+        let isVerified: Bool?
+    }
+    let artist: Inner?
+    var resolvedName: String?      { artist?.name ?? name }
+    var resolvedAvatar: String?    { artist?.avatar ?? avatar }
+    var resolvedSpecialty: String? { (artist?.specialties ?? specialties)?.first }
+    var resolvedVerified: Bool     { artist?.isVerified ?? isVerified ?? false }
+}
+
 @Observable
 @MainActor
 final class MyBookingsViewModel {
     var bookings: [Booking] = []
+    var artistCache: [String: BookingArtistInfo] = [:]
     var isLoading = false
     var errorMessage: String?
     var selectedStatus: BookingStatus?
@@ -53,13 +80,36 @@ final class MyBookingsViewModel {
                 .listMyBookings(status: selectedStatus?.rawValue, page: currentPage)
             )
             print("📋 Bookings cargadas: \(res.allBookings.count) — bookings:\(res.bookings?.count ?? -1) data:\(res.data?.count ?? -1) items:\(res.items?.count ?? -1)")
-            bookings.append(contentsOf: res.allBookings)
+            let newBookings = res.allBookings
+            bookings.append(contentsOf: newBookings)
             hasMore = res.hasMore
             currentPage += 1
+            // Precargar info de artistas en paralelo (deduplica por artistId)
+            await prefetchArtists(for: newBookings)
         } catch {
             let err = AppError(from: error)
             print("❌ Error cargando bookings: \(err.errorDescription ?? error.localizedDescription)")
             errorMessage = err.errorDescription
         }
+    }
+
+    private func prefetchArtists(for bookings: [Booking]) async {
+        let ids = Set(bookings.map { $0.artistId }).filter { artistCache[$0] == nil }
+        await withTaskGroup(of: Void.self) { group in
+            for id in ids {
+                group.addTask { await self.loadArtistInfo(id: id) }
+            }
+        }
+    }
+
+    private func loadArtistInfo(id: String) async {
+        guard let dto: ArtistSummaryDTO = try? await APIClient.request(.getArtist(id: id)),
+              let name = dto.resolvedName else { return }
+        artistCache[id] = BookingArtistInfo(
+            name: name,
+            avatar: dto.resolvedAvatar,
+            specialty: dto.resolvedSpecialty,
+            isVerified: dto.resolvedVerified
+        )
     }
 }

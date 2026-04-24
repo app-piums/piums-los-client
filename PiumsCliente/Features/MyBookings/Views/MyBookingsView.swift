@@ -71,10 +71,14 @@ struct MyBookingsView: View {
         }
         .navigationTitle("Mis Reservas")
         .task { await viewModel.loadInitial() }
-        .navigationDestination(item: $selectedBooking) { BookingDetailView(booking: $0) }
+        .navigationDestination(item: $selectedBooking) { booking in
+            BookingDetailView(booking: booking,
+                              preloadedArtist: viewModel.artistCache[booking.artistId])
+        }
         .navigationDestination(for: String.self) { bookingId in
             if let booking = viewModel.bookings.first(where: { $0.id == bookingId }) {
-                BookingDetailView(booking: booking)
+                BookingDetailView(booking: booking,
+                                  preloadedArtist: viewModel.artistCache[booking.artistId])
             } else {
                 DeepLinkBookingView(bookingId: bookingId)
             }
@@ -211,11 +215,18 @@ struct BookingDetailView: View {
     @State private var showShareSheet = false
     @Environment(\.dismiss) private var dismiss
 
-    // Datos del artista cargados al abrir el detalle
     @State private var loadedArtistName: String?
     @State private var loadedArtistAvatar: String?
     @State private var loadedArtistSpecialty: String?
     @State private var loadedArtistVerified: Bool = false
+
+    init(booking: Booking, preloadedArtist: BookingArtistInfo? = nil) {
+        self.booking = booking
+        _loadedArtistName      = State(initialValue: preloadedArtist?.name)
+        _loadedArtistAvatar    = State(initialValue: preloadedArtist?.avatar)
+        _loadedArtistSpecialty = State(initialValue: preloadedArtist?.specialty)
+        _loadedArtistVerified  = State(initialValue: preloadedArtist?.isVerified ?? false)
+    }
 
     // MARK: - Computed
 
