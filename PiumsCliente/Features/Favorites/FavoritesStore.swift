@@ -12,6 +12,9 @@ final class FavoritesStore {
     var isLoading = false
     var errorMessage: String?
 
+    private var hasDoneInitialLoad = false
+    private var isToggling = false
+
     var favoriteArtists: [Artist] {
         favorites.compactMap { artistsById[$0.entityId] }
     }
@@ -19,6 +22,7 @@ final class FavoritesStore {
     func loadFavorites() async {
         isLoading = true
         errorMessage = nil
+        hasDoneInitialLoad = true
         defer { isLoading = false }
         do {
             var allFavorites: [FavoriteRecord] = []
@@ -44,23 +48,60 @@ final class FavoritesStore {
     }
 
     func toggle(artist: Artist) async {
-        do {
-            let check: FavoriteCheckResponse = try await APIClient.request(
-                .checkFavorite(entityType: "ARTIST", entityId: artist.id)
+        guard !isToggling else { return }
+        isToggling = true
+        defer { isToggling = false }
+
+        // Cargar favoritos si aún no se han traído del backend
+        if !hasDoneInitialLoad {
+            await loadFavorites()
+        }
+
+        if let existing = favorites.first(where: { $0.entityId == artist.id }) {
+            // Ya es favorito → quitar optimistamente
+            favorites.removeAll { $0.id == existing.id }
+            artistsById.removeValue(forKey: artist.id)
+            do {
+                let _: VoidResponse = try await APIClient.request(.deleteFavorite(id: existing.id))
+            } catch {
+                // Revertir si falla
+                favorites.insert(existing, at: 0)
+                artistsById[artist.id] = artist
+                errorMessage = AppError(from: error).errorDescription
+            }
+        } else {
+            // No es favorito → agregar optimistamente con registro temporal
+            let tempId = UUID().uuidString
+            let placeholder = FavoriteRecord(
+                id: tempId, entityType: "ARTIST", entityId: artist.id,
+                notes: nil, createdAt: "", deletedAt: nil
             )
-            if check.isFavorite, let favId = check.favoriteId {
-                let _: VoidResponse = try await APIClient.request(.deleteFavorite(id: favId))
-                favorites.removeAll { $0.id == favId }
-                artistsById.removeValue(forKey: artist.id)
-            } else {
-                let rec: FavoriteRecord = try await APIClient.request(
+            favorites.insert(placeholder, at: 0)
+            artistsById[artist.id] = artist
+            do {
+                let real: FavoriteRecord = try await APIClient.request(
                     .addFavorite(entityType: "ARTIST", entityId: artist.id, notes: nil)
                 )
-                favorites.insert(rec, at: 0)
-                artistsById[artist.id] = artist
+                // Reemplazar el placeholder con el registro real del backend
+                if let idx = favorites.firstIndex(where: { $0.id == tempId }) {
+                    favorites[idx] = real
+                }
+            } catch let appErr as AppError {
+                if case .decoding = appErr {
+                    // El favorito SÍ fue guardado en el backend — solo la respuesta tiene
+                    // un formato distinto al esperado. Recargamos para obtener el ID real.
+                    await loadFavorites()
+                } else {
+                    // Error real (red, auth, etc.) — revertir
+                    favorites.removeAll { $0.id == tempId }
+                    artistsById.removeValue(forKey: artist.id)
+                    errorMessage = appErr.errorDescription
+                }
+            } catch {
+                favorites.removeAll { $0.id == tempId }
+                artistsById.removeValue(forKey: artist.id)
+                errorMessage = AppError(from: error).errorDescription
             }
-        } catch {
-            errorMessage = AppError(from: error).errorDescription
         }
     }
 

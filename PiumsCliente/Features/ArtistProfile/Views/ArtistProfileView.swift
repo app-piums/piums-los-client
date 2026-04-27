@@ -8,6 +8,7 @@ struct ArtistProfileView: View {
     @State private var selectedService: ArtistService?
     @State private var showBooking = false
     @State private var favorites = FavoritesStore.shared
+    @State private var showFavError = false
     @Environment(\.locationStore) private var locationStore
 
     init(artist: Artist) {
@@ -151,6 +152,12 @@ struct ArtistProfileView: View {
             }
         }
         .task { await viewModel.loadAll() }
+        .onChange(of: favorites.errorMessage) { _, msg in showFavError = msg != nil }
+        .alert("No se pudo actualizar favoritos", isPresented: $showFavError) {
+            Button("OK") { favorites.errorMessage = nil }
+        } message: {
+            Text(favorites.errorMessage ?? "")
+        }
         // Botón flotante Contratar
         .overlay(alignment: .bottom) {
             VStack {

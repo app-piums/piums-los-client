@@ -84,6 +84,7 @@ final class SearchViewModel {
     var hasMore = true
     private var currentPage = 1
     private var currentSmartPage = 1
+    private var searchNonce = 0
 
     // Ciudades reales extraídas del backend
     var cities = ["Guatemala", "Ciudad de Guatemala", "Antigua Guatemala",
@@ -93,6 +94,8 @@ final class SearchViewModel {
     // MARK: - Actions
 
     func search() async {
+        searchNonce += 1
+        isLoading = false   // cancela la guarda de la búsqueda anterior
         currentPage = 1
         currentSmartPage = 1
         results = []
@@ -144,6 +147,7 @@ final class SearchViewModel {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        let nonce = searchNonce
         do {
             let res: SmartSearchResponse = try await APIClient.request(
                 .smartSearch(
@@ -162,6 +166,7 @@ final class SearchViewModel {
                     sortOrder: sortOption == .priceAsc ? "asc" : (sortOption == .relevance ? nil : "desc")
                 )
             )
+            guard nonce == searchNonce else { return }
             smartResults.append(contentsOf: res.artists)
             if currentSmartPage == 1 {
                 expandedTerms = res.expandedTerms ?? []
@@ -170,6 +175,7 @@ final class SearchViewModel {
             hasMore = res.pagination?.hasMore ?? false
             currentSmartPage += 1
         } catch {
+            guard nonce == searchNonce else { return }
             errorMessage = AppError(from: error).errorDescription
         }
     }
@@ -179,6 +185,7 @@ final class SearchViewModel {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        let nonce = searchNonce
         do {
             let endpoint = APIEndpoint.searchArtists(
                 q: query.trimmingCharacters(in: .whitespaces),
@@ -194,10 +201,12 @@ final class SearchViewModel {
                 sortOrder: sortOption == .priceAsc ? "asc" : (sortOption == .relevance ? nil : "desc")
             )
             let res: SearchArtistsResponse = try await APIClient.request(endpoint)
+            guard nonce == searchNonce else { return }
             results.append(contentsOf: res.artists)
             hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {
+            guard nonce == searchNonce else { return }
             errorMessage = AppError(from: error).errorDescription
         }
     }

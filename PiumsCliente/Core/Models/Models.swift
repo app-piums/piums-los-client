@@ -171,6 +171,7 @@ struct SmartArtist: Codable, Identifiable {
     let matchedService: MatchedService?
     let score: Double?
     let createdAt: String?
+    let avatar: String?
     // Coordenadas exactas
     let baseLocationLat: Double?
     let baseLocationLng: Double?
@@ -185,7 +186,7 @@ struct SmartArtist: Codable, Identifiable {
                isVerified: isVerified, isActive: isActive, isAvailable: isAvailable,
                servicesCount: servicesCount, serviceIds: serviceIds, serviceTitles: serviceTitles,
                specialties: specialties, createdAt: createdAt,
-               baseLocationLat: baseLocationLat, baseLocationLng: baseLocationLng, avatar: nil)
+               baseLocationLat: baseLocationLat, baseLocationLng: baseLocationLng, avatar: avatar)
     }
 }
 
@@ -242,7 +243,7 @@ extension SmartArtist {
              totalReviews, totalBookings, hourlyRateMin, hourlyRateMax,
              mainServicePrice, mainServiceName, isVerified, isActive,
              isAvailable, servicesCount, serviceIds, serviceTitles,
-             specialties, matchedService, score, createdAt,
+             specialties, matchedService, score, createdAt, avatar,
              baseLocationLat, baseLocationLng
     }
     init(from decoder: Decoder) throws {
@@ -271,6 +272,7 @@ extension SmartArtist {
             matchedService: try c.decodeIfPresent(MatchedService.self, forKey: .matchedService),
             score: try c.decodeIfPresent(Double.self, forKey: .score),
             createdAt: try c.decodeIfPresent(String.self, forKey: .createdAt),
+            avatar: try c.decodeIfPresent(String.self, forKey: .avatar),
             baseLocationLat: try c.decodeIfPresent(Double.self, forKey: .baseLocationLat),
             baseLocationLng: try c.decodeIfPresent(Double.self, forKey: .baseLocationLng)
         )

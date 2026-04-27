@@ -91,12 +91,18 @@ struct SearchView: View {
                                     Text("También buscamos:")
                                         .font(.caption).foregroundStyle(.secondary)
                                     ForEach(viewModel.expandedTerms, id: \.self) { term in
-                                        Text(term)
-                                            .font(.caption.weight(.medium))
-                                            .padding(.horizontal, 8).padding(.vertical, 4)
-                                            .background(Color.piumsOrange.opacity(0.10))
-                                            .foregroundStyle(Color.piumsOrange)
-                                            .clipShape(Capsule())
+                                        Button {
+                                            viewModel.query = term
+                                            Task { await viewModel.search() }
+                                        } label: {
+                                            Text(term)
+                                                .font(.caption.weight(.medium))
+                                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                                .background(Color.piumsOrange.opacity(0.10))
+                                                .foregroundStyle(Color.piumsOrange)
+                                                .clipShape(Capsule())
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
                             }
