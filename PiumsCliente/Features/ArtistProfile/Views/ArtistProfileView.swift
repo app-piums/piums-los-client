@@ -19,6 +19,9 @@ struct ArtistProfileView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                // Banner de portada
+                CoverBannerView(coverURL: viewModel.coverURL)
+
                 // Header
                 ArtistHeaderView(artist: artist, avatarURL: viewModel.avatarURL)
 
@@ -140,8 +143,10 @@ struct ArtistProfileView: View {
                 Divider().padding(.horizontal)
 
                 // Información de Contacto (= sidebar de la web adaptada a móvil)
-                ContactInfoView(artist: artist) {
-                    // Reservar Ahora
+                ContactInfoView(
+                    instagram: viewModel.instagram,
+                    website: viewModel.website
+                ) {
                     if let first = viewModel.services.first { selectedService = first }
                     showBooking = true
                 }
@@ -200,11 +205,48 @@ struct ArtistProfileView: View {
     }
 }
 
+// MARK: - Banner de portada
+
+private struct CoverBannerView: View {
+    let coverURL: String?
+
+    var body: some View {
+        Group {
+            if let url = coverURL, let imageURL = URL(string: url) {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                    default:
+                        gradientFallback
+                    }
+                }
+            } else {
+                gradientFallback
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 180)
+        .clipped()
+    }
+
+    private var gradientFallback: some View {
+        LinearGradient(
+            colors: [Color.piumsOrange, Color(red: 0.75, green: 0.25, blue: 0.0)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - Información de Contacto
 
 private struct ContactInfoView: View {
-    let artist: Artist
+    let instagram: String?
+    let website: String?
     let onReserve: () -> Void
+
+    var hasSocialLinks: Bool { instagram != nil || website != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -232,13 +274,38 @@ private struct ContactInfoView: View {
                         .padding(.vertical, 13)
                         .background(Color.piumsOrange.opacity(0.10))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.piumsOrange, lineWidth: 1.5)
-                        )
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.piumsOrange, lineWidth: 1.5))
                 }
             }
             .padding(.horizontal)
+
+            if hasSocialLinks {
+                Divider().padding(.horizontal)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Redes Sociales")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    HStack(spacing: 14) {
+                        if let ig = instagram {
+                            Link(destination: URL(string: ig.hasPrefix("http") ? ig : "https://instagram.com/\(ig.trimmingCharacters(in: .init(charactersIn: "@")))") ?? URL(string: "https://instagram.com")!) {
+                                Label("Instagram", systemImage: "camera")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.piumsOrange)
+                            }
+                        }
+                        if let wb = website {
+                            Link(destination: URL(string: wb.hasPrefix("http") ? wb : "https://\(wb)") ?? URL(string: "https://piums.io")!) {
+                                Label("Sitio web", systemImage: "globe")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.piumsOrange)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
         }
         .padding(.vertical)
     }

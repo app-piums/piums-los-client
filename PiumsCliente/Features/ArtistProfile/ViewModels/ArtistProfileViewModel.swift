@@ -26,12 +26,18 @@ private struct ArtistAvatarResponse: Decodable {
     let avatarUrl: String?
     let name: String?
     let nombre: String?
+    let coverUrl: String?
+    let instagram: String?
+    let website: String?
 
     struct Inner: Decodable {
         let avatar: String?
         let avatarUrl: String?
         let name: String?
         let nombre: String?
+        let coverUrl: String?
+        let instagram: String?
+        let website: String?
         var resolvedAvatar: String? { avatar ?? avatarUrl }
         var resolvedName: String?  { name ?? nombre }
     }
@@ -42,6 +48,9 @@ private struct ArtistAvatarResponse: Decodable {
 
     var resolved: String?     { artist?.resolvedAvatar ?? data?.resolvedAvatar ?? user?.resolvedAvatar ?? avatar ?? avatarUrl }
     var resolvedName: String? { artist?.resolvedName   ?? data?.resolvedName   ?? user?.resolvedName   ?? name ?? nombre }
+    var resolvedCover: String?     { artist?.coverUrl   ?? data?.coverUrl   ?? user?.coverUrl   ?? coverUrl }
+    var resolvedInstagram: String? { artist?.instagram  ?? data?.instagram  ?? user?.instagram  ?? instagram }
+    var resolvedWebsite: String?   { artist?.website    ?? data?.website    ?? user?.website    ?? website }
 }
 
 // MARK: - ViewModel
@@ -51,6 +60,9 @@ private struct ArtistAvatarResponse: Decodable {
 final class ArtistProfileViewModel {
     var artist: Artist
     var avatarURL: String?
+    var coverURL: String?
+    var instagram: String?
+    var website: String?
     var services: [ArtistService] = []
     var reviews: [Review] = []
     var portfolio: [PortfolioItem] = []
@@ -59,7 +71,12 @@ final class ArtistProfileViewModel {
     var isLoadingPortfolio = false
     var errorMessage: String?
 
-    init(artist: Artist) { self.artist = artist }
+    init(artist: Artist) {
+        self.artist = artist
+        self.coverURL = artist.coverUrl
+        self.instagram = artist.instagram
+        self.website = artist.website
+    }
 
     func loadAll() async {
         async let s: () = loadServices()
@@ -73,7 +90,10 @@ final class ArtistProfileViewModel {
         do {
             let dto: ArtistAvatarResponse = try await APIClient.request(.getArtist(id: artist.id))
             print("🎨 ArtistDetail \(artist.id) — avatar: \(dto.resolved ?? "nil"), name: \(dto.resolvedName ?? "nil")")
-            if let url = dto.resolved { avatarURL = url }
+            if let url = dto.resolved        { avatarURL = url }
+            if let url = dto.resolvedCover    { coverURL = url }
+            if let ig  = dto.resolvedInstagram { instagram = ig }
+            if let wb  = dto.resolvedWebsite   { website = wb }
         } catch {
             print("❌ ArtistDetail \(artist.id) — \(error)")
         }
