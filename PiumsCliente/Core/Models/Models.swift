@@ -203,13 +203,47 @@ struct SmartSearchResponse: Codable {
 // Decoders tolerantes: el backend envía algunos precios como Double (e.g. 3.5).
 // Declarados en extension para preservar el memberwise init sintetizado.
 extension Artist {
+    // CodingKeys de decodificación — incluye alias que el backend usa según el endpoint
     enum CodingKeys: String, CodingKey {
         case id, name, bio, city, state, country, averageRating,
              totalReviews, totalBookings, hourlyRateMin, hourlyRateMax,
              mainServicePrice, mainServiceName, isVerified, isActive,
              isAvailable, servicesCount, serviceIds, serviceTitles,
-             specialties, createdAt, baseLocationLat, baseLocationLng, avatar,
-             coverUrl, instagram, website
+             specialties, createdAt, baseLocationLat, baseLocationLng,
+             avatar, avatarUrl,
+             coverUrl, coverImage,
+             instagram, website
+    }
+    // Encodable — solo las propiedades reales (avatarUrl/coverImage son aliases de entrada)
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encodeIfPresent(bio, forKey: .bio)
+        try c.encodeIfPresent(city, forKey: .city)
+        try c.encodeIfPresent(state, forKey: .state)
+        try c.encodeIfPresent(country, forKey: .country)
+        try c.encodeIfPresent(averageRating, forKey: .averageRating)
+        try c.encode(totalReviews, forKey: .totalReviews)
+        try c.encode(totalBookings, forKey: .totalBookings)
+        try c.encodeIfPresent(hourlyRateMin, forKey: .hourlyRateMin)
+        try c.encodeIfPresent(hourlyRateMax, forKey: .hourlyRateMax)
+        try c.encodeIfPresent(mainServicePrice, forKey: .mainServicePrice)
+        try c.encodeIfPresent(mainServiceName, forKey: .mainServiceName)
+        try c.encode(isVerified, forKey: .isVerified)
+        try c.encode(isActive, forKey: .isActive)
+        try c.encode(isAvailable, forKey: .isAvailable)
+        try c.encode(servicesCount, forKey: .servicesCount)
+        try c.encodeIfPresent(serviceIds, forKey: .serviceIds)
+        try c.encodeIfPresent(serviceTitles, forKey: .serviceTitles)
+        try c.encodeIfPresent(specialties, forKey: .specialties)
+        try c.encodeIfPresent(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(baseLocationLat, forKey: .baseLocationLat)
+        try c.encodeIfPresent(baseLocationLng, forKey: .baseLocationLng)
+        try c.encodeIfPresent(avatar, forKey: .avatar)
+        try c.encodeIfPresent(coverUrl, forKey: .coverUrl)
+        try c.encodeIfPresent(instagram, forKey: .instagram)
+        try c.encodeIfPresent(website, forKey: .website)
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -221,24 +255,28 @@ extension Artist {
             state: try c.decodeIfPresent(String.self, forKey: .state),
             country: try c.decodeIfPresent(String.self, forKey: .country),
             averageRating: try c.decodeIfPresent(Double.self, forKey: .averageRating),
-            totalReviews: try c.decode(Int.self, forKey: .totalReviews),
-            totalBookings: try c.decode(Int.self, forKey: .totalBookings),
+            totalReviews: (try? c.decode(Int.self, forKey: .totalReviews)) ?? 0,
+            totalBookings: (try? c.decode(Int.self, forKey: .totalBookings)) ?? 0,
             hourlyRateMin: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMin),
             hourlyRateMax: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMax),
             mainServicePrice: try c.decodeFlexibleIntIfPresent(forKey: .mainServicePrice),
             mainServiceName: try c.decodeIfPresent(String.self, forKey: .mainServiceName),
-            isVerified: try c.decode(Bool.self, forKey: .isVerified),
-            isActive: try c.decode(Bool.self, forKey: .isActive),
-            isAvailable: try c.decode(Bool.self, forKey: .isAvailable),
-            servicesCount: try c.decode(Int.self, forKey: .servicesCount),
+            isVerified: (try? c.decode(Bool.self, forKey: .isVerified)) ?? false,
+            isActive: (try? c.decode(Bool.self, forKey: .isActive)) ?? true,
+            isAvailable: (try? c.decode(Bool.self, forKey: .isAvailable)) ?? true,
+            servicesCount: (try? c.decode(Int.self, forKey: .servicesCount)) ?? 0,
             serviceIds: try c.decodeIfPresent([String].self, forKey: .serviceIds),
             serviceTitles: try c.decodeIfPresent([String].self, forKey: .serviceTitles),
             specialties: try c.decodeIfPresent([String].self, forKey: .specialties),
             createdAt: try c.decodeIfPresent(String.self, forKey: .createdAt),
             baseLocationLat: try c.decodeIfPresent(Double.self, forKey: .baseLocationLat),
             baseLocationLng: try c.decodeIfPresent(Double.self, forKey: .baseLocationLng),
-            avatar: try c.decodeIfPresent(String.self, forKey: .avatar),
-            coverUrl: try c.decodeIfPresent(String.self, forKey: .coverUrl),
+            // avatar: acepta "avatar" o "avatarUrl" indistintamente
+            avatar: try c.decodeIfPresent(String.self, forKey: .avatar)
+                 ?? c.decodeIfPresent(String.self, forKey: .avatarUrl),
+            // coverUrl: acepta "coverUrl" o "coverImage"
+            coverUrl: try c.decodeIfPresent(String.self, forKey: .coverUrl)
+                   ?? c.decodeIfPresent(String.self, forKey: .coverImage),
             instagram: try c.decodeIfPresent(String.self, forKey: .instagram),
             website: try c.decodeIfPresent(String.self, forKey: .website)
         )
