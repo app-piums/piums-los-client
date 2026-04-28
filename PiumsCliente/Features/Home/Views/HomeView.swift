@@ -378,8 +378,18 @@ struct RecommendedArtistCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // Cover
             ZStack(alignment: .bottomLeading) {
+                // Fondo: cover real o gradiente fallback
                 LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
                     .frame(width: 160, height: 120)
+                if let url = artist.coverUrl ?? artist.avatarUrl, let imageURL = URL(string: url) {
+                    AsyncImage(url: imageURL) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                        }
+                    }
+                    .frame(width: 160, height: 120)
+                    .clipped()
+                }
 
                 if let rating = artist.rating, rating >= 4.8 {
                     Text("TOP RATED")
@@ -391,7 +401,7 @@ struct RecommendedArtistCard: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }
 
-                // Avatar iniciales solapado
+                // Avatar solapado: foto real o iniciales
                 ZStack {
                     Circle()
                         .fill(LinearGradient(colors: [Color(red:0.85,green:0.30,blue:0.50),
@@ -399,7 +409,19 @@ struct RecommendedArtistCard: View {
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 36, height: 36)
                         .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
-                    Text(initials).font(.caption.bold()).foregroundStyle(.white)
+                    if let url = artist.avatarUrl, let imageURL = URL(string: url) {
+                        AsyncImage(url: imageURL) { phase in
+                            if case .success(let img) = phase {
+                                img.resizable().scaledToFill()
+                                    .frame(width: 36, height: 36)
+                                    .clipShape(Circle())
+                            } else {
+                                Text(initials).font(.caption.bold()).foregroundStyle(.white)
+                            }
+                        }
+                    } else {
+                        Text(initials).font(.caption.bold()).foregroundStyle(.white)
+                    }
                 }
                 .offset(x: 10, y: 18)
             }

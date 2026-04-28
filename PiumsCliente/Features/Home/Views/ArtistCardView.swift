@@ -38,15 +38,17 @@ struct ArtistCardView: View {
 
             // ── Cover ─────────────────────────────────────
             ZStack(alignment: .bottomLeading) {
-                // Gradient cover
+                // Gradiente de fondo siempre presente
                 LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
                     .frame(height: 130)
 
-                // Cover image si existiera
-                if let url = artist.avatarUrl, let imageURL = URL(string: url) {
-                    AsyncImage(url: imageURL) { img in
-                        img.resizable().scaledToFill()
-                    } placeholder: { EmptyView() }
+                // Portada real (coverUrl) o avatar como fallback de portada
+                if let url = artist.coverUrl ?? artist.avatarUrl, let imageURL = URL(string: url) {
+                    AsyncImage(url: imageURL) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                        }
+                    }
                     .frame(height: 130)
                     .clipped()
                 }
@@ -77,19 +79,27 @@ struct ArtistCardView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
 
-                // Avatar con iniciales — solapado abajo izquierda
+                // Avatar — foto real o iniciales solapado abajo izquierda
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(colors: [Color(red:0.85,green:0.30,blue:0.50),
-                                                    Color(red:0.96,green:0.36,blue:0.36)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
+                        .fill(LinearGradient(colors: [Color(red:0.85,green:0.30,blue:0.50),
+                                                      Color(red:0.96,green:0.36,blue:0.36)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 44, height: 44)
                         .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
-                    Text(initials)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.white)
+                    if let url = artist.avatarUrl, let imageURL = URL(string: url) {
+                        AsyncImage(url: imageURL) { phase in
+                            if case .success(let img) = phase {
+                                img.resizable().scaledToFill()
+                                    .frame(width: 44, height: 44)
+                                    .clipShape(Circle())
+                            } else {
+                                Text(initials).font(.subheadline.bold()).foregroundStyle(.white)
+                            }
+                        }
+                    } else {
+                        Text(initials).font(.subheadline.bold()).foregroundStyle(.white)
+                    }
                 }
                 .offset(x: 14, y: 22)
             }
