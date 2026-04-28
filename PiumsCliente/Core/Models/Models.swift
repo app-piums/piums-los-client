@@ -211,7 +211,7 @@ extension Artist {
              isAvailable, servicesCount, serviceIds, serviceTitles,
              specialties, createdAt, baseLocationLat, baseLocationLng,
              avatar, avatarUrl,
-             coverUrl, coverImage,
+             coverUrl, coverImage, coverPhoto,
              instagram, website
     }
     // Encodable — solo las propiedades reales (avatarUrl/coverImage son aliases de entrada)
@@ -274,9 +274,10 @@ extension Artist {
             // avatar: acepta "avatar" o "avatarUrl" indistintamente
             avatar: try c.decodeIfPresent(String.self, forKey: .avatar)
                  ?? c.decodeIfPresent(String.self, forKey: .avatarUrl),
-            // coverUrl: acepta "coverUrl" o "coverImage"
+            // coverUrl: acepta "coverUrl", "coverImage" o "coverPhoto"
             coverUrl: try c.decodeIfPresent(String.self, forKey: .coverUrl)
-                   ?? c.decodeIfPresent(String.self, forKey: .coverImage),
+                   ?? c.decodeIfPresent(String.self, forKey: .coverImage)
+                   ?? c.decodeIfPresent(String.self, forKey: .coverPhoto),
             instagram: try c.decodeIfPresent(String.self, forKey: .instagram),
             website: try c.decodeIfPresent(String.self, forKey: .website)
         )

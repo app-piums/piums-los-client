@@ -27,6 +27,7 @@ private struct ArtistAvatarResponse: Decodable {
     let name: String?
     let nombre: String?
     let coverUrl: String?
+    let coverPhoto: String?
     let instagram: String?
     let website: String?
 
@@ -36,10 +37,12 @@ private struct ArtistAvatarResponse: Decodable {
         let name: String?
         let nombre: String?
         let coverUrl: String?
+        let coverPhoto: String?
         let instagram: String?
         let website: String?
         var resolvedAvatar: String? { avatar ?? avatarUrl }
         var resolvedName: String?  { name ?? nombre }
+        var resolvedCoverInner: String? { coverUrl ?? coverPhoto }
     }
     // maneja: { "artist": {} }, { "data": {} }, { "user": {} }, o campos en raíz
     let artist: Inner?
@@ -48,7 +51,7 @@ private struct ArtistAvatarResponse: Decodable {
 
     var resolved: String?     { artist?.resolvedAvatar ?? data?.resolvedAvatar ?? user?.resolvedAvatar ?? avatar ?? avatarUrl }
     var resolvedName: String? { artist?.resolvedName   ?? data?.resolvedName   ?? user?.resolvedName   ?? name ?? nombre }
-    var resolvedCover: String?     { artist?.coverUrl   ?? data?.coverUrl   ?? user?.coverUrl   ?? coverUrl }
+    var resolvedCover: String?     { artist?.resolvedCoverInner ?? data?.resolvedCoverInner ?? user?.resolvedCoverInner ?? coverUrl ?? coverPhoto }
     var resolvedInstagram: String? { artist?.instagram  ?? data?.instagram  ?? user?.instagram  ?? instagram }
     var resolvedWebsite: String?   { artist?.website    ?? data?.website    ?? user?.website    ?? website }
 }
@@ -88,35 +91,12 @@ final class ArtistProfileViewModel {
 
     func loadArtistDetail() async {
         do {
-            // Log raw JSON para identificar nombre exacto del campo de portada
-            let base = Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://backend.piums.io"
-            if let token = TokenStorage.shared.accessToken,
-               let url = URL(string: "\(base)/api/artists/\(artist.id)") {
-                var req = URLRequest(url: url)
-                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                if let data = try? await URLSession.shared.data(for: req).0,
-                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let root = json["artist"] as? [String: Any] ?? json["data"] as? [String: Any] ?? json
-                    let imgKeys = root.keys.sorted().filter { k in
-                        if let v = root[k] as? String {
-                            return v.contains("http") || k.lowercased().contains("cover")
-                                || k.lowercased().contains("image") || k.lowercased().contains("photo")
-                                || k.lowercased().contains("banner")
-                        }
-                        return false
-                    }
-                    print("🖼 ArtistDetail campos imagen: \(imgKeys.map { "\($0)=\(root[$0] ?? "nil")" })")
-                }
-            }
             let dto: ArtistAvatarResponse = try await APIClient.request(.getArtist(id: artist.id))
-            print("🎨 ArtistDetail \(artist.id) — avatar: \(dto.resolved ?? "nil"), cover: \(dto.resolvedCover ?? "nil"), name: \(dto.resolvedName ?? "nil")")
-            if let url = dto.resolved        { avatarURL = url }
-            if let url = dto.resolvedCover    { coverURL = url }
+            if let url = dto.resolved          { avatarURL = url }
+            if let url = dto.resolvedCover     { coverURL = url }
             if let ig  = dto.resolvedInstagram { instagram = ig }
             if let wb  = dto.resolvedWebsite   { website = wb }
-        } catch {
-            print("❌ ArtistDetail \(artist.id) — \(error)")
-        }
+        } catch {}
     }
 
     func loadServices() async {
