@@ -553,11 +553,10 @@ struct Review: Codable, Identifiable {
     let id: String
     let artistId: String
     let clientId: String
-    let bookingId: String
+    let bookingId: String?   // null en algunas reseñas del backend
     let rating: Int
     let comment: String?
     let createdAt: String
-    // campos adicionales que puede mandar el backend
     let clientName: String?
     let clientAvatar: String?
 }
