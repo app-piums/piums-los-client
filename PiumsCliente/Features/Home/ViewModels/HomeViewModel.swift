@@ -57,6 +57,8 @@ final class HomeViewModel {
             artists.append(contentsOf: res.artists)
             hasMore = res.pagination.hasMore
             currentPage += 1
+            let sample = res.artists.prefix(3).map { "\($0.name): avatar=\($0.avatar ?? "nil")" }
+            print("🖼 Search artists avatars — \(sample)")
         } catch {
             errorMessage = AppError(from: error).errorDescription
         }
