@@ -19,9 +19,6 @@ struct ArtistProfileView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Banner de portada
-                CoverBannerView(coverURL: viewModel.coverURL)
-
                 // Header
                 ArtistHeaderView(artist: artist, avatarURL: viewModel.avatarURL)
 
@@ -202,40 +199,6 @@ struct ArtistProfileView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Banner de portada
-
-private struct CoverBannerView: View {
-    let coverURL: String?
-
-    var body: some View {
-        Group {
-            if let url = coverURL, let imageURL = URL(string: url) {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                    default:
-                        gradientFallback
-                    }
-                }
-            } else {
-                gradientFallback
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 180)
-        .clipped()
-    }
-
-    private var gradientFallback: some View {
-        LinearGradient(
-            colors: [Color.piumsOrange, Color(red: 0.75, green: 0.25, blue: 0.0)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }
 
