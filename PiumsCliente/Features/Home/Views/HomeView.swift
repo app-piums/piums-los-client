@@ -1,12 +1,16 @@
 // HomeView.swift — rediseño según mockup
 import SwiftUI
 import CoreLocation
+import MapKit
 
 struct HomeView: View {
     @State private var viewModel = HomeViewModel()
     @State private var selectedArtist: Artist?
     @State private var selectedDate: Date? = nil
     @State private var showArtistSearch = false
+    @State private var showLocationPicker = false
+    @State private var pickedLocationName: String = ""
+    @State private var pickedCoordinate: CLLocationCoordinate2D? = nil
     @State private var showNotifications = false
     @Environment(\.locationStore) private var locationStore
 
@@ -32,7 +36,9 @@ struct HomeView: View {
                     nextBooking: viewModel.nextBooking
                 ) { tappedDay in
                     selectedDate = tappedDay
-                    showArtistSearch = true
+                    pickedLocationName = locationStore.cityName
+                    pickedCoordinate = locationStore.coordinate
+                    showLocationPicker = true
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 28)
@@ -63,10 +69,24 @@ struct HomeView: View {
             if let date = selectedDate {
                 ArtistSearchByDateView(
                     selectedDate: date,
-                    userLocation: locationStore.coordinate,
-                    locationName: locationStore.cityName
+                    userLocation: pickedCoordinate,
+                    locationName: pickedLocationName
                 )
             }
+        }
+        .sheet(isPresented: $showLocationPicker) {
+            EventLocationPickerView(
+                selectedDate: selectedDate ?? Date(),
+                locationName: $pickedLocationName,
+                coordinate: $pickedCoordinate,
+                onContinue: {
+                    showLocationPicker = false
+                    showArtistSearch = true
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color(.secondarySystemGroupedBackground))
         }
         .onAppear { locationStore.requestIfNeeded() }
     }
@@ -481,6 +501,177 @@ struct PromoBannerView: View {
                 .padding(.top, 4)
             }
             .padding(20)
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// MARK: - Event Location Picker (paso previo a búsqueda de artistas)
+// ══════════════════════════════════════════════════════════════
+
+private struct EventLocationPickerView: View {
+    let selectedDate: Date
+    @Binding var locationName: String
+    @Binding var coordinate: CLLocationCoordinate2D?
+    let onContinue: () -> Void
+
+    @Environment(\.locationStore) private var locationStore
+
+    private static let guatemalaCity = CLLocationCoordinate2D(latitude: 14.6349, longitude: -90.5069)
+
+    @State private var cameraPosition: MapCameraPosition = .region(
+        MKCoordinateRegion(center: guatemalaCity, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
+    )
+    @State private var isGeocoding = false
+
+    private var formattedDate: String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE d 'de' MMMM"
+        f.locale = Locale(identifier: "es_ES")
+        return f.string(from: selectedDate).capitalized
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("¿Dónde será el evento?")
+                    .font(.title2.bold())
+                Text(formattedDate)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.piumsOrange)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            // Mapa con crosshair
+            ZStack {
+                Map(position: $cameraPosition)
+                    .onMapCameraChange(frequency: .onEnd) { ctx in
+                        let center = ctx.region.center
+                        coordinate = center
+                        reverseGeocode(center)
+                    }
+
+                // Crosshair central
+                VStack(spacing: 0) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 34))
+                        .foregroundStyle(Color.piumsOrange)
+                        .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    // Sombra bajo el pin
+                    Ellipse()
+                        .fill(Color.black.opacity(0.18))
+                        .frame(width: 14, height: 5)
+                        .offset(y: -2)
+                }
+
+                // Botón GPS en esquina inferior-derecha
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            if let coord = locationStore.coordinate {
+                                centerTo(coord)
+                            } else {
+                                locationStore.refresh()
+                            }
+                        } label: {
+                            Image(systemName: locationStore.isLocating ? "location" : "location.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white)
+                                .padding(12)
+                                .background(Color.piumsOrange)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                        }
+                        .padding(12)
+                    }
+                }
+            }
+            .frame(height: 300)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 16)
+
+            // Campo de dirección (auto-rellenado por geocoder)
+            HStack(spacing: 10) {
+                if isGeocoding {
+                    ProgressView().scaleEffect(0.75)
+                } else {
+                    Image(systemName: "mappin.and.ellipse")
+                        .foregroundStyle(coordinate != nil ? Color.piumsOrange : .secondary)
+                }
+                TextField("Mueve el mapa para fijar la ubicación", text: $locationName)
+                    .font(.subheadline)
+                if !locationName.isEmpty {
+                    Button {
+                        locationName = ""
+                        coordinate = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(14)
+            .background(Color(.tertiarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+
+            Spacer()
+
+            // Botón continuar
+            Button(action: onContinue) {
+                HStack(spacing: 8) {
+                    Spacer()
+                    Text(locationName.isEmpty ? "Buscar artistas" : "Buscar artistas aquí")
+                        .font(.headline)
+                    Image(systemName: "arrow.right")
+                    Spacer()
+                }
+                .foregroundStyle(.white)
+                .padding(.vertical, 16)
+                .background(Color.piumsOrange)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
+        }
+        .onAppear {
+            let startCoord = coordinate ?? locationStore.coordinate
+            if let coord = startCoord {
+                centerTo(coord)
+            }
+        }
+        .onChange(of: locationStore.cityName) { _, newName in
+            guard let newCoord = locationStore.coordinate else { return }
+            coordinate = newCoord
+            centerTo(newCoord)
+            if locationName.isEmpty { locationName = newName }
+        }
+    }
+
+    private func centerTo(_ coord: CLLocationCoordinate2D) {
+        cameraPosition = .region(MKCoordinateRegion(
+            center: coord,
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        ))
+        coordinate = coord
+    }
+
+    private func reverseGeocode(_ coord: CLLocationCoordinate2D) {
+        isGeocoding = true
+        CLGeocoder().reverseGeocodeLocation(CLLocation(latitude: coord.latitude, longitude: coord.longitude)) { places, _ in
+            isGeocoding = false
+            guard let place = places?.first else { return }
+            let parts = [place.thoroughfare, place.subLocality, place.locality]
+                .compactMap { $0 }.filter { !$0.isEmpty }
+            if !parts.isEmpty {
+                locationName = parts.joined(separator: ", ")
+            }
         }
     }
 }

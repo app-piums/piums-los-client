@@ -293,34 +293,24 @@ struct ArtistSearchByDateView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                // Filtros rápidos
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Toggle("Solo disponibles", isOn: $viewModel.showOnlyAvailable)
-                            .toggleStyle(.button)
-                            .font(.caption.weight(.semibold))
-                            .tint(.green)
-                            .padding(.horizontal, 4)
-
-                        HStack(spacing: 6) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            TextField("Nombre, estilo…", text: $viewModel.searchQuery)
-                                .font(.subheadline)
-                                .frame(width: 140)
-                            if !viewModel.searchQuery.isEmpty {
-                                Button { viewModel.searchQuery = "" } label: {
-                                    Image(systemName: "xmark.circle.fill").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
+                // Barra de búsqueda
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    TextField("Nombre, estilo, especialidad…", text: $viewModel.searchQuery)
+                        .font(.subheadline)
+                    if !viewModel.searchQuery.isEmpty {
+                        Button { viewModel.searchQuery = "" } label: {
+                            Image(systemName: "xmark.circle.fill").font(.caption).foregroundStyle(.secondary)
                         }
-                        .padding(.horizontal, 10).padding(.vertical, 7)
-                        .background(Color(.tertiarySystemGroupedBackground))
-                        .clipShape(Capsule())
                     }
-                    .padding(.horizontal, 16)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(.bar)
 
@@ -451,7 +441,7 @@ struct ArtistSearchByDateView: View {
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                     .tracking(0.8)
-                                if locationStore.isLocating {
+                                                if locationStore.isLocating && locationName.isEmpty {
                                     HStack(spacing: 6) {
                                         ProgressView().scaleEffect(0.7)
                                         Text("Obteniendo ubicación…")

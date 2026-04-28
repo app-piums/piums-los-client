@@ -2,6 +2,44 @@
 import SwiftUI
 import CoreLocation
 
+// Haversine distance (km) between two coordinates
+private func haversineKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
+    let R = 6371.0
+    let dLat = (lat2 - lat1) * .pi / 180
+    let dLon = (lon2 - lon1) * .pi / 180
+    let a = sin(dLat/2)*sin(dLat/2) + cos(lat1 * .pi/180)*cos(lat2 * .pi/180)*sin(dLon/2)*sin(dLon/2)
+    return R * 2 * atan2(sqrt(a), sqrt(1-a))
+}
+
+// Coordenadas aproximadas por ciudad (fallback cuando el artista no tiene coords exactas)
+private let ARTIST_CITY_COORDS: [String: (Double, Double)] = [
+    "Guatemala":              (14.6349, -90.5069),
+    "Ciudad de Guatemala":    (14.6349, -90.5069),
+    "Antigua Guatemala":      (14.5586, -90.7295),
+    "Antigua":                (14.5586, -90.7295),
+    "Quetzaltenango":         (14.8444, -91.5183),
+    "Cobán":                  (15.4736, -90.3789),
+    "Escuintla":              (14.3057, -90.7861),
+    "Huehuetenango":          (15.3197, -91.4737),
+    "Flores":                 (16.9328, -89.8929),
+    "Chiquimula":             (14.7981, -89.5433),
+    "Zacapa":                 (14.9717, -89.5344),
+    "Jalapa":                 (14.6339, -89.9881),
+    "Jutiapa":                (14.2934, -89.8964),
+    "Santa Rosa":             (14.2800, -90.2750),
+    "Retalhuleu":             (14.5397, -91.6864),
+    "San Marcos":             (14.9658, -91.7953),
+    "Totonicapán":            (14.9108, -91.3606),
+    "Sololá":                 (14.7764, -91.1822),
+    "Chimaltenango":          (14.6631, -90.8197),
+    "Sacatepéquez":           (14.5586, -90.7295),
+    "El Progreso":            (14.9428, -89.8650),
+    "Baja Verapaz":           (15.1136, -90.1822),
+    "Alta Verapaz":           (15.4736, -90.3789),
+    "Izabal":                 (15.7356, -88.6014),
+    "Petén":                  (16.9328, -89.8929),
+]
+
 enum BFlowStep: Int, CaseIterable {
     case service=0, datetime=1, details=2, review=3
     var label: String { ["Servicio","Fecha","Detalles","Resumen"][rawValue] }
@@ -62,21 +100,88 @@ final class BookingFlowViewModel {
         guard let svc = context.service else { return }
         priceError = nil
         var payload: [String: Any] = ["serviceId": svc.id, "durationMinutes": context.durationMinutes]
-        if let lat = context.locationLat { payload["locationLat"] = lat }
-        if let lng = context.locationLng { payload["locationLng"] = lng }
+
+        // Calcular distanceKm entre el cliente y la ciudad base del artista
+        if let clientLat = context.locationLat, let clientLng = context.locationLng {
+            payload["locationLat"] = clientLat
+            payload["locationLng"] = clientLng
+
+            // Intentar coords exactas del artista, luego fallback por ciudad
+            let artistLat: Double?
+            let artistLng: Double?
+            if let aLat = context.artist.baseLocationLat, let aLng = context.artist.baseLocationLng {
+                artistLat = aLat; artistLng = aLng
+            } else if let city = context.artist.city,
+                      let cityCoords = ARTIST_CITY_COORDS[city] {
+                artistLat = cityCoords.0; artistLng = cityCoords.1
+            } else {
+                artistLat = nil; artistLng = nil
+            }
+            if let aLat = artistLat, let aLng = artistLng {
+                let distKm = haversineKm(clientLat, clientLng, aLat, aLng)
+                payload["distanceKm"] = distKm
+            }
+        }
+
         if context.isMultiDay { payload["numDays"] = context.numDays }
         do {
             priceQuote = try await APIClient.request(.calculatePrice(payload: payload))
             context.priceQuote = priceQuote
         } catch {
-            let base = svc.basePrice
-            priceQuote = PriceQuote(serviceId: svc.id, currency: svc.currency,
-                items: [PriceQuoteItem(type:"BASE", name:svc.name, qty:1, unitPriceCents:base, totalPriceCents:base, metadata:nil)],
-                subtotalCents: base, totalCents: base,
-                breakdown: PriceQuoteBreakdown(baseCents: base, addonsCents: 0, travelCents: 0, discountsCents: 0))
+            print("💰 calculatePrice error (\(type(of: error))): \(error)")
+            print("💰 payload was: \(payload)")
+            priceQuote = buildLocalQuote(svc: svc, distanceKm: payload["distanceKm"] as? Double)
             context.priceQuote = priceQuote
             priceError = "Precio estimado"
         }
+    }
+
+    // Mirrors backend pricing.service.ts logic for offline fallback
+    // - 10 km included; Q20/km per extra km (single day)
+    // - Multi-day: Q150/day food + Q400/day lodging + Q200 flat transport
+    func buildLocalQuote(svc: ArtistService, distanceKm: Double?) -> PriceQuote {
+        let baseCents = svc.basePrice
+        var travelCents = 0
+
+        if let dist = distanceKm, dist > 10 {
+            if context.isMultiDay {
+                // Q550/day (food+lodging) + Q200 flat transport
+                travelCents = (context.numDays * 55_000) + 20_000
+            } else {
+                // Q20 per extra km
+                travelCents = Int((dist - 10) * 2_000)
+            }
+        }
+
+        var items: [PriceQuoteItem] = [
+            PriceQuoteItem(type: "BASE", name: svc.name, qty: 1,
+                           unitPriceCents: baseCents, totalPriceCents: baseCents, metadata: nil)
+        ]
+        if travelCents > 0 {
+            items.append(PriceQuoteItem(
+                type: "TRAVEL",
+                name: context.isMultiDay ? "Viáticos" : "Traslado",
+                qty: context.isMultiDay ? context.numDays : 1,
+                unitPriceCents: nil,
+                totalPriceCents: travelCents,
+                metadata: nil
+            ))
+        }
+
+        let total = baseCents + travelCents
+        return PriceQuote(
+            serviceId: svc.id,
+            currency: svc.currency,
+            items: items,
+            subtotalCents: total,
+            totalCents: total,
+            breakdown: PriceQuoteBreakdown(
+                baseCents: baseCents,
+                addonsCents: 0,
+                travelCents: travelCents,
+                discountsCents: nil
+            )
+        )
     }
 
     func submitBooking(clientId: String) async {
@@ -166,8 +271,11 @@ struct BookingFlowView: View {
             if locationStore.coordinate == nil { locationStore.requestIfNeeded() }
         }
         .onChange(of: vm.context.locationLat) { _, newLat in
-            // Recalculate price whenever coordinates become available/change while on review
             guard vm.step == .review, newLat != nil else { return }
+            Task { await vm.calculatePrice() }
+        }
+        .onChange(of: vm.context.numDays) { _, _ in
+            guard vm.step == .review else { return }
             Task { await vm.calculatePrice() }
         }
         .onChange(of: locationStore.coordinate?.latitude) { _, _ in
@@ -186,11 +294,16 @@ struct BookingFlowView: View {
             } onCancel: {
                 showConfirmModal = false
             }
-            .presentationDetents([.medium])
+            .presentationDetents([.height(580)])
+            .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
+            .presentationBackground(Color(.systemBackground))
         }
         .sheet(isPresented: Binding(get: { vm.didComplete }, set: { if !$0 { dismiss() } })) {
-            BookingSuccessView(booking: vm.bookingResult, artist: context.artist) { dismiss() }
+            BookingSuccessView(booking: vm.bookingResult, artist: context.artist) {
+                NotificationCenter.default.post(name: .navigateToMySpace, object: nil)
+                dismiss()
+            }
         }
     }
 
@@ -325,20 +438,53 @@ struct BookingFlowView: View {
                     }
                 }
             }
-            if let svc = vm.context.service, (svc.durationMin ?? 0) >= 480 {
-                VStack(alignment: .leading, spacing: 10) {
-                    Toggle(isOn: $vm.context.isMultiDay) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Evento multi-día").font(.subheadline.weight(.semibold))
-                            Text("Activa viáticos para artistas fuera del área.").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }.tint(.piumsOrange)
-                    if vm.context.isMultiDay {
-                        Stepper("Días: \(vm.context.numDays)", value: $vm.context.numDays, in: 1...30).font(.subheadline)
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: $vm.context.isMultiDay) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Evento multi-día").font(.subheadline.weight(.semibold))
+                        Text("El evento se extiende por más de un día.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                .padding(14).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
+                .tint(.piumsOrange)
+                .onChange(of: vm.context.isMultiDay) { _, on in
+                    if on && vm.context.numDays < 2 { vm.context.numDays = 2 }
+                    if !on { vm.context.numDays = 1 }
+                }
+                if vm.context.isMultiDay {
+                    Divider()
+                    HStack {
+                        Text("Duración del evento")
+                            .font(.subheadline)
+                        Spacer()
+                        HStack(spacing: 14) {
+                            Button {
+                                if vm.context.numDays > 2 { vm.context.numDays -= 1 }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(vm.context.numDays <= 2 ? Color(.systemGray4) : Color.piumsOrange)
+                            }
+                            .disabled(vm.context.numDays <= 2)
+                            Text("\(vm.context.numDays) días")
+                                .font(.subheadline.bold())
+                                .foregroundStyle(Color.piumsOrange)
+                                .frame(minWidth: 52)
+                                .multilineTextAlignment(.center)
+                            Button {
+                                if vm.context.numDays < 30 { vm.context.numDays += 1 }
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(Color.piumsOrange)
+                            }
+                            .disabled(vm.context.numDays >= 30)
+                        }
+                    }
+                }
             }
+            .padding(14)
+            .background(Color(.tertiarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
     }
 
@@ -495,13 +641,23 @@ struct BookingFlowView: View {
 
             VStack(spacing: 8) {
                 ForEach(q.items, id: \.type) { item in
-                    // Hide travel row if location not set yet (would show Q0)
                     if item.type == "TRAVEL" && vm.context.locationLat == nil { EmptyView() }
                     else {
-                        HStack {
+                        HStack(alignment: .center) {
                             HStack(spacing: 6) {
-                                if item.type == "TRAVEL" { Image(systemName: "car.fill").foregroundStyle(.orange) }
-                                Text(item.name).font(.subheadline)
+                                if item.type == "TRAVEL" {
+                                    Image(systemName: "car.fill").foregroundStyle(.orange)
+                                    if vm.context.isMultiDay, let unit = item.unitPriceCents, unit > 0 {
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text("Viáticos (\(vm.context.numDays) días)").font(.subheadline)
+                                            Text("\(unit.piumsFormatted) / día").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    } else {
+                                        Text(item.name).font(.subheadline)
+                                    }
+                                } else {
+                                    Text(item.name).font(.subheadline)
+                                }
                             }
                             Spacer()
                             Text(item.totalPriceCents.piumsFormatted).font(.subheadline.bold())
@@ -521,7 +677,10 @@ struct BookingFlowView: View {
             if q.hasTravel {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle.fill").foregroundStyle(.orange)
-                    Text("Los viáticos cubren transporte, alimentación y hospedaje del artista.").font(.caption).foregroundStyle(.secondary)
+                    Text(vm.context.isMultiDay
+                         ? "Los viáticos cubren transporte, hospedaje y alimentación del artista por los \(vm.context.numDays) días del evento."
+                         : "Los viáticos cubren transporte, alimentación y hospedaje del artista.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 .padding(12).background(Color.orange.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -697,6 +856,10 @@ struct BookingConfirmModalView: View {
                     confirmRow(icon: "calendar", label: "Fecha", value: dateLabel)
                     Divider().padding(.leading, 44)
                     confirmRow(icon: "clock", label: "Hora", value: vm.context.selectedSlot?.time ?? "—")
+                    if vm.context.isMultiDay {
+                        Divider().padding(.leading, 44)
+                        confirmRow(icon: "calendar.badge.plus", label: "Días", value: "\(vm.context.numDays) días")
+                    }
                     if let q = vm.priceQuote {
                         Divider().padding(.leading, 44)
                         confirmRow(icon: "banknote", label: "Total", value: q.totalCents.piumsFormatted, highlight: true)

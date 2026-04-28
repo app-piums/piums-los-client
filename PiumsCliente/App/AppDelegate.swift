@@ -110,4 +110,5 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
 extension Notification.Name {
     static let navigateToBooking = Notification.Name("navigateToBooking")
+    static let navigateToMySpace = Notification.Name("navigateToMySpace")
 }
