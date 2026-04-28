@@ -88,8 +88,28 @@ final class ArtistProfileViewModel {
 
     func loadArtistDetail() async {
         do {
+            // Log raw JSON para identificar nombre exacto del campo de portada
+            let base = Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://backend.piums.io"
+            if let token = TokenStorage.shared.accessToken,
+               let url = URL(string: "\(base)/api/artists/\(artist.id)") {
+                var req = URLRequest(url: url)
+                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                if let data = try? await URLSession.shared.data(for: req).0,
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let root = json["artist"] as? [String: Any] ?? json["data"] as? [String: Any] ?? json
+                    let imgKeys = root.keys.sorted().filter { k in
+                        if let v = root[k] as? String {
+                            return v.contains("http") || k.lowercased().contains("cover")
+                                || k.lowercased().contains("image") || k.lowercased().contains("photo")
+                                || k.lowercased().contains("banner")
+                        }
+                        return false
+                    }
+                    print("🖼 ArtistDetail campos imagen: \(imgKeys.map { "\($0)=\(root[$0] ?? "nil")" })")
+                }
+            }
             let dto: ArtistAvatarResponse = try await APIClient.request(.getArtist(id: artist.id))
-            print("🎨 ArtistDetail \(artist.id) — avatar: \(dto.resolved ?? "nil"), name: \(dto.resolvedName ?? "nil")")
+            print("🎨 ArtistDetail \(artist.id) — avatar: \(dto.resolved ?? "nil"), cover: \(dto.resolvedCover ?? "nil"), name: \(dto.resolvedName ?? "nil")")
             if let url = dto.resolved        { avatarURL = url }
             if let url = dto.resolvedCover    { coverURL = url }
             if let ig  = dto.resolvedInstagram { instagram = ig }
