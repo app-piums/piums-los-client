@@ -5,7 +5,7 @@ import CoreLocation
 struct ArtistProfileView: View {
     let artist: Artist
     @State private var viewModel: ArtistProfileViewModel
-    @State private var selectedService: ArtistService?
+    @State private var bookingService: ArtistService?
     @State private var showBooking = false
     @State private var favorites = FavoritesStore.shared
     @State private var showFavError = false
@@ -62,10 +62,8 @@ struct ArtistProfileView: View {
                             .padding(.horizontal)
                     } else {
                         ForEach(viewModel.services) { service in
-                            ServiceRowView(service: service, isSelected: selectedService?.id == service.id) {
-                                selectedService = service
-                            } onReserve: {
-                                selectedService = service
+                            ServiceRowView(service: service) {
+                                bookingService = service
                                 showBooking = true
                             }
                             .padding(.horizontal)
@@ -144,11 +142,13 @@ struct ArtistProfileView: View {
                     instagram: viewModel.instagram,
                     website: viewModel.website
                 ) {
-                    if let first = viewModel.services.first { selectedService = first }
-                    showBooking = true
+                    if let first = viewModel.services.first {
+                        bookingService = first
+                        showBooking = true
+                    }
                 }
 
-                Spacer().frame(height: 100)
+                Spacer().frame(height: 30)
             }
         }
         .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
@@ -171,20 +171,8 @@ struct ArtistProfileView: View {
         } message: {
             Text(favorites.errorMessage ?? "")
         }
-        // Botón flotante Contratar
-        .overlay(alignment: .bottom) {
-            VStack {
-                PiumsButton(title: selectedService == nil ? "Selecciona un servicio" : "Contratar") {
-                    if selectedService != nil { showBooking = true }
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 12)
-                .disabled(selectedService == nil)
-            }
-            .background(.regularMaterial)
-        }
         .sheet(isPresented: $showBooking) {
-            if let service = selectedService {
+            if let service = bookingService {
                 let coord = locationStore.coordinate
                 let lat: Double? = coord.map { $0.latitude }
                 let lng: Double? = coord.map { $0.longitude }
@@ -339,35 +327,24 @@ private struct StatCell: View {
 
 private struct ServiceRowView: View {
     let service: ArtistService
-    let isSelected: Bool
-    let onTap: () -> Void
     let onReserve: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Button(action: onTap) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(service.name).font(.subheadline.bold())
-                        if let desc = service.description {
-                            Text(desc).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                        }
-                        Label("\(service.duration) min", systemImage: "clock")
-                            .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(service.name).font(.subheadline.bold())
+                    if let desc = service.description {
+                        Text(desc).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(service.price.piumsFormatted)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(Color.piumsOrange)
-                        if isSelected {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Color.piumsOrange)
-                        }
-                    }
+                    Label("\(service.duration) min", systemImage: "clock")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
+                Spacer()
+                Text(service.price.piumsFormatted)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(Color.piumsOrange)
             }
-            .buttonStyle(.plain)
 
             Button(action: onReserve) {
                 Text("Reservar")
@@ -381,12 +358,8 @@ private struct ServiceRowView: View {
             .buttonStyle(.plain)
         }
         .padding(14)
-        .background(isSelected ? Color.piumsOrange.opacity(0.08) : Color(.tertiarySystemGroupedBackground))
+        .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color.piumsOrange : Color.clear, lineWidth: 1.5)
-        )
     }
 }
 
