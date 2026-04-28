@@ -176,7 +176,15 @@ final class SearchViewModel {
             currentSmartPage += 1
         } catch {
             guard nonce == searchNonce else { return }
-            errorMessage = AppError(from: error).errorDescription
+            let appErr = AppError(from: error)
+            // Smart search no disponible (5xx/504) → fallback al índice rápido
+            if case .serverError = appErr {
+                isSmartSearch = false
+                expandedTerms = []
+                await loadNext()
+            } else {
+                errorMessage = appErr.errorDescription
+            }
         }
     }
 
