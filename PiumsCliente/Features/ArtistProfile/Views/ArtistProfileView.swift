@@ -196,7 +196,7 @@ struct ArtistProfileView: View {
             WriteReviewSheet(artistId: artist.id, artistName: artist.artistName) {
                 Task { await viewModel.loadReviews() }
             }
-            .presentationDetents([.height(420)])
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
         }
@@ -396,95 +396,167 @@ private struct WriteReviewSheet: View {
     @State private var rating = 0
     @State private var comment = ""
     @State private var isSubmitting = false
+    @State private var isLoadingBookings = true
+    @State private var completedBookings: [Booking] = []
+    @State private var selectedBookingId: String? = nil
     @State private var errorMessage: String?
     @State private var didSucceed = false
     @Environment(\.dismiss) private var dismiss
 
     private let labels = ["", "Malo", "Regular", "Bueno", "Muy bueno", "Excelente"]
 
+    private var canSubmit: Bool { rating > 0 && selectedBookingId != nil && !isSubmitting }
+
     var body: some View {
         VStack(spacing: 0) {
             Capsule().fill(Color(.systemGray4)).frame(width: 36, height: 4).padding(.top, 14)
 
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Escribir reseña").font(.title2.bold())
-                    Text(artistName).font(.subheadline).foregroundStyle(.secondary)
-                }
-
-                // Estrellas
-                VStack(spacing: 6) {
-                    HStack(spacing: 10) {
-                        ForEach(1...5, id: \.self) { star in
-                            Image(systemName: star <= rating ? "star.fill" : "star")
-                                .font(.system(size: 32))
-                                .foregroundStyle(star <= rating ? Color.piumsOrange : Color(.systemGray3))
-                                .onTapGesture { withAnimation(.easeInOut(duration: 0.1)) { rating = star } }
-                        }
-                    }
-                    if rating > 0 {
-                        Text(labels[rating])
-                            .font(.caption.bold())
-                            .foregroundStyle(Color.piumsOrange)
-                    }
+            if isLoadingBookings {
+                ProgressView("Cargando reservas…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.vertical, 60)
+            } else if completedBookings.isEmpty {
+                VStack(spacing: 14) {
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .font(.system(size: 44))
+                        .foregroundStyle(Color(.systemGray3))
+                    Text("Sin reservas completadas")
+                        .font(.headline)
+                    Text("Solo puedes dejar una reseña después de completar una reserva con este artista.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                    Button("Cerrar") { dismiss() }
+                        .font(.subheadline.bold())
+                        .foregroundStyle(Color.piumsOrange)
                 }
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 50)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Escribir reseña").font(.title2.bold())
+                            Text(artistName).font(.subheadline).foregroundStyle(.secondary)
+                        }
 
-                // Comentario
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Comentario (opcional)").font(.subheadline.weight(.medium))
-                    TextEditor(text: $comment)
-                        .frame(height: 90)
-                        .padding(10)
-                        .background(Color(.tertiarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            Group {
-                                if comment.isEmpty {
-                                    Text("Cuéntanos tu experiencia…")
-                                        .foregroundStyle(Color(.placeholderText))
-                                        .padding(.leading, 14)
-                                        .padding(.top, 18)
-                                        .allowsHitTesting(false)
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        // Selector de reserva (si hay más de una)
+                        if completedBookings.count > 1 {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Reserva a reseñar").font(.subheadline.weight(.medium))
+                                ForEach(completedBookings) { booking in
+                                    let isSelected = selectedBookingId == booking.id
+                                    Button {
+                                        selectedBookingId = booking.id
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                                .foregroundStyle(isSelected ? Color.piumsOrange : Color(.systemGray3))
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(booking.resolvedArtistName ?? artistName)
+                                                    .font(.subheadline.bold())
+                                                Text(String(booking.scheduledDate.prefix(10)))
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                            if let code = booking.code {
+                                                Text(code).font(.caption2.monospaced()).foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        .padding(12)
+                                        .background(isSelected ? Color.piumsOrange.opacity(0.08) : Color(.tertiarySystemGroupedBackground))
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSelected ? Color.piumsOrange : Color.clear, lineWidth: 1.5))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
-                        )
-                }
+                        }
 
-                if let err = errorMessage {
-                    Text(err).font(.caption).foregroundStyle(.red)
-                }
+                        // Estrellas
+                        VStack(spacing: 6) {
+                            HStack(spacing: 10) {
+                                ForEach(1...5, id: \.self) { star in
+                                    Image(systemName: star <= rating ? "star.fill" : "star")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(star <= rating ? Color.piumsOrange : Color(.systemGray3))
+                                        .onTapGesture { withAnimation(.easeInOut(duration: 0.1)) { rating = star } }
+                                }
+                            }
+                            if rating > 0 {
+                                Text(labels[rating]).font(.caption.bold()).foregroundStyle(Color.piumsOrange)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
 
-                Button {
-                    Task { await submit() }
-                } label: {
-                    HStack {
-                        if isSubmitting { ProgressView().tint(.white) }
-                        Text(didSucceed ? "¡Reseña enviada!" : "Enviar reseña")
+                        // Comentario
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Comentario (opcional)").font(.subheadline.weight(.medium))
+                            TextEditor(text: $comment)
+                                .frame(height: 90)
+                                .padding(10)
+                                .background(Color(.tertiarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    Group {
+                                        if comment.isEmpty {
+                                            Text("Cuéntanos tu experiencia…")
+                                                .foregroundStyle(Color(.placeholderText))
+                                                .padding(.leading, 14).padding(.top, 18)
+                                                .allowsHitTesting(false)
+                                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                        }
+                                    }
+                                )
+                        }
+
+                        if let err = errorMessage {
+                            Text(err).font(.caption).foregroundStyle(.red)
+                        }
+
+                        Button {
+                            Task { await submit() }
+                        } label: {
+                            HStack {
+                                if isSubmitting { ProgressView().tint(.white) }
+                                Text(didSucceed ? "¡Reseña enviada!" : "Enviar reseña")
+                            }
+                            .font(.headline).foregroundStyle(.white)
+                            .frame(maxWidth: .infinity).padding(.vertical, 14)
+                            .background(canSubmit ? Color.piumsOrange : Color(.systemGray4))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .disabled(!canSubmit)
                     }
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(rating > 0 && !isSubmitting ? Color.piumsOrange : Color(.systemGray4))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal, 24)
+                    .padding(.top, 20)
+                    .padding(.bottom, 30)
                 }
-                .disabled(rating == 0 || isSubmitting)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 20)
-            .padding(.bottom, 30)
         }
+        .task { await loadCompletedBookings() }
+    }
+
+    private func loadCompletedBookings() async {
+        isLoadingBookings = true
+        do {
+            let res: BookingsResponse = try await APIClient.request(.listMyBookings(status: "COMPLETED", page: 1))
+            completedBookings = res.allBookings.filter { $0.artistId == artistId }
+            selectedBookingId = completedBookings.first?.id
+        } catch {
+            completedBookings = []
+        }
+        isLoadingBookings = false
     }
 
     private func submit() async {
+        guard let bookingId = selectedBookingId else { return }
         isSubmitting = true
         errorMessage = nil
-        var payload: [String: Any] = ["artistId": artistId, "rating": rating]
-        if !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            payload["comment"] = comment.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        var payload: [String: Any] = ["artistId": artistId, "bookingId": bookingId, "rating": rating]
+        let trimmed = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { payload["comment"] = trimmed }
         do {
             let _: CreateReviewResponse = try await APIClient.request(.createReview(payload: payload))
             didSucceed = true
