@@ -213,6 +213,7 @@ struct BookingDetailView: View {
     @State private var showReview = false
     @State private var showQueja  = false
     @State private var showShareSheet = false
+    @State private var showReschedule = false
     @Environment(\.dismiss) private var dismiss
 
     @State private var loadedArtistName: String?
@@ -402,6 +403,12 @@ struct BookingDetailView: View {
                         actionButton(icon: "square.and.arrow.up", label: "Compartir reserva", color: Color.piumsOrange) {
                             showShareSheet = true
                         }
+                        if canReschedule {
+                            Divider()
+                            actionButton(icon: "calendar.badge.clock", label: "Cambiar fecha", color: .purple) {
+                                showReschedule = true
+                            }
+                        }
                         if booking.status == .completed {
                             Divider()
                             actionButton(icon: "star.bubble", label: "Dejar reseña", color: .yellow) {
@@ -430,6 +437,12 @@ struct BookingDetailView: View {
         .task { await loadArtist() }
         .sheet(isPresented: $showReview) { ReviewView(booking: booking) }
         .sheet(isPresented: $showQueja)  { CreateQuejaView(booking: booking) }
+        .sheet(isPresented: $showReschedule) {
+            RescheduleBookingSheet(booking: booking)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+        }
         .sheet(isPresented: $showShareSheet) {
             if let code = booking.code {
                 ShareSheet(items: ["Mi reserva \(code) — \(formattedDate)"])
@@ -479,6 +492,13 @@ struct BookingDetailView: View {
     private var canOpenQueja: Bool {
         switch booking.status {
         case .completed, .cancelledArtist, .noShow, .rejected: return true
+        default: return false
+        }
+    }
+
+    private var canReschedule: Bool {
+        switch booking.status {
+        case .pending, .confirmed, .rescheduled: return true
         default: return false
         }
     }
@@ -775,4 +795,245 @@ struct FavoritesContentView: View {
             description: "Guarda artistas con el botón de corazón en su perfil para encontrarlos rápido aquí."
         )
     }
+}
+
+// MARK: - RescheduleBookingSheet
+
+struct RescheduleBookingSheet: View {
+    let booking: Booking
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var selectedDate: Date? = nil
+    @State private var selectedSlot: TimeSlot? = nil
+    @State private var reason = ""
+    @State private var disabledDates: [Date] = []
+    @State private var slots: [TimeSlot] = []
+    @State private var isLoadingSlots = false
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+    @State private var didSucceed = false
+    @State private var displayMonth = Date()
+
+    private let cal = Calendar.current
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+
+                    // Reserva actual
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Fecha actual").font(.subheadline).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar").foregroundStyle(Color.piumsOrange)
+                            Text(booking.scheduledDate).font(.subheadline.bold())
+                            if let t = booking.scheduledTime {
+                                Text("·").foregroundStyle(.secondary)
+                                Image(systemName: "clock").foregroundStyle(Color.piumsOrange)
+                                Text(t).font(.subheadline.bold())
+                            }
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.tertiarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    // Calendario
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Nueva fecha").font(.headline)
+                        calendarView
+                    }
+
+                    // Slots
+                    if !slots.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Horario disponible").font(.headline)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 85))], spacing: 8) {
+                                ForEach(slots) { s in
+                                    Button { selectedSlot = s } label: {
+                                        Text(s.time)
+                                            .font(.subheadline.weight(.semibold))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
+                                            .background(selectedSlot?.time == s.time ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
+                                            .foregroundStyle(selectedSlot?.time == s.time ? .white : .primary)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    } else if isLoadingSlots {
+                        ProgressView("Cargando horarios…").frame(maxWidth: .infinity)
+                    } else if selectedDate != nil {
+                        Text("No hay horarios disponibles para este día.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+
+                    // Motivo (opcional)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Motivo del cambio (opcional)").font(.subheadline.weight(.medium))
+                        TextEditor(text: $reason)
+                            .frame(height: 70)
+                            .padding(10)
+                            .background(Color(.tertiarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                Group {
+                                    if reason.isEmpty {
+                                        Text("Ej. Cambio de planes, evento adelantado…")
+                                            .foregroundStyle(Color(.placeholderText))
+                                            .padding(.leading, 14).padding(.top, 18)
+                                            .allowsHitTesting(false)
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    }
+                                }
+                            )
+                    }
+
+                    if let err = errorMessage {
+                        Text(err).font(.caption).foregroundStyle(.red)
+                    }
+
+                    // Confirmar
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        HStack {
+                            if isSubmitting { ProgressView().tint(.white) }
+                            Text(didSucceed ? "¡Cambio solicitado!" : "Confirmar cambio de fecha")
+                        }
+                        .font(.headline).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 14)
+                        .background(canConfirm ? Color.piumsOrange : Color(.systemGray4))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(!canConfirm)
+                }
+                .padding(20)
+            }
+            .scrollIndicators(.hidden)
+            .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("Cambiar fecha")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancelar") { dismiss() }.foregroundStyle(Color.piumsOrange)
+                }
+            }
+            .task { await loadCalendar() }
+        }
+    }
+
+    // MARK: - Calendar view (inline)
+
+    private var calendarView: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text(monthLabel).font(.headline.bold())
+                Spacer()
+                Button { changeMonth(-1) } label: { Image(systemName: "chevron.left").foregroundStyle(Color.piumsOrange) }
+                Button { changeMonth(1)  } label: { Image(systemName: "chevron.right").foregroundStyle(Color.piumsOrange) }
+            }
+            HStack(spacing: 0) {
+                ForEach(["L","M","X","J","V","S","D"], id: \.self) {
+                    Text($0).font(.caption.bold()).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                }
+            }
+            let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+            LazyVGrid(columns: cols, spacing: 4) {
+                ForEach(calendarDays, id: \.self) { day in
+                    let isOff = disabledDates.contains { cal.isDate($0, inSameDayAs: day) }
+                    let isPast = day < cal.startOfDay(for: Date())
+                    let isCurrent = cal.component(.month, from: day) == cal.component(.month, from: displayMonth)
+                    let isSel = selectedDate.map { cal.isDate(day, inSameDayAs: $0) } ?? false
+                    Button {
+                        guard !isOff && !isPast && isCurrent else { return }
+                        selectedDate = day; selectedSlot = nil
+                        Task { await loadSlots(for: day) }
+                    } label: {
+                        ZStack {
+                            if isSel      { Circle().fill(Color.piumsOrange) }
+                            else if isOff { Circle().fill(Color.red.opacity(0.08)) }
+                            Text("\(cal.component(.day, from: day))")
+                                .font(.system(size: 13, weight: isSel ? .bold : .regular))
+                                .foregroundStyle(isSel ? .white : isOff ? Color.red.opacity(0.5) : isPast || !isCurrent ? Color(.systemGray4) : .primary)
+                        }
+                        .frame(height: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isOff || isPast || !isCurrent)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(.tertiarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var monthLabel: String {
+        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"; f.locale = Locale(identifier: "es_ES")
+        return f.string(from: displayMonth).capitalized
+    }
+
+    private func changeMonth(_ d: Int) {
+        if let n = cal.date(byAdding: .month, value: d, to: displayMonth) { withAnimation { displayMonth = n } }
+    }
+
+    private var calendarDays: [Date] {
+        guard let start = cal.date(from: cal.dateComponents([.year,.month], from: displayMonth)),
+              let range = cal.range(of: .day, in: .month, for: start) else { return [] }
+        let wd = cal.component(.weekday, from: start); let off = (wd-2+7)%7
+        return (-off..<(range.count + (7-(range.count+off)%7)%7)).compactMap {
+            cal.date(byAdding: .day, value: $0, to: start)
+        }
+    }
+
+    // MARK: - Async
+
+    private func loadCalendar() async {
+        let yr = cal.component(.year, from: displayMonth)
+        let mo = cal.component(.month, from: displayMonth)
+        do {
+            let res: ArtistCalendar = try await APIClient.request(
+                .getArtistCalendar(artistId: booking.artistId, year: yr, month: mo))
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+            disabledDates = (res.occupiedDates + res.blockedDates).compactMap { f.date(from: $0) }
+        } catch {}
+    }
+
+    private func loadSlots(for date: Date) async {
+        isLoadingSlots = true; slots = []
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        do {
+            let res: TimeSlotsResponse = try await APIClient.request(
+                .getAvailableSlots(artistId: booking.artistId, date: f.string(from: date)))
+            slots = res.slots.filter { $0.available }
+        } catch {}
+        isLoadingSlots = false
+    }
+
+    private func submit() async {
+        guard let date = selectedDate, let slot = selectedSlot else { return }
+        isSubmitting = true; errorMessage = nil
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        var payload: [String: Any] = [
+            "scheduledDate": df.string(from: date),
+            "scheduledTime": slot.time
+        ]
+        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { payload["reason"] = trimmed }
+        do {
+            let _: VoidResponse = try await APIClient.request(.rescheduleBooking(id: booking.id, payload: payload))
+            didSucceed = true
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            dismiss()
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+        isSubmitting = false
+    }
+
+    private var canConfirm: Bool { selectedDate != nil && selectedSlot != nil && !isSubmitting }
 }

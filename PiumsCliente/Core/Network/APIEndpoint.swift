@@ -34,9 +34,10 @@ enum APIEndpoint {
     case listMyBookings(status: String?, page: Int)
     case getBooking(id: String)
     case cancelBooking(id: String)
+    case rescheduleBooking(id: String, payload: [String: Any])
     case getAvailableSlots(artistId: String, date: String)
-    case getArtistCalendar(artistId: String, year: Int, month: Int)   // NEW: occupiedDates, blockedDates
-    case calculatePrice(payload: [String: Any])                        // NEW: POST /api/catalog/pricing/calculate
+    case getArtistCalendar(artistId: String, year: Int, month: Int)
+    case calculatePrice(payload: [String: Any])
 
     // ── Reviews ───────────────────────────────────────────
     case listReviews(artistId: String, page: Int)
@@ -107,7 +108,7 @@ extension APIEndpoint {
              .logout, .createPaymentIntent, .calculatePrice,
              .createEvent, .sendMessage, .addFavorite:
             return "POST"
-        case .cancelBooking:
+        case .cancelBooking, .rescheduleBooking:
             return "POST"
         case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead:
             return "PATCH"
@@ -132,7 +133,8 @@ extension APIEndpoint {
             return encode(["refreshToken": t])
         case .forgotPassword(let e):
             return encode(["email": e])
-        case .createBooking(let p), .createReview(let p), .createDispute(let p):
+        case .createBooking(let p), .createReview(let p), .createDispute(let p),
+             .rescheduleBooking(_, let p):
             return try? JSONSerialization.data(withJSONObject: p)
         case .addDisputeMessage(_, let msg):
             return encode(["message": msg])
@@ -230,7 +232,8 @@ extension APIEndpoint {
             if let s = s { p += "&status=\(s)" }
             return p
         case .getBooking(let id):              return "/api/bookings/\(id)"
-        case .cancelBooking(let id):           return "/api/bookings/\(id)/cancel"
+        case .cancelBooking(let id):            return "/api/bookings/\(id)/cancel"
+        case .rescheduleBooking(let id, _):    return "/api/bookings/\(id)/reschedule"
         case .getAvailableSlots(let a, let d): return "/api/availability/time-slots?artistId=\(a)&date=\(d)"
         case .getArtistCalendar(let a, let yr, let mo): return "/api/availability/calendar?artistId=\(a)&year=\(yr)&month=\(mo)"
         case .calculatePrice:                  return "/api/catalog/pricing/calculate"
