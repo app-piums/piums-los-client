@@ -201,61 +201,42 @@ private struct ContactInfoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Información de Contacto")
-                .font(.headline)
-                .padding(.horizontal)
-
-            VStack(spacing: 10) {
-                Button(action: onReserve) {
-                    Text("Reservar Ahora")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color.piumsOrange)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink(destination: InboxView()) {
-                    Text("Enviar Mensaje")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(Color.piumsOrange)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color.piumsOrange.opacity(0.10))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.piumsOrange, lineWidth: 1.5))
-                }
+            Button(action: onReserve) {
+                Text("Reservar Ahora")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(Color.piumsOrange)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
             .padding(.horizontal)
 
             if hasSocialLinks {
                 Divider().padding(.horizontal)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Redes Sociales")
-                        .font(.headline)
-                        .padding(.horizontal)
+                Text("Redes Sociales")
+                    .font(.headline)
+                    .padding(.horizontal)
 
-                    HStack(spacing: 14) {
-                        if let ig = instagram {
-                            Link(destination: URL(string: ig.hasPrefix("http") ? ig : "https://instagram.com/\(ig.trimmingCharacters(in: .init(charactersIn: "@")))") ?? URL(string: "https://instagram.com")!) {
-                                Label("Instagram", systemImage: "camera")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.piumsOrange)
-                            }
-                        }
-                        if let wb = website {
-                            Link(destination: URL(string: wb.hasPrefix("http") ? wb : "https://\(wb)") ?? URL(string: "https://piums.io")!) {
-                                Label("Sitio web", systemImage: "globe")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.piumsOrange)
-                            }
+                HStack(spacing: 14) {
+                    if let ig = instagram {
+                        Link(destination: URL(string: ig.hasPrefix("http") ? ig : "https://instagram.com/\(ig.trimmingCharacters(in: .init(charactersIn: "@")))") ?? URL(string: "https://instagram.com")!) {
+                            Label("Instagram", systemImage: "camera")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.piumsOrange)
                         }
                     }
-                    .padding(.horizontal)
+                    if let wb = website {
+                        Link(destination: URL(string: wb.hasPrefix("http") ? wb : "https://\(wb)") ?? URL(string: "https://piums.io")!) {
+                            Label("Sitio web", systemImage: "globe")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.piumsOrange)
+                        }
+                    }
                 }
+                .padding(.horizontal)
             }
         }
         .padding(.vertical)

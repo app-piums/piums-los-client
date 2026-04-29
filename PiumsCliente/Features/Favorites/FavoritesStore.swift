@@ -79,23 +79,11 @@ final class FavoritesStore {
             favorites.insert(placeholder, at: 0)
             artistsById[artist.id] = artist
             do {
-                let real: FavoriteRecord = try await APIClient.request(
+                let resp: FavoriteAddResponse = try await APIClient.request(
                     .addFavorite(entityType: "ARTIST", entityId: artist.id, notes: nil)
                 )
-                // Reemplazar el placeholder con el registro real del backend
                 if let idx = favorites.firstIndex(where: { $0.id == tempId }) {
-                    favorites[idx] = real
-                }
-            } catch let appErr as AppError {
-                if case .decoding = appErr {
-                    // El favorito SÍ fue guardado en el backend — solo la respuesta tiene
-                    // un formato distinto al esperado. Recargamos para obtener el ID real.
-                    await loadFavorites()
-                } else {
-                    // Error real (red, auth, etc.) — revertir
-                    favorites.removeAll { $0.id == tempId }
-                    artistsById.removeValue(forKey: artist.id)
-                    errorMessage = appErr.errorDescription
+                    favorites[idx] = resp.favorite
                 }
             } catch {
                 favorites.removeAll { $0.id == tempId }

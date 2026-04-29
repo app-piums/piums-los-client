@@ -360,91 +360,141 @@ private struct DayCell: View {
 struct RecommendedArtistCard: View {
     let artist: Artist
 
-    private static let gradients: [[Color]] = [
-        [Color(red: 0.55, green: 0.36, blue: 0.96), Color(red: 0.96, green: 0.36, blue: 0.55)],
-        [Color(red: 0.36, green: 0.55, blue: 0.96), Color(red: 0.96, green: 0.55, blue: 0.36)],
-        [Color(red: 0.70, green: 0.30, blue: 0.90), Color(red: 0.90, green: 0.50, blue: 0.70)],
-        [Color(red: 0.40, green: 0.60, blue: 0.90), Color(red: 0.80, green: 0.40, blue: 0.90)],
-    ]
-    private var gradient: [Color] {
-        Self.gradients[abs(artist.id.hashValue) % Self.gradients.count]
-    }
     private var initials: String {
         artist.artistName.split(separator: " ").prefix(2)
             .compactMap { $0.first.map { String($0) } }.joined().uppercased()
     }
 
+    private var specialtyCoverGradient: LinearGradient {
+        let spec = artist.specialties?.first?.lowercased() ?? ""
+        let colors: [Color]
+        switch true {
+        case spec.contains("músic") || spec.contains("music"):
+            colors = [Color(hex: "#FF6A00"), Color(hex: "#F59E0B")]
+        case spec.contains("dj"):
+            colors = [Color(hex: "#FF6A00"), Color(hex: "#E91E8C")]
+        case spec.contains("fotograf"):
+            colors = [Color(hex: "#00AEEF"), Color(hex: "#1E3A8A")]
+        case spec.contains("video"):
+            colors = [Color(hex: "#4F46E5"), Color(hex: "#E91E8C")]
+        case spec.contains("diseñ") || spec.contains("disen"):
+            colors = [Color(hex: "#00AEEF"), Color(hex: "#10B981")]
+        case spec.contains("bail"):
+            colors = [Color(hex: "#FF6A00"), Color(hex: "#EF4444")]
+        case spec.contains("maquillaj"):
+            colors = [Color(hex: "#F472B6"), Color(hex: "#7C2D12")]
+        case spec.contains("tatua"):
+            colors = [Color(hex: "#1E40AF"), Color(hex: "#7C3AED")]
+        case spec.contains("pintur") || spec.contains("pintor"):
+            colors = [Color(hex: "#06B6D4"), Color(hex: "#10B981")]
+        case spec.contains("mag"):
+            colors = [Color(hex: "#7C3AED"), Color(hex: "#4F46E5")]
+        default:
+            colors = [Color(hex: "#FF6A00"), Color(hex: "#00AEEF")]
+        }
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Cover
-            ZStack(alignment: .bottomLeading) {
-                // Fondo: cover real o gradiente fallback
-                LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .frame(width: 160, height: 120)
-                if let url = artist.coverUrl ?? artist.avatarUrl, let imageURL = URL(string: url) {
-                    AsyncImage(url: imageURL) { phase in
-                        if case .success(let img) = phase {
-                            img.resizable().scaledToFill()
-                        }
-                    }
-                    .frame(width: 160, height: 120)
-                    .clipped()
-                }
-
-                if let rating = artist.rating, rating >= 4.8 {
-                    Text("TOP RATED")
-                        .font(.system(size: 9, weight: .black)).tracking(0.5)
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(Capsule().fill(.white))
-                        .padding(8)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                }
-
-                // Avatar solapado: foto real o iniciales
+        ZStack(alignment: .topLeading) {
+            // ── Card content ─────────────────────────────
+            VStack(alignment: .leading, spacing: 0) {
+                // Cover
                 ZStack {
-                    Circle()
-                        .fill(LinearGradient(colors: [Color(red:0.85,green:0.30,blue:0.50),
-                                                      Color(red:0.96,green:0.36,blue:0.36)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 36, height: 36)
-                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
-                    if let url = artist.avatarUrl, let imageURL = URL(string: url) {
+                    if let url = artist.coverUrl, let imageURL = URL(string: url) {
+                        Color(.systemGray5).frame(width: 160, height: 120)
                         AsyncImage(url: imageURL) { phase in
                             if case .success(let img) = phase {
                                 img.resizable().scaledToFill()
-                                    .frame(width: 36, height: 36)
-                                    .clipShape(Circle())
-                            } else {
-                                Text(initials).font(.caption.bold()).foregroundStyle(.white)
                             }
                         }
+                        .frame(width: 160, height: 120)
+                        .clipped()
                     } else {
-                        Text(initials).font(.caption.bold()).foregroundStyle(.white)
+                        specialtyCoverGradient.frame(width: 160, height: 120)
+
+                        Canvas { context, size in
+                            let spacing: CGFloat = 14
+                            let r: CGFloat = 1.2
+                            var y = spacing / 2
+                            while y < size.height {
+                                var x = spacing / 2
+                                while x < size.width {
+                                    context.fill(
+                                        Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                                        with: .color(.white.opacity(0.25))
+                                    )
+                                    x += spacing
+                                }
+                                y += spacing
+                            }
+                        }
+                        .frame(width: 160, height: 120)
+                        .allowsHitTesting(false)
+
+                        Text(String(initials.prefix(1)))
+                            .font(.system(size: 70, weight: .black))
+                            .foregroundStyle(.white.opacity(0.12))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            .padding(.trailing, 4)
+                            .offset(y: 16)
+                    }
+
+                    if let rating = artist.rating, rating >= 4.8 {
+                        Text("TOP RATED")
+                            .font(.system(size: 9, weight: .black)).tracking(0.5)
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Capsule().fill(.white))
+                            .padding(8)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
                 }
-                .offset(x: 10, y: 18)
-            }
-            .frame(width: 160, height: 120)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+                .frame(width: 160, height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
 
-            // Info
-            VStack(alignment: .leading, spacing: 3) {
-                Text(artist.artistName).font(.subheadline.bold()).lineLimit(1).padding(.top, 22)
-                Text("\(artist.specialties?.first ?? "Artista") · \(artist.city ?? "")")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                if let price = artist.mainServicePrice, price > 0 {
-                    Text(price.piumsFormatted)
-                        .font(.caption.bold()).foregroundStyle(Color.piumsOrange)
+                // Info
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(artist.artistName).font(.subheadline.bold()).lineLimit(1).padding(.top, 22)
+                    Text("\(artist.specialties?.first ?? "Artista") · \(artist.city ?? "")")
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    if let price = artist.mainServicePrice, price > 0 {
+                        Text(price.piumsFormatted)
+                            .font(.caption.bold()).foregroundStyle(Color.piumsOrange)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.bottom, 8)
+            }
+            .frame(width: 160)
+            .background(Color(.tertiarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
+
+            // ── Avatar — outside card clip, at the cover/info seam ──
+            ZStack {
+                Circle()
+                    .fill(specialtyCoverGradient)
+                    .frame(width: 36, height: 36)
+                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                if let url = artist.avatarUrl, let imageURL = URL(string: url) {
+                    AsyncImage(url: imageURL) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                                .frame(width: 36, height: 36)
+                                .clipShape(Circle())
+                        } else {
+                            Text(initials).font(.caption.bold()).foregroundStyle(.white)
+                        }
+                    }
+                    .frame(width: 36, height: 36)
+                    .clipShape(Circle())
+                } else {
+                    Text(initials).font(.caption.bold()).foregroundStyle(.white)
                 }
             }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 8)
+            .offset(x: 10, y: 102) // center avatar at seam (120 - 18 = 102)
         }
-        .frame(width: 160)
-        .background(Color(.tertiarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
     }
 }
 

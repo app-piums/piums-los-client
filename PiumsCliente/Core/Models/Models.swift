@@ -175,6 +175,7 @@ struct SmartArtist: Codable, Identifiable {
     let score: Double?
     let createdAt: String?
     let avatar: String?
+    let coverPhoto: String?
     // Coordenadas exactas
     let baseLocationLat: Double?
     let baseLocationLng: Double?
@@ -190,7 +191,7 @@ struct SmartArtist: Codable, Identifiable {
                servicesCount: servicesCount, serviceIds: serviceIds, serviceTitles: serviceTitles,
                specialties: specialties, createdAt: createdAt,
                baseLocationLat: baseLocationLat, baseLocationLng: baseLocationLng, avatar: avatar,
-               coverUrl: nil, instagram: nil, website: nil)
+               coverUrl: coverPhoto, instagram: nil, website: nil)
     }
 }
 
@@ -290,7 +291,7 @@ extension SmartArtist {
              totalReviews, totalBookings, hourlyRateMin, hourlyRateMax,
              mainServicePrice, mainServiceName, isVerified, isActive,
              isAvailable, servicesCount, serviceIds, serviceTitles,
-             specialties, matchedService, score, createdAt, avatar,
+             specialties, matchedService, score, createdAt, avatar, coverPhoto,
              baseLocationLat, baseLocationLng
     }
     init(from decoder: Decoder) throws {
@@ -320,6 +321,7 @@ extension SmartArtist {
             score: try c.decodeIfPresent(Double.self, forKey: .score),
             createdAt: try c.decodeIfPresent(String.self, forKey: .createdAt),
             avatar: try c.decodeIfPresent(String.self, forKey: .avatar),
+            coverPhoto: try c.decodeIfPresent(String.self, forKey: .coverPhoto),
             baseLocationLat: try c.decodeIfPresent(Double.self, forKey: .baseLocationLat),
             baseLocationLng: try c.decodeIfPresent(Double.self, forKey: .baseLocationLng)
         )
@@ -901,11 +903,37 @@ struct FavoriteRecord: Codable, Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct FavoritesResponse: Codable {
+struct FavoritesResponse: Decodable {
     let data: [FavoriteRecord]
     let total: Int
     let page: Int
     let totalPages: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case data, favorites, total, page, totalPages, pagination
+    }
+    private struct Pagination: Decodable {
+        let total: Int; let page: Int; let totalPages: Int
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let d = try? c.decode([FavoriteRecord].self, forKey: .data) {
+            data = d
+        } else {
+            data = try c.decode([FavoriteRecord].self, forKey: .favorites)
+        }
+        if let pg = try? c.decode(Pagination.self, forKey: .pagination) {
+            total = pg.total; page = pg.page; totalPages = pg.totalPages
+        } else {
+            total      = (try? c.decode(Int.self, forKey: .total))       ?? 0
+            page       = (try? c.decode(Int.self, forKey: .page))        ?? 1
+            totalPages = (try? c.decode(Int.self, forKey: .totalPages))  ?? 1
+        }
+    }
+}
+
+struct FavoriteAddResponse: Codable {
+    let favorite: FavoriteRecord
 }
 
 struct FavoriteCheckResponse: Codable {
