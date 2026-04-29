@@ -2,7 +2,7 @@
 import SwiftUI
 
 // Destino de navegación extraído de una notificación
-private enum NotifDestination: Identifiable {
+private enum NotifDestination: Identifiable, Hashable {
     case booking(id: String)
     case artist(id: String)
     case inbox
