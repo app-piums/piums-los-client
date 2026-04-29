@@ -6,7 +6,6 @@ struct ArtistProfileView: View {
     let artist: Artist
     @State private var viewModel: ArtistProfileViewModel
     @State private var bookingService: ArtistService?
-    @State private var showBooking = false
     @State private var favorites = FavoritesStore.shared
     @State private var showFavError = false
     @Environment(\.locationStore) private var locationStore
@@ -64,33 +63,8 @@ struct ArtistProfileView: View {
                         ForEach(viewModel.services) { service in
                             ServiceRowView(service: service) {
                                 bookingService = service
-                                showBooking = true
                             }
                             .padding(.horizontal)
-                        }
-                    }
-                }
-                .padding(.vertical)
-
-                Divider().padding(.horizontal)
-
-                // Reseñas
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Reseñas")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    if viewModel.isLoadingReviews {
-                        ProgressView().frame(maxWidth: .infinity).padding()
-                    } else if viewModel.reviews.isEmpty {
-                        Text("Aún no hay reseñas")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                    } else {
-                        ForEach(viewModel.reviews) { review in
-                            ReviewRowView(review: review)
-                                .padding(.horizontal)
                         }
                     }
                 }
@@ -137,16 +111,39 @@ struct ArtistProfileView: View {
 
                 Divider().padding(.horizontal)
 
-                // Información de Contacto (= sidebar de la web adaptada a móvil)
+                // Información de Contacto + Redes Sociales
                 ContactInfoView(
                     instagram: viewModel.instagram,
                     website: viewModel.website
                 ) {
                     if let first = viewModel.services.first {
                         bookingService = first
-                        showBooking = true
                     }
                 }
+
+                Divider().padding(.horizontal)
+
+                // Reseñas — al final
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Reseñas")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    if viewModel.isLoadingReviews {
+                        ProgressView().frame(maxWidth: .infinity).padding()
+                    } else if viewModel.reviews.isEmpty {
+                        Text("Aún no hay reseñas")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
+                    } else {
+                        ForEach(viewModel.reviews) { review in
+                            ReviewRowView(review: review)
+                                .padding(.horizontal)
+                        }
+                    }
+                }
+                .padding(.vertical)
 
                 Spacer().frame(height: 30)
             }
@@ -171,20 +168,18 @@ struct ArtistProfileView: View {
         } message: {
             Text(favorites.errorMessage ?? "")
         }
-        .sheet(isPresented: $showBooking) {
-            if let service = bookingService {
-                let coord = locationStore.coordinate
-                let lat: Double? = coord.map { $0.latitude }
-                let lng: Double? = coord.map { $0.longitude }
-                NavigationStack {
-                    BookingFlowView(context: BookingFlowContext(
-                        artist: artist,
-                        service: service,
-                        location: locationStore.cityName,
-                        locationLat: lat,
-                        locationLng: lng
-                    ))
-                }
+        .sheet(item: $bookingService) { service in
+            let coord = locationStore.coordinate
+            let lat: Double? = coord.map { $0.latitude }
+            let lng: Double? = coord.map { $0.longitude }
+            NavigationStack {
+                BookingFlowView(context: BookingFlowContext(
+                    artist: artist,
+                    service: service,
+                    location: locationStore.cityName,
+                    locationLat: lat,
+                    locationLng: lng
+                ))
             }
         }
     }
