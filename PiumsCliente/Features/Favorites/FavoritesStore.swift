@@ -99,8 +99,8 @@ final class FavoritesStore {
             for id in ids {
                 group.addTask {
                     do {
-                        let artist: Artist = try await APIClient.request(.getArtist(id: id))
-                        return (id, artist)
+                        let res: ArtistDetailResponse = try await APIClient.request(.getArtist(id: id))
+                        return (id, res.artist)
                     } catch { return (id, nil) }
                 }
             }

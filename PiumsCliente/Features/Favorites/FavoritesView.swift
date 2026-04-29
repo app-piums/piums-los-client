@@ -44,12 +44,28 @@ struct FavoritesView: View {
 private struct FavoriteArtistRow: View {
     let artist: Artist
 
+    private var initials: String {
+        artist.artistName.split(separator: " ").prefix(2)
+            .compactMap { $0.first.map { String($0) } }.joined().uppercased()
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(Color.piumsOrange.opacity(0.15))
-                .frame(width: 44, height: 44)
-                .overlay(Image(systemName: "heart.fill").foregroundStyle(Color.piumsOrange))
+            Group {
+                if let url = artist.avatarUrl ?? artist.coverUrl, let imageURL = URL(string: url) {
+                    AsyncImage(url: imageURL) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                        } else {
+                            placeholder
+                        }
+                    }
+                } else {
+                    placeholder
+                }
+            }
+            .frame(width: 48, height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(artist.artistName)
@@ -69,6 +85,13 @@ private struct FavoriteArtistRow: View {
         .padding(12)
         .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var placeholder: some View {
+        ZStack {
+            Color.piumsOrange.opacity(0.15)
+            Text(initials).font(.subheadline.bold()).foregroundStyle(Color.piumsOrange)
+        }
     }
 }
 

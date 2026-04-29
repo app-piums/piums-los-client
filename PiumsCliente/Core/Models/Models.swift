@@ -107,6 +107,16 @@ struct Artist: Codable, Identifiable, Hashable {
 
 struct ArtistDetailResponse: Decodable {
     let artist: Artist?
+
+    private enum CK: String, CodingKey { case artist, data }
+    init(from decoder: Decoder) throws {
+        // Intenta { "artist": {...} } o { "data": {...} } primero, luego raíz plana
+        if let c = try? decoder.container(keyedBy: CK.self) {
+            if let a = try? c.decodeIfPresent(Artist.self, forKey: .artist) { artist = a; return }
+            if let a = try? c.decodeIfPresent(Artist.self, forKey: .data)   { artist = a; return }
+        }
+        artist = try? Artist(from: decoder)
+    }
 }
 
 // MARK: - Search Response  (shape: /api/search/artists)
