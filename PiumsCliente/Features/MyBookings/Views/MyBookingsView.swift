@@ -23,7 +23,8 @@ struct MyBookingsView: View {
                             ErrorBannerView(message: msg).padding(.horizontal)
                         }
                         ForEach(viewModel.bookings) { booking in
-                            BookingRowView(booking: booking)
+                            BookingRowView(booking: booking,
+                                          cachedArtistName: viewModel.artistCache[booking.artistId]?.name)
                                 .padding(.horizontal)
                                 .contentShape(Rectangle())
                                 .onTapGesture { selectedBooking = booking }
@@ -101,59 +102,98 @@ struct MyBookingsView: View {
 
 struct BookingRowView: View {
     let booking: Booking
+    var cachedArtistName: String? = nil
+
+    private var displayName: String {
+        cachedArtistName ?? booking.resolvedArtistName ?? "—"
+    }
 
     var body: some View {
         HStack(spacing: 14) {
             // Icono estado
-            Circle()
-                .fill(statusColor.opacity(0.15))
-                .frame(width: 44, height: 44)
-                .overlay(
-                    Image(systemName: statusIcon)
-                        .foregroundStyle(statusColor)
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(statusColor.opacity(0.12))
+                    .frame(width: 48, height: 48)
+                Image(systemName: statusIcon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(statusColor)
+            }
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    if let code = booking.code {
-                        Text(code).font(.headline)
-                    } else {
-                        Text("Reserva").font(.headline)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        // Título principal: nombre del artista
+                        Text(displayName)
+                            .font(.subheadline.bold())
+                            .lineLimit(1)
+                        // Subtítulo: nombre + código
+                        HStack(spacing: 4) {
+                            Text(displayName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            if let code = booking.code {
+                                Text("·").font(.caption).foregroundStyle(.secondary)
+                                Text(code)
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                     Spacer()
-                    Text(booking.totalPrice.piumsFormatted)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(Color.piumsOrange)
-                }
-                if let artistName = booking.resolvedArtistName {
-                    HStack(spacing: 4) {
-                        Image(systemName: "music.microphone").font(.caption2)
-                        Text(artistName).font(.caption.weight(.medium))
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if booking.totalPrice > 0 {
+                            Text(booking.totalPrice.piumsFormatted)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(Color.piumsOrange)
+                        }
+                        Text(shortDate)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.primary)
                 }
-                Text(booking.status.displayName)
-                    .font(.caption.bold())
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(statusColor.opacity(0.12))
-                    .foregroundStyle(statusColor)
-                    .clipShape(Capsule())
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar").font(.caption2)
-                    Text(booking.scheduledDate)
+
+                HStack(spacing: 6) {
+                    Text(booking.status.displayName)
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(statusColor.opacity(0.12))
+                        .foregroundStyle(statusColor)
+                        .clipShape(Capsule())
                     if let time = booking.scheduledTime {
-                        Text("·")
-                        Image(systemName: "clock").font(.caption2)
-                        Text(time)
+                        HStack(spacing: 3) {
+                            Image(systemName: "clock").font(.caption2)
+                            Text(time)
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                    if let dur = booking.duration {
+                        HStack(spacing: 3) {
+                            Image(systemName: "timer").font(.caption2)
+                            Text("\(dur) min")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
         .padding(14)
         .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    // "5 abr" style
+    private var shortDate: String {
+        let raw = booking.scheduledDate
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: raw) ?? df.date(from: String(raw.prefix(10))) else { return raw }
+        let out = DateFormatter(); out.dateFormat = "d MMM"; out.locale = Locale(identifier: "es_ES")
+        return out.string(from: date)
     }
 
     private var statusColor: Color {
