@@ -1,8 +1,33 @@
 // NotificationsView.swift
 import SwiftUI
 
+// Destino de navegación extraído de una notificación
+private enum NotifDestination: Identifiable {
+    case booking(id: String)
+    case artist(id: String)
+    case inbox
+
+    var id: String {
+        switch self {
+        case .booking(let id): return "booking-\(id)"
+        case .artist(let id):  return "artist-\(id)"
+        case .inbox:           return "inbox"
+        }
+    }
+}
+
+private extension PiumsNotification {
+    var destination: NotifDestination? {
+        if let bid = data?.bookingId, !bid.isEmpty { return .booking(id: bid) }
+        if type == "NEW_MESSAGE"                   { return .inbox }
+        if let aid = data?.artistId,  !aid.isEmpty { return .artist(id: aid) }
+        return nil
+    }
+}
+
 struct NotificationsView: View {
     @State private var viewModel = NotificationsViewModel()
+    @State private var navDestination: NotifDestination?
 
     var body: some View {
         Group {
@@ -28,9 +53,13 @@ struct NotificationsView: View {
                             .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
+                            .contentShape(Rectangle())
                             .onTapGesture {
                                 if !notification.isRead {
                                     Task { await viewModel.markAsRead(id: notification.id) }
+                                }
+                                if let dest = notification.destination {
+                                    navDestination = dest
                                 }
                             }
                             .task { await viewModel.loadMoreIfNeeded(current: notification) }
@@ -56,8 +85,17 @@ struct NotificationsView: View {
                 }
             }
         }
+        .navigationDestination(item: $navDestination) { dest in
+            switch dest {
+            case .booking(let id):
+                DeepLinkBookingView(bookingId: id)
+            case .artist(let id):
+                DeepLinkArtistView(artistId: id)
+            case .inbox:
+                InboxView()
+            }
+        }
         .task { await viewModel.loadInitial() }
-        .refreshable { await viewModel.loadInitial() }
     }
 }
 
@@ -96,6 +134,13 @@ struct NotificationRowView: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+
+            if notification.destination != nil {
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(Color(.systemGray3))
+                    .padding(.top, 2)
+            }
         }
         .padding(14)
         .background(notification.isRead ? Color(.tertiarySystemGroupedBackground) : Color.piumsOrange.opacity(0.05))
@@ -126,6 +171,46 @@ struct NotificationRowView: View {
         case "NEW_MESSAGE":         return .piumsOrange
         default:                    return .secondary
         }
+    }
+}
+
+// MARK: - DeepLinkArtistView
+
+struct DeepLinkArtistView: View {
+    let artistId: String
+    @State private var artist: Artist?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if isLoading {
+                LoadingView()
+            } else if let artist {
+                ArtistProfileView(artist: artist)
+            } else {
+                EmptyStateView(
+                    systemImage: "person.slash",
+                    title: "Artista no encontrado",
+                    description: errorMessage ?? "No pudimos cargar este perfil.",
+                    actionTitle: "Reintentar"
+                ) { Task { await load() } }
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let res: ArtistDetailResponse = try await APIClient.request(.getArtist(id: artistId))
+            artist = res.artist
+            if artist == nil { errorMessage = "Perfil no disponible" }
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+        isLoading = false
     }
 }
 
