@@ -6,6 +6,7 @@ struct ArtistProfileView: View {
     let artist: Artist
     @State private var viewModel: ArtistProfileViewModel
     @State private var bookingService: ArtistService?
+    @State private var showWriteReview = false
     @State private var favorites = FavoritesStore.shared
     @State private var showFavError = false
     @Environment(\.locationStore) private var locationStore
@@ -125,9 +126,18 @@ struct ArtistProfileView: View {
 
                 // Reseñas — al final
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Reseñas")
-                        .font(.headline)
-                        .padding(.horizontal)
+                    HStack {
+                        Text("Reseñas").font(.headline)
+                        Spacer()
+                        Button {
+                            showWriteReview = true
+                        } label: {
+                            Label("Escribir reseña", systemImage: "star.bubble")
+                                .font(.caption.bold())
+                                .foregroundStyle(Color.piumsOrange)
+                        }
+                    }
+                    .padding(.horizontal)
 
                     if viewModel.isLoadingReviews {
                         ProgressView().frame(maxWidth: .infinity).padding()
@@ -181,6 +191,14 @@ struct ArtistProfileView: View {
                     locationLng: lng
                 ))
             }
+        }
+        .sheet(isPresented: $showWriteReview) {
+            WriteReviewSheet(artistId: artist.id, artistName: artist.artistName) {
+                Task { await viewModel.loadReviews() }
+            }
+            .presentationDetents([.height(420)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
         }
     }
 }
@@ -358,6 +376,125 @@ private struct ReviewRowView: View {
         .padding(12)
         .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Review creation response (backend puede envolver en { review: {...} })
+
+private struct CreateReviewResponse: Decodable {
+    let review: Review?
+    let id: String?
+}
+
+// MARK: - WriteReviewSheet
+
+private struct WriteReviewSheet: View {
+    let artistId: String
+    let artistName: String
+    let onSubmitted: () -> Void
+
+    @State private var rating = 0
+    @State private var comment = ""
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+    @State private var didSucceed = false
+    @Environment(\.dismiss) private var dismiss
+
+    private let labels = ["", "Malo", "Regular", "Bueno", "Muy bueno", "Excelente"]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Capsule().fill(Color(.systemGray4)).frame(width: 36, height: 4).padding(.top, 14)
+
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Escribir reseña").font(.title2.bold())
+                    Text(artistName).font(.subheadline).foregroundStyle(.secondary)
+                }
+
+                // Estrellas
+                VStack(spacing: 6) {
+                    HStack(spacing: 10) {
+                        ForEach(1...5, id: \.self) { star in
+                            Image(systemName: star <= rating ? "star.fill" : "star")
+                                .font(.system(size: 32))
+                                .foregroundStyle(star <= rating ? Color.piumsOrange : Color(.systemGray3))
+                                .onTapGesture { withAnimation(.easeInOut(duration: 0.1)) { rating = star } }
+                        }
+                    }
+                    if rating > 0 {
+                        Text(labels[rating])
+                            .font(.caption.bold())
+                            .foregroundStyle(Color.piumsOrange)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
+                // Comentario
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Comentario (opcional)").font(.subheadline.weight(.medium))
+                    TextEditor(text: $comment)
+                        .frame(height: 90)
+                        .padding(10)
+                        .background(Color(.tertiarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            Group {
+                                if comment.isEmpty {
+                                    Text("Cuéntanos tu experiencia…")
+                                        .foregroundStyle(Color(.placeholderText))
+                                        .padding(.leading, 14)
+                                        .padding(.top, 18)
+                                        .allowsHitTesting(false)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                }
+                            }
+                        )
+                }
+
+                if let err = errorMessage {
+                    Text(err).font(.caption).foregroundStyle(.red)
+                }
+
+                Button {
+                    Task { await submit() }
+                } label: {
+                    HStack {
+                        if isSubmitting { ProgressView().tint(.white) }
+                        Text(didSucceed ? "¡Reseña enviada!" : "Enviar reseña")
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(rating > 0 && !isSubmitting ? Color.piumsOrange : Color(.systemGray4))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(rating == 0 || isSubmitting)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 30)
+        }
+    }
+
+    private func submit() async {
+        isSubmitting = true
+        errorMessage = nil
+        var payload: [String: Any] = ["artistId": artistId, "rating": rating]
+        if !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            payload["comment"] = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        do {
+            let _: CreateReviewResponse = try await APIClient.request(.createReview(payload: payload))
+            didSucceed = true
+            onSubmitted()
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            dismiss()
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+        isSubmitting = false
     }
 }
 
