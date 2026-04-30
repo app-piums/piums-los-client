@@ -49,7 +49,7 @@ final class OAuthWebLogin: NSObject, ASWebAuthenticationPresentationContextProvi
                 }
             }
             s.presentationContextProvider = self
-            s.prefersEphemeralWebBrowserSession = false
+            s.prefersEphemeralWebBrowserSession = true
             activeSession = s
             s.start()
         }

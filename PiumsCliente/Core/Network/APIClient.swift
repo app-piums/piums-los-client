@@ -2,6 +2,16 @@
 import Foundation
 
 struct APIClient {
+
+    // URLSession con certificate pinning para backend.piums.io
+    private static let pinningDelegate = CertificatePinningDelegate()
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest  = 30
+        config.timeoutIntervalForResource = 60
+        return URLSession(configuration: config, delegate: pinningDelegate, delegateQueue: nil)
+    }()
+
     @discardableResult
     static func request<T: Decodable>(
         _ endpoint: APIEndpoint,
@@ -11,8 +21,10 @@ struct APIClient {
         do {
             return try JSONDecoder.piums.decode(T.self, from: data)
         } catch {
+            #if DEBUG
             let raw = String(data: data, encoding: .utf8) ?? "(binary)"
             print("🔴 Decode error [\(endpoint.url.path)]: \(error)\nRaw: \(raw.prefix(800))")
+            #endif
             throw AppError.decoding(error)
         }
     }
@@ -30,40 +42,36 @@ struct APIClient {
             urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        let (data, response) = try await session.data(for: urlRequest)
 
         guard let http = response as? HTTPURLResponse else {
             throw AppError.unknown(URLError(.badServerResponse))
         }
 
-        // Leer mensaje real del backend para cualquier error
         let backendMessage = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
-        
-        // Debug: imprimir la respuesta raw si hay error
+
+        #if DEBUG
         if http.statusCode >= 400 {
             let raw = String(data: data, encoding: .utf8) ?? "(binary)"
             print("❌ APIClient [\(http.statusCode)] \(endpoint.url.path):\n\(raw)")
         }
+        #endif
 
         switch http.statusCode {
         case 200..<300:
             return data
         case 401 where retryOnUnauthorized && endpoint.requiresAuth:
-            // Solo intentar refresh si es una ruta protegida (no login/register)
             try await AuthManager.shared.refreshIfNeeded()
             return try await rawRequest(endpoint, retryOnUnauthorized: false)
         case 401 where endpoint.requiresAuth:
-            // Ruta protegida y refresh falló → cerrar sesión
             await AuthManager.shared.logout()
             throw AppError.unauthorized
         case 401:
-            // Login/register con credenciales incorrectas → mostrar mensaje del backend
             let msg = backendMessage ?? "Credenciales incorrectas"
             throw AppError.http(statusCode: 401, message: msg)
         case 404:
             throw AppError.notFound
         case 500..<600:
-            let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             throw AppError.serverError
         default:
             let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)

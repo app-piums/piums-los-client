@@ -28,14 +28,30 @@ final class TokenStorage {
 
     private func save(key: String, value: String) {
         let data = Data(value.utf8)
+        // kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly:
+        //   - Requiere que el dispositivo tenga código de acceso configurado
+        //   - El ítem se elimina si se quita el código (previene extracción sin auth)
+        //   - No pide biometría en cada acceso (UX razonable)
+        //   - Nunca migra a iCloud ni a otro dispositivo
         let query: [CFString: Any] = [
-            kSecClass:            kSecClassGenericPassword,
-            kSecAttrAccount:      key,
-            kSecValueData:        data,
-            kSecAttrAccessible:   kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecClass:          kSecClassGenericPassword,
+            kSecAttrAccount:    key,
+            kSecValueData:      data,
+            kSecAttrAccessible: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
         ]
         SecItemDelete(query as CFDictionary)
-        SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            // Fallback si el dispositivo no tiene código configurado (desarrollo/simulador)
+            let fallback: [CFString: Any] = [
+                kSecClass:          kSecClassGenericPassword,
+                kSecAttrAccount:    key,
+                kSecValueData:      data,
+                kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            ]
+            SecItemDelete(fallback as CFDictionary)
+            SecItemAdd(fallback as CFDictionary, nil)
+        }
     }
 
     private func read(key: String) -> String? {

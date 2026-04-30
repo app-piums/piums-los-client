@@ -25,15 +25,21 @@ final class AuthViewModel {
 
     func login() async {
         guard validate(for: .login) else { return }
+        let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
+        if let blocked = LoginRateLimiter.shared.shouldBlock(email: normalizedEmail) {
+            errorMessage = blocked; return
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
         do {
-            try await AuthManager.shared.login(email: email.lowercased().trimmingCharacters(in: .whitespaces),
-                                               password: password)
+            try await AuthManager.shared.login(email: normalizedEmail, password: password)
+            LoginRateLimiter.shared.reset(email: normalizedEmail)
         } catch let e as AppError {
+            LoginRateLimiter.shared.recordFailure(email: normalizedEmail)
             errorMessage = e.errorDescription
         } catch {
+            LoginRateLimiter.shared.recordFailure(email: normalizedEmail)
             errorMessage = AppError(from: error).errorDescription
         }
     }
@@ -99,16 +105,23 @@ final class AuthViewModel {
 
     func forgotPassword() async {
         guard !email.isEmpty else { errorMessage = "Ingresa tu correo electrónico"; return }
+        let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
+        if let blocked = LoginRateLimiter.shared.shouldBlock(email: "forgot:\(normalizedEmail)") {
+            errorMessage = blocked; return
+        }
         isLoading = true
         errorMessage = nil
         successMessage = nil
         defer { isLoading = false }
         do {
-            try await AuthManager.shared.forgotPassword(email: email.lowercased().trimmingCharacters(in: .whitespaces))
+            try await AuthManager.shared.forgotPassword(email: normalizedEmail)
+            LoginRateLimiter.shared.reset(email: "forgot:\(normalizedEmail)")
             successMessage = "Revisa tu correo para restablecer tu contraseña"
         } catch let e as AppError {
+            LoginRateLimiter.shared.recordFailure(email: "forgot:\(normalizedEmail)")
             errorMessage = e.errorDescription
         } catch {
+            LoginRateLimiter.shared.recordFailure(email: "forgot:\(normalizedEmail)")
             errorMessage = AppError(from: error).errorDescription
         }
     }
