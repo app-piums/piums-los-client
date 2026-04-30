@@ -25,6 +25,7 @@ struct LoginView: View {
             }
             .ignoresSafeArea()
         }
+        .environment(\.colorScheme, .dark)
         .navigationBarHidden(true)
         .onAppear {
             withAnimation(.spring(response: 0.75, dampingFraction: 0.88).delay(0.05)) {
@@ -181,7 +182,7 @@ struct LoginView: View {
                     .foregroundStyle(Color.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .background(Color(.systemBackground))
+                    .background(Color(.tertiarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
@@ -319,7 +320,7 @@ struct LoginView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 15)
-                .background(Color(.systemBackground))
+                .background(Color(.tertiarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 13))
                 .overlay(
                     RoundedRectangle(cornerRadius: 13)
@@ -368,7 +369,7 @@ struct LoginView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
-            .background(Color(.systemBackground))
+            .background(Color(.tertiarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 13))
             .overlay(
                 RoundedRectangle(cornerRadius: 13)
@@ -507,7 +508,7 @@ private struct SocialSignInButton: View {
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .padding(.horizontal, 16)
-            .background(Color(.systemBackground))
+            .background(Color(.tertiarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)

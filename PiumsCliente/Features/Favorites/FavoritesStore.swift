@@ -36,9 +36,27 @@ final class FavoritesStore {
                 totalPages = res.totalPages
                 page += 1
             } while page <= totalPages
+            #if DEBUG
+            print("📋 Favorites: \(allFavorites.count) registros, totalPages=\(totalPages)")
+            for fav in allFavorites {
+                print("  • id=\(fav.id) entityId=\(fav.entityId) entity=\(fav.entity?.name ?? "nil")")
+            }
+            #endif
             favorites = allFavorites
-            await loadArtistsForFavorites()
+            for fav in allFavorites {
+                if let artist = fav.entity { artistsById[artist.id] = artist }
+            }
+            let missingIds = allFavorites
+                .filter { artistsById[$0.entityId] == nil }
+                .map { $0.entityId }
+            #if DEBUG
+            print("🔍 IDs pendientes de cargar: \(missingIds)")
+            #endif
+            if !missingIds.isEmpty { await loadArtistsForIds(missingIds) }
         } catch {
+            #if DEBUG
+            print("❌ Favorites error: \(error)")
+            #endif
             errorMessage = AppError(from: error).errorDescription
         }
     }
@@ -74,7 +92,7 @@ final class FavoritesStore {
             let tempId = UUID().uuidString
             let placeholder = FavoriteRecord(
                 id: tempId, entityType: "ARTIST", entityId: artist.id,
-                notes: nil, createdAt: "", deletedAt: nil
+                notes: nil, createdAt: nil, deletedAt: nil, entity: nil
             )
             favorites.insert(placeholder, at: 0)
             artistsById[artist.id] = artist
@@ -93,15 +111,22 @@ final class FavoritesStore {
         }
     }
 
-    private func loadArtistsForFavorites() async {
-        let ids = favorites.map { $0.entityId }
+    private func loadArtistsForIds(_ ids: [String]) async {
         await withTaskGroup(of: (String, Artist?).self) { group in
             for id in ids {
                 group.addTask {
                     do {
                         let res: ArtistDetailResponse = try await APIClient.request(.getArtist(id: id))
+                        #if DEBUG
+                        print("  getArtist(\(id)): \(res.artist?.name ?? "nil — decode falló")")
+                        #endif
                         return (id, res.artist)
-                    } catch { return (id, nil) }
+                    } catch {
+                        #if DEBUG
+                        print("  getArtist(\(id)) error: \(error)")
+                        #endif
+                        return (id, nil)
+                    }
                 }
             }
             for await (id, artist) in group {

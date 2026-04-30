@@ -88,10 +88,10 @@ struct Artist: Codable, Identifiable, Hashable {
     let createdAt: String?
     let baseLocationLat: Double?
     let baseLocationLng: Double?
-    let avatar: String?         // null in search, present in full artist detail
-    let coverUrl: String?       // banner/portada del perfil
-    let instagram: String?      // handle o URL de Instagram
-    let website: String?        // URL del sitio web
+    let avatar: String?
+    let coverUrl: String?
+    let instagram: String?
+    let website: String?
 
     // Computed helpers para la UI
     var artistName: String { name }
@@ -108,14 +108,27 @@ struct Artist: Codable, Identifiable, Hashable {
 struct ArtistDetailResponse: Decodable {
     let artist: Artist?
 
-    private enum CK: String, CodingKey { case artist, data }
+    private enum CK: String, CodingKey { case artist, data, user }
     init(from decoder: Decoder) throws {
-        // Intenta { "artist": {...} } o { "data": {...} } primero, luego raíz plana
         if let c = try? decoder.container(keyedBy: CK.self) {
-            if let a = try? c.decodeIfPresent(Artist.self, forKey: .artist) { artist = a; return }
-            if let a = try? c.decodeIfPresent(Artist.self, forKey: .data)   { artist = a; return }
+            for key in [CK.artist, .data, .user] {
+                do {
+                    if let a = try c.decodeIfPresent(Artist.self, forKey: key) { artist = a; return }
+                } catch {
+                    #if DEBUG
+                    print("🔎 ArtistDetailResponse[\(key.rawValue)] decode error: \(error)")
+                    #endif
+                }
+            }
         }
-        artist = try? Artist(from: decoder)
+        do {
+            artist = try Artist(from: decoder)
+        } catch {
+            #if DEBUG
+            print("🔎 ArtistDetailResponse[root] decode error: \(error)")
+            #endif
+            artist = nil
+        }
     }
 }
 
@@ -216,7 +229,7 @@ struct SmartSearchResponse: Codable {
 extension Artist {
     // CodingKeys de decodificación — incluye alias que el backend usa según el endpoint
     enum CodingKeys: String, CodingKey {
-        case id, name, bio, city, state, country, averageRating,
+        case id, name, nombre, bio, city, state, country, averageRating,
              totalReviews, totalBookings, hourlyRateMin, hourlyRateMax,
              mainServicePrice, mainServiceName, isVerified, isActive,
              isAvailable, servicesCount, serviceIds, serviceTitles,
@@ -260,7 +273,8 @@ extension Artist {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             id: try c.decode(String.self, forKey: .id),
-            name: try c.decode(String.self, forKey: .name),
+            name: try (c.decodeIfPresent(String.self, forKey: .name)
+               ?? c.decode(String.self, forKey: .nombre)),
             bio: try c.decodeIfPresent(String.self, forKey: .bio),
             city: try c.decodeIfPresent(String.self, forKey: .city),
             state: try c.decodeIfPresent(String.self, forKey: .state),
@@ -906,8 +920,9 @@ struct FavoriteRecord: Codable, Identifiable, Hashable {
     let entityType: String
     let entityId: String
     let notes: String?
-    let createdAt: String
+    let createdAt: String?
     let deletedAt: String?
+    let entity: Artist?        // backend puede embedder el artista directamente
 
     static func == (lhs: FavoriteRecord, rhs: FavoriteRecord) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

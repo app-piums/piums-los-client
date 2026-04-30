@@ -38,6 +38,14 @@ struct FavoritesView: View {
         }
         .navigationDestination(item: $selectedArtist) { ArtistProfileView(artist: $0) }
         .task { await store.loadFavorites() }
+        .alert("Error", isPresented: Binding(
+            get: { store.errorMessage != nil },
+            set: { if !$0 { store.errorMessage = nil } }
+        )) {
+            Button("OK") { store.errorMessage = nil }
+        } message: {
+            Text(store.errorMessage ?? "")
+        }
     }
 }
 

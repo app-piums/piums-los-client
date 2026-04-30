@@ -60,12 +60,8 @@ struct TourOverlayView: View {
 
                                     Spacer()
 
-                                    Button { tutorial.end() } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.title3)
-                                            .symbolRenderingMode(.hierarchical)
-                                            .foregroundStyle(.secondary)
-                                    }
+                                    Button("Cerrar") { tutorial.end() }
+                                        .foregroundStyle(.secondary)
                                 }
 
                                 // Descripción

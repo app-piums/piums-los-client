@@ -179,7 +179,7 @@ final class AuthManager {
 
     func refreshIfNeeded() async throws {
         guard let refresh = TokenStorage.shared.refreshToken else { throw AppError.unauthorized }
-        let response: AuthResponse = try await APIClient.request(.refreshToken(token: refresh))
+        let response: AuthResponse = try await APIClient.request(.refreshToken(token: refresh), retryOnUnauthorized: false)
         store(response)
     }
 

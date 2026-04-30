@@ -11,7 +11,10 @@ struct SplashVideoView: UIViewRepresentable {
         let view = PlayerContainerView()
         view.backgroundColor = .black
 
-        guard let url = Bundle.main.url(forResource: "PiumsSplash", withExtension: "mp4") else {
+        let url = Bundle.main.url(forResource: "PiumsSplash", withExtension: "mp4")
+            ?? Bundle.main.url(forResource: "PiumsSplash", withExtension: "mp4", subdirectory: "Resources")
+
+        guard let url else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { onFinished() }
             return view
         }
@@ -31,6 +34,7 @@ struct SplashVideoView: UIViewRepresentable {
         view.horizontalOffset = 20
         view.setPlayerLayer(layer)
         context.coordinator.setup(player: player, onFinished: onFinished)
+
         player.playImmediately(atRate: 2.0)
         return view
     }
@@ -41,18 +45,35 @@ struct SplashVideoView: UIViewRepresentable {
         private var player: AVPlayer?
         private var onFinished: (() -> Void)?
         private var endObserver: Any?
+        private var timeoutTask: Task<Void, Never>?
 
         func setup(player: AVPlayer, onFinished: @escaping () -> Void) {
             self.player = player
             self.onFinished = onFinished
+
             endObserver = NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
                 object: player.currentItem,
                 queue: .main
-            ) { [weak self] _ in self?.onFinished?() }
+            ) { [weak self] _ in self?.finish() }
+
+            // Timeout via Swift concurrency — funciona con SWIFT_DEFAULT_ACTOR_ISOLATION=MainActor
+            timeoutTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                self?.finish()
+            }
+        }
+
+        func finish() {
+            guard let cb = onFinished else { return }
+            onFinished = nil
+            timeoutTask?.cancel()
+            timeoutTask = nil
+            cb()
         }
 
         deinit {
+            timeoutTask?.cancel()
             if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         }
     }

@@ -75,11 +75,8 @@ struct HowItWorksView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { closeView() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(Color(.systemGray3))
-                    }
+                    Button("Cerrar") { closeView() }
+                        .foregroundStyle(Color(.systemGray3))
                 }
             }
         }
