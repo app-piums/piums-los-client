@@ -33,9 +33,15 @@ struct APIClient {
         _ endpoint: APIEndpoint,
         retryOnUnauthorized: Bool = true
     ) async throws -> Data {
+        // Refresh proactivo: si el token ya expiró no esperamos a recibir 401
+        if endpoint.requiresAuth && retryOnUnauthorized && TokenStorage.shared.isAccessTokenExpired {
+            try? await AuthManager.shared.refreshIfNeeded()
+        }
+
         var urlRequest = URLRequest(url: endpoint.url)
         urlRequest.httpMethod = endpoint.method
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
         urlRequest.httpBody = endpoint.body
 
         if let token = TokenStorage.shared.accessToken {

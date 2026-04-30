@@ -70,30 +70,73 @@ final class AuthManager {
         try await loginWithBackendOAuth(path: "/api/auth/tiktok", provider: "TikTok")
     }
 
-    /// Flujo genérico: abre el OAuth del backend en SFAuthenticationSession,
+    /// Flujo genérico: abre el OAuth del backend en ASWebAuthenticationSession,
     /// captura el ?token=JWT del callback HTTPS y verifica la sesión.
     /// El JWT del OAuth social dura 7 días (sin refreshToken).
     private func loginWithBackendOAuth(path: String, provider: String) async throws {
-        // Initiation URL usa API_BASE_URL (backend), no el host del callback (frontend)
         let apiBase = Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://backend.piums.io"
         let cleanPath = path.hasPrefix("/") ? path : "/\(path)"
-        guard let url = URL(string: "\(apiBase)\(cleanPath)") else {
+
+        // CSRF: nonce aleatorio enviado en ?state= y verificado en el callback.
+        // Requiere que el backend (Passport.js) reenvíe el parámetro state al redirect.
+        // Si el backend no lo reenvía, se loguea una advertencia pero el login prosigue
+        // para no bloquear la producción. Actualizar el backend para que lo soporte.
+        let stateNonce = Self.generateNonce()
+
+        guard var components = URLComponents(string: "\(apiBase)\(cleanPath)") else {
             throw AppError.http(statusCode: 0, message: "URL de autenticación inválida")
         }
+        var queryItems = components.queryItems ?? []
+        queryItems.append(URLQueryItem(name: "state", value: stateNonce))
+        components.queryItems = queryItems
+        guard let url = components.url else {
+            throw AppError.http(statusCode: 0, message: "URL de autenticación inválida")
+        }
+
         let callbackURL = try await OAuthWebLogin.shared.start(url: url)
-        let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
-        if let errorParam = components?.queryItems?.first(where: { $0.name == "error" })?.value {
+        let cbComponents = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
+
+        // Verificar CSRF state si el backend lo devuelve
+        if let returnedState = cbComponents?.queryItems?.first(where: { $0.name == "state" })?.value {
+            guard returnedState == stateNonce else {
+                throw AppError.http(statusCode: 401, message: "Error de seguridad OAuth (state inválido). Intenta de nuevo.")
+            }
+        } else {
+            #if DEBUG
+            print("⚠️ OAuth: backend no reenvía 'state' — CSRF protection no activa para \(provider). Actualizar el backend.")
+            #endif
+        }
+
+        if let errorParam = cbComponents?.queryItems?.first(where: { $0.name == "error" })?.value {
             throw AppError.http(statusCode: 401, message: errorDescriptionFor(errorParam, provider: provider))
         }
-        guard let token = components?.queryItems?.first(where: { $0.name == "token" })?.value else {
+
+        guard let token = cbComponents?.queryItems?.first(where: { $0.name == "token" })?.value else {
             throw AppError.http(statusCode: 401, message: "No se recibió token de \(provider)")
         }
+
+        // Validar que el token tiene estructura JWT antes de guardarlo en Keychain
+        guard TokenStorage.looksLikeJWT(token) else {
+            throw AppError.http(statusCode: 401, message: "Token de \(provider) con formato inválido")
+        }
+
         TokenStorage.shared.accessToken = token
         await verify()
         guard currentUser != nil else {
             TokenStorage.shared.clearAll()
             throw AppError.http(statusCode: 401, message: "No se pudo verificar la sesión de \(provider)")
         }
+    }
+
+    // MARK: - Helpers
+
+    private static func generateNonce(length: Int = 16) -> String {
+        var bytes = [UInt8](repeating: 0, count: length)
+        SecRandomCopyBytes(kSecRandomDefault, length, &bytes)
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 
     private func errorDescriptionFor(_ code: String, provider: String) -> String {

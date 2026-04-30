@@ -24,6 +24,49 @@ final class TokenStorage {
         delete(key: refreshKey)
     }
 
+    // MARK: - JWT utilities
+
+    /// `true` si el access token ya expiró o no existe (basado en el claim `exp`).
+    var isAccessTokenExpired: Bool {
+        guard let token = accessToken else { return true }
+        guard let expiry = jwtExpiry(of: token) else { return false } // no parseable → asumir válido
+        return expiry <= Date().addingTimeInterval(30) // 30s de margen
+    }
+
+    /// Fecha de expiración del access token, o `nil` si no se puede decodificar.
+    var accessTokenExpiry: Date? {
+        guard let token = accessToken else { return nil }
+        return jwtExpiry(of: token)
+    }
+
+    /// Valida que un string tenga estructura de JWT (3 partes base64url separadas por punto).
+    static func looksLikeJWT(_ token: String) -> Bool {
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return false }
+        return parts.allSatisfy { part in
+            !part.isEmpty && part.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" || $0 == "=" }
+        }
+    }
+
+    // MARK: - Private JWT decoding
+
+    private func jwtExpiry(of token: String) -> Date? {
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return nil }
+
+        var b64 = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let rem = b64.count % 4
+        if rem > 0 { b64 += String(repeating: "=", count: 4 - rem) }
+
+        guard let data    = Data(base64Encoded: b64),
+              let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let exp     = payload["exp"] as? TimeInterval else { return nil }
+
+        return Date(timeIntervalSince1970: exp)
+    }
+
     // MARK: - Private helpers
 
     private func save(key: String, value: String) {
