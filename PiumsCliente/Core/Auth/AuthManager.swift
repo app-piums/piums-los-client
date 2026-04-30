@@ -151,7 +151,21 @@ final class AuthManager {
     }
 
     func forgotPassword(email: String) async throws {
-        let _: EmptyResponse = try await APIClient.request(.forgotPassword(email: email))
+        // Tiempo mínimo de respuesta para dificultar enumeración de emails por timing.
+        // Tanto "email existe" como "email no existe" tardan al menos 600ms.
+        let start = ContinuousClock.now
+        var caughtError: Error?
+        do {
+            let _: EmptyResponse = try await APIClient.request(.forgotPassword(email: email))
+        } catch {
+            caughtError = error
+        }
+        let elapsed = ContinuousClock.now - start
+        let minDelay = Duration.milliseconds(600)
+        if elapsed < minDelay {
+            try? await Task.sleep(for: minDelay - elapsed)
+        }
+        if let caughtError { throw caughtError }
     }
 
     func logout() async {
