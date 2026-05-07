@@ -442,9 +442,20 @@ struct BookingDetailView: View {
                 // ── Resumen de pago ─────────────────────────
                 DetailCard(title: "Resumen de Pago") {
                     VStack(spacing: 12) {
+                        let baseTotal = booking.totalPrice + (booking.couponDiscountAmount ?? 0)
                         if booking.anticipoRequired == true, let anticipo = booking.anticipoAmount {
                             let rest = booking.totalPrice - anticipo
-                            payRow(label: "Total del servicio", value: booking.totalPrice.piumsFormatted, bold: false)
+                            payRow(label: "Total del servicio", value: baseTotal.piumsFormatted, bold: false)
+                            if let discount = booking.couponDiscountAmount, discount > 0,
+                               let code = booking.couponCode {
+                                HStack {
+                                    Label(code, systemImage: "tag.fill")
+                                        .font(.caption).foregroundStyle(.green)
+                                    Spacer()
+                                    Text("-\(discount.piumsFormatted)")
+                                        .font(.subheadline).foregroundStyle(.green)
+                                }
+                            }
                             payRow(label: "Anticipo (50%)", value: anticipo.piumsFormatted, bold: false)
                             payRow(label: "Saldo restante", value: rest.piumsFormatted, bold: false)
                             if booking.paymentStatus == .anticipoPaid {
@@ -452,7 +463,17 @@ struct BookingDetailView: View {
                                     .font(.caption2).foregroundStyle(.secondary)
                             }
                         } else {
-                            payRow(label: "Total del servicio", value: booking.totalPrice.piumsFormatted, bold: false)
+                            payRow(label: "Total del servicio", value: baseTotal.piumsFormatted, bold: false)
+                            if let discount = booking.couponDiscountAmount, discount > 0,
+                               let code = booking.couponCode {
+                                HStack {
+                                    Label(code, systemImage: "tag.fill")
+                                        .font(.caption).foregroundStyle(.green)
+                                    Spacer()
+                                    Text("-\(discount.piumsFormatted)")
+                                        .font(.subheadline).foregroundStyle(.green)
+                                }
+                            }
                         }
                         Divider()
                         payRow(label: "Total", value: booking.totalPrice.piumsFormatted, bold: true)

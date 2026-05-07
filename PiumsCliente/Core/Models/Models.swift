@@ -486,6 +486,8 @@ struct Booking: Codable, Identifiable, Hashable {
     let anticipoRequired: Bool?
     let anticipoAmount: Int?
     let currency: String?
+    let couponCode: String?
+    let couponDiscountAmount: Int?
 
     // Participantes — pueden venir anidados del backend
     let artist: BookingParticipant?
@@ -920,6 +922,7 @@ extension Booking {
                 scheduledDate: "2026-05-10", scheduledTime: "15:00", duration: 60,
                 notes: nil, location: "Salón Principal", eventId: nil, createdAt: nil,
                 anticipoRequired: nil, anticipoAmount: nil, currency: "USD",
+                couponCode: nil, couponDiscountAmount: nil,
                 artist: nil, client: nil, artistName: nil, clientName: nil)
     }
 }

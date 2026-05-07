@@ -1183,7 +1183,13 @@ struct BookingSuccessView: View {
                                 } else {
                                     Text((booking?.totalPrice ?? 0).piumsFormatted)
                                         .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
-                                    Text("USD Total").font(.caption).foregroundStyle(.secondary)
+                                    if let discount = booking?.couponDiscountAmount, discount > 0,
+                                       let code = booking?.couponCode {
+                                        Label("\(code) · -\(discount.piumsFormatted)", systemImage: "tag.fill")
+                                            .font(.caption).foregroundStyle(.green)
+                                    } else {
+                                        Text("USD Total").font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
