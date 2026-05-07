@@ -296,10 +296,12 @@ private struct AddCardSheet: View {
     @State private var errorMsg: String?
 
     private var formattedNumber: String {
-        let digits = cardNumber.filter(\.isNumber).prefix(16)
-        return stride(from: 0, to: digits.count, by: 4)
-            .map { String(digits[$0..<min($0+4, digits.endIndex)]) }
-            .joined(separator: " ")
+        var result = ""
+        for (i, ch) in cardNumber.filter(\.isNumber).prefix(16).enumerated() {
+            if i > 0 && i % 4 == 0 { result += " " }
+            result.append(ch)
+        }
+        return result
     }
 
     private var isValid: Bool {
