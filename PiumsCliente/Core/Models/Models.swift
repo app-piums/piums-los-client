@@ -36,9 +36,15 @@ struct AuthUser: Codable, Identifiable {
     let emailVerified: Bool?
     let status: String?        // "ACTIVE" | "BANNED" | "SUSPENDED"
 
+    // Identidad (vienen de GET /api/auth/me)
+    let documentType: String?
+    let documentFrontUrl: String?
+    let documentSelfieUrl: String?
+
     var avatarUrl: String? { avatar }
     var displayName: String { nombre ?? email }
     var isActive: Bool { status == nil || status == "ACTIVE" }
+    var hasSubmittedIdentity: Bool { documentFrontUrl != nil && documentSelfieUrl != nil }
 }
 
 // MARK: - Avatar upload DTOs (backend puede responder con distintas formas)

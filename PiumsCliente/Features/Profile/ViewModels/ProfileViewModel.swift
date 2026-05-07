@@ -70,6 +70,16 @@ final class ProfileViewModel {
         }
     }
 
+    func refreshProfile() async {
+        do {
+            let res: MeResponse = try await APIClient.request(.getMe)
+            AuthManager.shared.currentUser = res.user
+            if res.user.hasSubmittedIdentity {
+                UserDefaults.standard.set(true, forKey: "identityVerificationSubmitted")
+            }
+        } catch {}
+    }
+
     func logout() async {
         await AuthManager.shared.logout()
     }

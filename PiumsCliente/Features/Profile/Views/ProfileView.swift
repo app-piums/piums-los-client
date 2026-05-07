@@ -103,7 +103,7 @@ struct ProfileView: View {
 
             // Verificación de identidad
             Section("Verificación") {
-                if identitySubmitted {
+                if viewModel.user?.hasSubmittedIdentity == true || identitySubmitted {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Documentos enviados").font(.subheadline)
@@ -197,6 +197,7 @@ struct ProfileView: View {
                 showVerifyIdentity = false
             }
         }
+        .task { await viewModel.refreshProfile() }
         .alert("¿Cerrar sesión?", isPresented: $showLogoutConfirm) {
             Button("Cancelar", role: .cancel) {}
             Button("Cerrar sesión", role: .destructive) {
@@ -289,7 +290,10 @@ struct ProfileView: View {
                 AuthManager.shared.currentUser = AuthManager.shared.currentUser.map {
                     AuthUser(id: $0.id, email: $0.email, nombre: $0.nombre,
                              role: $0.role, avatar: newURL,
-                             emailVerified: $0.emailVerified, status: $0.status)
+                             emailVerified: $0.emailVerified, status: $0.status,
+                             documentType: $0.documentType,
+                             documentFrontUrl: $0.documentFrontUrl,
+                             documentSelfieUrl: $0.documentSelfieUrl)
                 }
                 viewModel.successMessage = "Foto actualizada"
             }
