@@ -393,7 +393,8 @@ struct BookingFlowView: View {
                         HStack(spacing: 6) {
                             if vm.appliedDiscount > 0 {
                                 Text(q.totalCents.piumsFormatted)
-                                    .font(.caption.strikethrough())
+                                    .font(.caption)
+                                    .strikethrough()
                                     .foregroundStyle(.secondary)
                             }
                             Text(vm.finalTotal.piumsFormatted)
