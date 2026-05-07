@@ -634,10 +634,10 @@ struct BookingDetailView: View {
     }
 
     private var artistForPayment: Artist {
-        if let a = booking.artist { return a }
+        let participant = booking.artist
         return Artist(
             id: booking.artistId,
-            name: loadedArtistName ?? "Artista",
+            name: loadedArtistName ?? participant?.resolvedName ?? "Artista",
             bio: nil, city: nil, state: nil,
             country: loadedArtistCountry,
             averageRating: nil,
@@ -645,11 +645,11 @@ struct BookingDetailView: View {
             hourlyRateMin: nil, hourlyRateMax: nil,
             mainServicePrice: nil,
             mainServiceName: loadedArtistSpecialty,
-            isVerified: loadedArtistVerified,
+            isVerified: loadedArtistVerified ?? participant?.isVerified,
             isActive: true, isAvailable: true, servicesCount: 0,
             serviceIds: nil, serviceTitles: nil, specialties: nil,
             createdAt: nil, baseLocationLat: nil, baseLocationLng: nil,
-            avatar: loadedArtistAvatar, coverUrl: nil,
+            avatar: loadedArtistAvatar ?? participant?.avatar, coverUrl: nil,
             instagram: nil, website: nil
         )
     }
