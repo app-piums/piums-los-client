@@ -1,5 +1,6 @@
 // OnboardingViewModel.swift
 import SwiftUI
+import UIKit
 
 enum OnboardingStep { case welcome, interests, refine, identity }
 
@@ -31,9 +32,14 @@ final class OnboardingViewModel {
     // ── Identidad ─────────────────────────────────────────
     var documentType: DocumentType = .dpi
     var documentNumber: String = ""
+    var ciudad: String = ""
+    var birthDate: Date = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
     var docFrontUrl: String?
     var docBackUrl: String?
     var docSelfieUrl: String?
+    var docFrontImage: UIImage?
+    var docBackImage: UIImage?
+    var docSelfieImage: UIImage?
     var isUploadingFront  = false
     var isUploadingBack   = false
     var isUploadingSelfie = false
@@ -99,18 +105,21 @@ final class OnboardingViewModel {
     // MARK: - Upload de documentos
 
     func uploadFront(_ data: Data) async {
+        docFrontImage = UIImage(data: data)
         isUploadingFront = true
         defer { isUploadingFront = false }
         docFrontUrl = await uploadDoc(data, folder: "front")
     }
 
     func uploadBack(_ data: Data) async {
+        docBackImage = UIImage(data: data)
         isUploadingBack = true
         defer { isUploadingBack = false }
         docBackUrl = await uploadDoc(data, folder: "back")
     }
 
     func uploadSelfie(_ data: Data) async {
+        docSelfieImage = UIImage(data: data)
         isUploadingSelfie = true
         defer { isUploadingSelfie = false }
         docSelfieUrl = await uploadDoc(data, folder: "selfie")
@@ -151,13 +160,17 @@ final class OnboardingViewModel {
         // 3 — Guardar identidad si fue completada (no bloquea si falla)
         if !skip, let frontUrl = docFrontUrl, let selfieUrl = docSelfieUrl,
            !documentNumber.trimmingCharacters(in: .whitespaces).isEmpty {
+            let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"
             var payload: [String: Any] = [
                 "documentType": documentType.rawValue,
                 "documentNumber": documentNumber.trimmingCharacters(in: .whitespaces),
                 "documentFrontUrl": frontUrl,
                 "documentSelfieUrl": selfieUrl,
+                "birthDate": formatter.string(from: birthDate),
             ]
             if let backUrl = docBackUrl { payload["documentBackUrl"] = backUrl }
+            let c = ciudad.trimmingCharacters(in: .whitespaces)
+            if !c.isEmpty { payload["ciudad"] = c }
             do {
                 let _: AuthUser = try await APIClient.request(.updateMyProfile(payload: payload))
                 UserDefaults.standard.set(true, forKey: "identityVerificationSubmitted")

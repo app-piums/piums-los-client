@@ -292,6 +292,32 @@ private struct OnboardingIdentityStep: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
 
+                    // Ciudad
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ciudad de residencia").font(.subheadline.bold())
+                        TextField("Ej. Ciudad de Guatemala", text: $vm.ciudad)
+                            .padding(12)
+                            .background(Color(.tertiarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    // Fecha de nacimiento
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Fecha de nacimiento").font(.subheadline.bold())
+                        DatePicker(
+                            "",
+                            selection: $vm.birthDate,
+                            in: ...Calendar.current.date(byAdding: .year, value: -18, to: Date())!,
+                            displayedComponents: .date
+                        )
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                        .tint(Color.piumsOrange)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(Color(.tertiarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+
                     // Fotografías
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Fotografías").font(.subheadline.bold())
@@ -299,29 +325,35 @@ private struct OnboardingIdentityStep: View {
                         HStack(spacing: 10) {
                             DocPhotoButton(
                                 label: "Frente",
-                                icon: "creditcard",
+                                icon: "doc.text.fill",
+                                image: vm.docFrontImage,
                                 url: vm.docFrontUrl,
-                                isLoading: vm.isUploadingFront
+                                isLoading: vm.isUploadingFront,
+                                isRequired: true
                             ) { data in await vm.uploadFront(data) }
 
                             if vm.documentType == .dpi {
                                 DocPhotoButton(
                                     label: "Dorso",
-                                    icon: "creditcard.trianglebadge.exclamationmark",
+                                    icon: "doc.fill",
+                                    image: vm.docBackImage,
                                     url: vm.docBackUrl,
-                                    isLoading: vm.isUploadingBack
+                                    isLoading: vm.isUploadingBack,
+                                    isRequired: false
                                 ) { data in await vm.uploadBack(data) }
                             }
 
                             DocPhotoButton(
                                 label: "Selfie",
-                                icon: "person.crop.rectangle.badge.plus",
+                                icon: "person.fill.viewfinder",
+                                image: vm.docSelfieImage,
                                 url: vm.docSelfieUrl,
-                                isLoading: vm.isUploadingSelfie
+                                isLoading: vm.isUploadingSelfie,
+                                isRequired: true
                             ) { data in await vm.uploadSelfie(data) }
                         }
 
-                        Text("Toma una foto clara de tu documento. La selfie debe mostrar tu rostro y el documento.")
+                        Text("Foto clara del documento. La selfie debe mostrar tu rostro junto al documento.")
                             .font(.caption).foregroundStyle(.secondary).lineSpacing(3)
                     }
 
@@ -371,37 +403,76 @@ private struct OnboardingIdentityStep: View {
 private struct DocPhotoButton: View {
     let label: String
     let icon: String
+    let image: UIImage?
     let url: String?
     let isLoading: Bool
+    let isRequired: Bool
     let onSelect: (Data) async -> Void
 
     @State private var pickerItem: PhotosPickerItem?
 
+    var isUploaded: Bool { url != nil }
+
     var body: some View {
         PhotosPicker(selection: $pickerItem, matching: .images) {
-            VStack(spacing: 6) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(url != nil
-                              ? Color.piumsOrange.opacity(0.08)
-                              : Color(.tertiarySystemGroupedBackground))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(url != nil ? Color.piumsOrange : Color(.systemGray5), lineWidth: 1.5)
-                        )
-                        .frame(height: 72)
-
-                    if isLoading {
-                        ProgressView().tint(Color.piumsOrange)
-                    } else if url != nil {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2).foregroundStyle(Color.piumsOrange)
-                    } else {
-                        Image(systemName: icon)
-                            .font(.title2).foregroundStyle(.secondary)
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.tertiarySystemGroupedBackground))
+                    .frame(height: 100)
+                    .overlay {
+                        if let img = image {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity, maxHeight: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else {
+                            VStack(spacing: 6) {
+                                Image(systemName: icon)
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                                Text(label)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.primary)
+                                if isRequired {
+                                    Image(systemName: "asterisk")
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                        }
                     }
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                isUploaded ? Color.piumsOrange.opacity(0.6) :
+                                (isRequired ? Color.piumsOrange.opacity(0.3) : Color(.systemGray5)),
+                                lineWidth: 1.5
+                            )
+                    )
+
+                // Badge de estado
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.75)
+                        .padding(5)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                        .padding(6)
+                } else if isUploaded {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.system(size: 18))
+                        .background(Circle().fill(Color(.systemBackground)).padding(2))
+                        .padding(6)
                 }
-                Text(label).font(.caption).foregroundStyle(.secondary)
+            }
+            // Label debajo si hay imagen
+            if image != nil {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
             }
         }
         .frame(maxWidth: .infinity)
