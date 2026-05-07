@@ -7,8 +7,10 @@ struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showLogoutConfirm = false
     @State private var showHowItWorks = false
+    @State private var showVerifyIdentity = false
     @State private var photoItem: PhotosPickerItem?
     @State private var isUploadingPhoto = false
+    @AppStorage("identityVerificationSubmitted") private var identitySubmitted = false
     @EnvironmentObject private var themeManager: ThemeManager
     @Environment(\.openURL) private var openURL
 
@@ -95,6 +97,31 @@ struct ProfileView: View {
                 .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
 
+            // Verificación de identidad
+            Section("Verificación") {
+                if identitySubmitted {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Documentos enviados").font(.subheadline)
+                            Text("En revisión por nuestro equipo").font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "checkmark.seal.fill").foregroundStyle(Color.piumsOrange)
+                    }
+                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                } else {
+                    Button { showVerifyIdentity = true } label: {
+                        HStack {
+                            Label("Verificar identidad", systemImage: "person.badge.shield.checkmark")
+                            Spacer()
+                            Text("Requerida")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                }
+            }
+
             // Apariencia
             Section("Apariencia") {
                 Toggle(isOn: Binding(
@@ -160,6 +187,12 @@ struct ProfileView: View {
             ChangePasswordSheet(viewModel: viewModel)
         }
         .sheet(isPresented: $showHowItWorks) { HowItWorksView() }
+        .sheet(isPresented: $showVerifyIdentity) {
+            VerifyIdentitySheet {
+                identitySubmitted = true
+                showVerifyIdentity = false
+            }
+        }
         .alert("¿Cerrar sesión?", isPresented: $showLogoutConfirm) {
             Button("Cancelar", role: .cancel) {}
             Button("Cerrar sesión", role: .destructive) {
@@ -361,6 +394,200 @@ private struct ChangePasswordSheet: View {
     }
 }
 
+
+// MARK: - VerifyIdentitySheet
+
+private struct VerifyIdentitySheet: View {
+    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var documentType: DocumentType = .dpi
+    @State private var documentNumber = ""
+    @State private var docFrontUrl: String?
+    @State private var docBackUrl: String?
+    @State private var docSelfieUrl: String?
+    @State private var isUploadingFront  = false
+    @State private var isUploadingBack   = false
+    @State private var isUploadingSelfie = false
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var canSave: Bool {
+        !documentNumber.trimmingCharacters(in: .whitespaces).isEmpty
+            && docFrontUrl != nil
+            && docSelfieUrl != nil
+            && !isSaving
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Tipo de documento") {
+                    Picker("Tipo", selection: $documentType) {
+                        ForEach(DocumentType.allCases, id: \.self) { t in
+                            Text(t.label).tag(t)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                }
+
+                Section("Número de documento") {
+                    TextField("Ej. 2456789012345", text: $documentNumber)
+                        .keyboardType(.numberPad)
+                        .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                }
+
+                Section("Fotografías") {
+                    HStack(spacing: 12) {
+                        IdentityPhotoButton(
+                            label: "Frente",
+                            icon: "creditcard",
+                            url: docFrontUrl,
+                            isLoading: isUploadingFront
+                        ) { data in await upload(data, folder: "front") { docFrontUrl = $0 } }
+
+                        if documentType == .dpi {
+                            IdentityPhotoButton(
+                                label: "Dorso",
+                                icon: "creditcard.trianglebadge.exclamationmark",
+                                url: docBackUrl,
+                                isLoading: isUploadingBack
+                            ) { data in await upload(data, folder: "back") { docBackUrl = $0 } }
+                        }
+
+                        IdentityPhotoButton(
+                            label: "Selfie",
+                            icon: "person.crop.rectangle.badge.plus",
+                            url: docSelfieUrl,
+                            isLoading: isUploadingSelfie
+                        ) { data in await upload(data, folder: "selfie") { docSelfieUrl = $0 } }
+                    }
+                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
+
+                    Text("Foto clara del documento y una selfie mostrando tu rostro con el documento.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+
+                if let err = errorMessage {
+                    Section {
+                        ErrorBannerView(message: err)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("Verificar identidad")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancelar") { dismiss() }.foregroundStyle(.secondary)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Enviar") { Task { await save() } }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(canSave ? Color.piumsOrange : Color.secondary)
+                        .disabled(!canSave)
+                }
+            }
+        }
+    }
+
+    private func upload(_ data: Data, folder: String, assign: @escaping (String) -> Void) async {
+        switch folder {
+        case "front":   isUploadingFront = true
+        case "back":    isUploadingBack = true
+        default:        isUploadingSelfie = true
+        }
+        defer {
+            isUploadingFront = false
+            isUploadingBack = false
+            isUploadingSelfie = false
+        }
+        do {
+            let resp: AvatarUploadResponseDTO = try await APIClient.uploadMultipart(
+                .uploadDocument(folder: folder), imageData: data
+            )
+            if let url = resp.resolvedURL { assign(url) }
+        } catch {}
+    }
+
+    private func save() async {
+        guard let frontUrl = docFrontUrl, let selfieUrl = docSelfieUrl else { return }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        var payload: [String: Any] = [
+            "documentType": documentType.rawValue,
+            "documentNumber": documentNumber.trimmingCharacters(in: .whitespaces),
+            "documentFrontUrl": frontUrl,
+            "documentSelfieUrl": selfieUrl,
+        ]
+        if let backUrl = docBackUrl { payload["documentBackUrl"] = backUrl }
+        do {
+            let _: AuthUser = try await APIClient.request(.updateMyProfile(payload: payload))
+            onDone()
+        } catch {
+            errorMessage = AppError(from: error).errorDescription ?? "Error al guardar"
+        }
+    }
+}
+
+// MARK: - IdentityPhotoButton
+
+private struct IdentityPhotoButton: View {
+    let label: String
+    let icon: String
+    let url: String?
+    let isLoading: Bool
+    let onSelect: (Data) async -> Void
+
+    @State private var pickerItem: PhotosPickerItem?
+
+    var body: some View {
+        PhotosPicker(selection: $pickerItem, matching: .images) {
+            VStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(url != nil
+                              ? Color.piumsOrange.opacity(0.08)
+                              : Color(.tertiarySystemGroupedBackground))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(url != nil ? Color.piumsOrange : Color(.systemGray5), lineWidth: 1.5)
+                        )
+                        .frame(height: 72)
+
+                    if isLoading {
+                        ProgressView().tint(Color.piumsOrange)
+                    } else if url != nil {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2).foregroundStyle(Color.piumsOrange)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.title2).foregroundStyle(.secondary)
+                    }
+                }
+                Text(label).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .onChange(of: pickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self) {
+                    await onSelect(data)
+                }
+                pickerItem = nil
+            }
+        }
+    }
+}
 
 #Preview {
     NavigationStack { ProfileView() }

@@ -203,7 +203,10 @@ struct BookingRowView: View {
         case .paymentPending:   return .yellow
         case .paymentCompleted: return .teal
         case .inProgress:       return .piumsOrange
+        case .delivered:        return .green
         case .completed:        return .green
+        case .disputeOpen:      return .red
+        case .disputeResolved:  return .teal
         case .cancelledClient, .cancelledArtist, .rejected, .noShow: return .red
         case .rescheduled:      return .purple
         case .unknown:          return .secondary
@@ -216,7 +219,10 @@ struct BookingRowView: View {
         case .confirmed:        return "checkmark.circle"
         case .paymentPending, .paymentCompleted: return "creditcard"
         case .inProgress:       return "play.circle"
+        case .delivered:        return "shippingbox"
         case .completed:        return "checkmark.seal"
+        case .disputeOpen:      return "exclamationmark.triangle"
+        case .disputeResolved:  return "shield.checkered"
         case .cancelledClient, .cancelledArtist: return "xmark.circle"
         case .rejected:         return "hand.raised"
         case .noShow:           return "person.slash"
@@ -254,11 +260,15 @@ struct BookingDetailView: View {
     @State private var showQueja  = false
     @State private var showShareSheet = false
     @State private var showReschedule = false
+    @State private var showPayCheckout = false
+    @State private var showNoShowAlert = false
+    @State private var noShowReason = ""
     @Environment(\.dismiss) private var dismiss
 
     @State private var loadedArtistName: String?
     @State private var loadedArtistAvatar: String?
     @State private var loadedArtistSpecialty: String?
+    @State private var loadedArtistCountry: String?
     @State private var loadedArtistVerified: Bool = false
 
     init(booking: Booking, preloadedArtist: BookingArtistInfo? = nil) {
@@ -297,7 +307,10 @@ struct BookingDetailView: View {
         case .confirmed:        return .blue
         case .paymentPending, .paymentCompleted: return .teal
         case .inProgress:       return Color.piumsOrange
+        case .delivered:        return .green
         case .completed:        return .green
+        case .disputeOpen:      return .red
+        case .disputeResolved:  return .teal
         case .cancelledClient, .cancelledArtist, .rejected, .noShow: return .red
         case .rescheduled:      return .purple
         case .unknown:          return .secondary
@@ -311,7 +324,10 @@ struct BookingDetailView: View {
         case .paymentPending:   return "creditcard"
         case .paymentCompleted: return "creditcard.fill"
         case .inProgress:       return "play.circle.fill"
+        case .delivered:        return "shippingbox.fill"
         case .completed:        return "checkmark.seal.fill"
+        case .disputeOpen:      return "exclamationmark.triangle.fill"
+        case .disputeResolved:  return "shield.checkered"
         case .cancelledClient, .cancelledArtist: return "xmark.circle.fill"
         case .rejected:         return "hand.raised.fill"
         case .noShow:           return "person.slash.fill"
@@ -406,10 +422,17 @@ struct BookingDetailView: View {
                         }
                         BookingInfoCell(label: "ESTADO PAGO") {
                             HStack(spacing: 5) {
-                                let pc: Color = booking.paymentStatus == .completed ? .green :
-                                               booking.paymentStatus == .failed ? .red : .orange
+                                let pc: Color = {
+                                    switch booking.paymentStatus {
+                                    case .fullyPaid, .completed: return .green
+                                    case .failed, .frozen:       return .red
+                                    case .anticipoPaid, .chargingRemaining: return Color.piumsOrange
+                                    case .refunded, .partiallyRefunded: return .purple
+                                    default: return .orange
+                                    }
+                                }()
                                 Circle().fill(pc).frame(width: 7, height: 7)
-                                Text(booking.paymentStatus.rawValue.capitalized)
+                                Text(booking.paymentStatus.displayName)
                                     .font(.caption.weight(.semibold)).foregroundStyle(pc)
                             }
                         }
@@ -419,7 +442,18 @@ struct BookingDetailView: View {
                 // ── Resumen de pago ─────────────────────────
                 DetailCard(title: "Resumen de Pago") {
                     VStack(spacing: 12) {
-                        payRow(label: "Total del servicio", value: booking.totalPrice.piumsFormatted, bold: false)
+                        if booking.anticipoRequired == true, let anticipo = booking.anticipoAmount {
+                            let rest = booking.totalPrice - anticipo
+                            payRow(label: "Total del servicio", value: booking.totalPrice.piumsFormatted, bold: false)
+                            payRow(label: "Anticipo (50%)", value: anticipo.piumsFormatted, bold: false)
+                            payRow(label: "Saldo restante", value: rest.piumsFormatted, bold: false)
+                            if booking.paymentStatus == .anticipoPaid {
+                                Text("Saldo se cobra automáticamente 72h antes del evento")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                        } else {
+                            payRow(label: "Total del servicio", value: booking.totalPrice.piumsFormatted, bold: false)
+                        }
                         Divider()
                         payRow(label: "Total", value: booking.totalPrice.piumsFormatted, bold: true)
                     }
@@ -435,6 +469,12 @@ struct BookingDetailView: View {
                 // ── Acciones ────────────────────────────────
                 DetailCard(title: "Acciones") {
                     VStack(spacing: 10) {
+                        if booking.paymentStatus == .pending {
+                            actionButton(icon: "creditcard.fill", label: "Pagar ahora", color: Color.piumsOrange) {
+                                showPayCheckout = true
+                            }
+                            Divider()
+                        }
                         // Agregar a calendario (iOS nativo)
                         actionButton(icon: "calendar.badge.plus", label: "Agregar al Calendario", color: .blue) {
                             addToCalendar()
@@ -449,10 +489,16 @@ struct BookingDetailView: View {
                                 showReschedule = true
                             }
                         }
-                        if booking.status == .completed {
+                        if booking.status == .completed || booking.status == .delivered {
                             Divider()
                             actionButton(icon: "star.bubble", label: "Dejar reseña", color: .yellow) {
                                 showReview = true
+                            }
+                        }
+                        if canReportNoShow {
+                            Divider()
+                            actionButton(icon: "person.slash.fill", label: "Reportar no presentación", color: .orange) {
+                                showNoShowAlert = true
                             }
                         }
                         if canOpenQueja {
@@ -488,12 +534,25 @@ struct BookingDetailView: View {
                 ShareSheet(items: ["Mi reserva \(code) — \(formattedDate)"])
             }
         }
+        .fullScreenCover(isPresented: $showPayCheckout) {
+            PaymentCheckoutView(booking: booking, artist: artistForPayment) {
+                showPayCheckout = false
+            }
+        }
+        .alert("Reportar no presentación", isPresented: $showNoShowAlert) {
+            TextField("Motivo (opcional)", text: $noShowReason)
+            Button("Cancelar", role: .cancel) { noShowReason = "" }
+            Button("Reportar", role: .destructive) {
+                Task { await submitNoShow() }
+            }
+        } message: {
+            Text("¿El artista no se presentó? Se notificará al equipo de soporte.")
+        }
     }
 
     // MARK: - Helpers
 
     private func loadArtist() async {
-        // Si ya tenemos nombre (del cache o del booking) solo rellenamos avatar/specialty si faltan
         guard loadedArtistName == nil else { return }
         struct ArtistDTO: Decodable {
             let name: String?
@@ -501,15 +560,16 @@ struct BookingDetailView: View {
             let avatar: String?
             let specialties: [String]?
             let isVerified: Bool?
+            let country: String?
             struct Nested: Decodable {
                 let name: String?
                 let nombre: String?
                 let avatar: String?
                 let specialties: [String]?
                 let isVerified: Bool?
+                let country: String?
                 var resolvedName: String? { name ?? nombre }
             }
-            // maneja: { "artist": {} }, { "data": {} }, { "user": {} }, o campos en raíz
             let artist: Nested?
             let data: Nested?
             let user: Nested?
@@ -517,21 +577,21 @@ struct BookingDetailView: View {
             var resolvedAvatar: String?    { artist?.avatar ?? data?.avatar ?? user?.avatar ?? avatar }
             var resolvedSpecialty: String? { (artist?.specialties ?? data?.specialties ?? user?.specialties ?? specialties)?.first }
             var resolvedVerified: Bool     { artist?.isVerified ?? data?.isVerified ?? user?.isVerified ?? isVerified ?? false }
+            var resolvedCountry: String?   { artist?.country ?? data?.country ?? user?.country ?? country }
         }
         if let dto: ArtistDTO = try? await APIClient.request(.getArtist(id: booking.artistId)) {
-            print("🎨 loadArtist \(booking.artistId) — resolvedName: \(dto.resolvedName ?? "nil")")
             if let n = dto.resolvedName      { loadedArtistName = n }
             if let a = dto.resolvedAvatar    { loadedArtistAvatar = a }
             if let s = dto.resolvedSpecialty { loadedArtistSpecialty = s }
+            if let c = dto.resolvedCountry   { loadedArtistCountry = c }
             if dto.resolvedName != nil       { loadedArtistVerified = dto.resolvedVerified }
-        } else {
-            print("❌ loadArtist \(booking.artistId) — fetch/decode falló")
         }
     }
 
     private var canOpenQueja: Bool {
         switch booking.status {
-        case .completed, .cancelledArtist, .noShow, .rejected: return true
+        case .completed, .delivered, .cancelledArtist, .noShow, .rejected,
+             .disputeOpen, .disputeResolved: return true
         default: return false
         }
     }
@@ -541,6 +601,31 @@ struct BookingDetailView: View {
         case .pending, .confirmed, .rescheduled: return true
         default: return false
         }
+    }
+
+    private var canReportNoShow: Bool {
+        booking.status == .confirmed || booking.status == .inProgress
+    }
+
+    private var artistForPayment: Artist {
+        if let a = booking.artist { return a }
+        return Artist(
+            id: booking.artistId,
+            name: loadedArtistName ?? "Artista",
+            bio: nil, city: nil, state: nil,
+            country: loadedArtistCountry,
+            averageRating: nil,
+            totalReviews: 0, totalBookings: 0,
+            hourlyRateMin: nil, hourlyRateMax: nil,
+            mainServicePrice: nil,
+            mainServiceName: loadedArtistSpecialty,
+            isVerified: loadedArtistVerified,
+            isActive: true, isAvailable: true, servicesCount: 0,
+            serviceIds: nil, serviceTitles: nil, specialties: nil,
+            createdAt: nil, baseLocationLat: nil, baseLocationLng: nil,
+            avatar: loadedArtistAvatar, coverUrl: nil,
+            instagram: nil, website: nil
+        )
     }
 
     private func addToCalendar() {
@@ -561,6 +646,16 @@ struct BookingDetailView: View {
         let loc = booking.location ?? ""
         let url = URL(string: "https://calendar.google.com/calendar/render?action=TEMPLATE&text=\(title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title)&dates=\(startStr)/\(endStr)&location=\(loc.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? loc)")!
         UIApplication.shared.open(url)
+    }
+
+    private func submitNoShow() async {
+        let reason = noShowReason.trimmingCharacters(in: .whitespacesAndNewlines)
+        noShowReason = ""
+        do {
+            let _: VoidResponse = try await APIClient.request(
+                .reportNoShow(bookingId: booking.id, reason: reason.isEmpty ? "No especificado" : reason)
+            )
+        } catch {}
     }
 
     @ViewBuilder
@@ -727,12 +822,14 @@ private struct DetailRow: View {
 enum MySpaceTab: String, CaseIterable {
     case bookings  = "Reservas"
     case events    = "Eventos"
+    case coupons   = "Cupones"
     case favorites = "Favoritos"
 
     var systemImage: String {
         switch self {
         case .bookings:  return "calendar"
         case .events:    return "ticket.fill"
+        case .coupons:   return "tag.fill"
         case .favorites: return "heart.fill"
         }
     }
@@ -756,6 +853,7 @@ struct MySpaceView: View {
                 switch selected {
                 case .bookings:  MyBookingsView()
                 case .events:    EventsView()
+                case .coupons:   CouponsView()
                 case .favorites: FavoritesView()
                 }
             }

@@ -44,7 +44,10 @@ final class MyBookingsViewModel {
     var hasMore = true
     private var currentPage = 1
 
-    let statusFilters: [BookingStatus?] = [nil, .pending, .confirmed, .paymentPending, .inProgress, .completed, .cancelledClient]
+    let statusFilters: [BookingStatus?] = [
+        nil, .pending, .confirmed, .paymentPending, .inProgress,
+        .delivered, .completed, .disputeOpen, .cancelledClient
+    ]
 
     func statusLabel(_ s: BookingStatus?) -> String {
         s?.displayName ?? "Todas"

@@ -62,6 +62,15 @@ final class BookingFlowViewModel {
     var bookingResult: Booking?
     var didComplete = false
 
+    // Coupon
+    var couponCode = ""
+    var couponResult: CouponValidationResult?
+    var isValidatingCoupon = false
+    var couponError: String?
+
+    var appliedDiscount: Int { couponResult?.valid == true ? (couponResult?.discount ?? 0) : 0 }
+    var finalTotal: Int { (priceQuote?.totalCents ?? 0) - appliedDiscount }
+
     init(context: BookingFlowContext) { self.context = context }
 
     func loadServices() async {
@@ -184,6 +193,36 @@ final class BookingFlowViewModel {
         )
     }
 
+    func validateCoupon(clientId: String) async {
+        let trimmed = couponCode.trimmingCharacters(in: .whitespaces).uppercased()
+        guard !trimmed.isEmpty else { return }
+        isValidatingCoupon = true
+        couponError = nil
+        couponResult = nil
+        defer { isValidatingCoupon = false }
+        let payload: [String: Any] = [
+            "code": trimmed,
+            "userId": clientId,
+            "bookingId": "",
+            "bookingTotal": priceQuote?.totalCents ?? 0,
+            "artistId": context.artist.id,
+            "serviceId": context.service?.id ?? ""
+        ]
+        do {
+            let result: CouponValidationResult = try await APIClient.request(.validateCoupon(payload: payload))
+            couponResult = result
+            if !result.valid { couponError = result.error ?? "Cupón no válido" }
+        } catch {
+            couponError = AppError(from: error).errorDescription ?? "Error al validar el cupón"
+        }
+    }
+
+    func clearCoupon() {
+        couponCode = ""
+        couponResult = nil
+        couponError = nil
+    }
+
     func submitBooking(clientId: String) async {
         guard let isoDate = context.scheduledDateISO else { errorMessage = "Selecciona fecha y hora."; return }
         guard let svc = context.service else { errorMessage = "Selecciona un servicio."; return }
@@ -197,6 +236,10 @@ final class BookingFlowViewModel {
         if let lng = context.locationLng { payload["locationLng"] = lng }
         if !context.clientNotes.isEmpty  { payload["clientNotes"] = context.clientNotes }
         if let eventId = context.eventId { payload["eventId"] = eventId }
+        if couponResult?.valid == true {
+            let trimmed = couponCode.trimmingCharacters(in: .whitespaces).uppercased()
+            if !trimmed.isEmpty { payload["couponCode"] = trimmed }
+        }
         do {
             bookingResult = try await APIClient.request(.createBooking(payload: payload))
             didComplete = true
@@ -347,7 +390,16 @@ struct BookingFlowView: View {
                 if let q = vm.priceQuote {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Total").font(.caption2).foregroundStyle(.secondary)
-                        Text(q.totalCents.piumsFormatted).font(.title3.bold()).foregroundStyle(Color.piumsOrange)
+                        HStack(spacing: 6) {
+                            if vm.appliedDiscount > 0 {
+                                Text(q.totalCents.piumsFormatted)
+                                    .font(.caption.strikethrough())
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(vm.finalTotal.piumsFormatted)
+                                .font(.title3.bold())
+                                .foregroundStyle(vm.appliedDiscount > 0 ? .green : Color.piumsOrange)
+                        }
                     }
                 }
                 Spacer()
@@ -555,8 +607,85 @@ struct BookingFlowView: View {
             } else {
                 ProgressView("Calculando precio…")
             }
+            couponSection
             if let e = vm.errorMessage { ErrorBannerView(message: e) }
         }
+    }
+
+    // MARK: - Coupon section
+
+    private var couponSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("¿Tienes un cupón?").font(.headline)
+
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "tag.fill").foregroundStyle(Color.piumsOrange).font(.subheadline)
+                    TextField("Código de cupón", text: $vm.couponCode)
+                        .textCase(.uppercase)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.characters)
+                        .onChange(of: vm.couponCode) { _, _ in
+                            if vm.couponResult != nil { vm.clearCoupon() }
+                        }
+                }
+                .padding(12)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                if vm.couponResult?.valid == true {
+                    Button { vm.clearCoupon() } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).font(.title3)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        guard let uid = AuthManager.shared.currentUser?.id else { return }
+                        Task { await vm.validateCoupon(clientId: uid) }
+                    } label: {
+                        Group {
+                            if vm.isValidatingCoupon {
+                                ProgressView().tint(.white)
+                            } else {
+                                Text("Aplicar").font(.subheadline.bold())
+                            }
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16).padding(.vertical, 12)
+                        .background(vm.couponCode.trimmingCharacters(in: .whitespaces).isEmpty
+                                    ? Color(.systemGray4) : Color.piumsOrange)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(vm.couponCode.trimmingCharacters(in: .whitespaces).isEmpty || vm.isValidatingCoupon)
+                }
+            }
+
+            if let result = vm.couponResult, result.valid {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Cupón aplicado: \(result.coupon?.discountLabel ?? "")").font(.subheadline.bold()).foregroundStyle(.green)
+                        if let name = result.coupon?.name {
+                            Text(name).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Text("-\(result.discount.piumsFormatted)").font(.subheadline.bold()).foregroundStyle(.green)
+                }
+                .padding(12)
+                .background(Color.green.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else if let err = vm.couponError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
+                    Text(err).font(.caption).foregroundStyle(.red)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(.tertiarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private var detailRows: some View {
@@ -923,6 +1052,11 @@ struct BookingSuccessView: View {
     let artist: Artist
     let onDone: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var showCheckout = false
+
+    private var paymentPending: Bool {
+        booking?.paymentStatus == .pending
+    }
 
     private var formattedDate: String {
         guard let dateStr = booking?.scheduledDate else { return "—" }
@@ -978,6 +1112,16 @@ struct BookingSuccessView: View {
                     }
                     .padding(.top, 32)
 
+                    // ── CTA de pago (si el pago está pendiente) ──────
+                    if paymentPending, let b = booking {
+                        PaymentCtaCard(
+                            anticipoRequired: b.anticipoRequired ?? false,
+                            anticipoAmount: b.anticipoAmount,
+                            totalPrice: b.totalPrice,
+                            currency: b.currency ?? "USD"
+                        ) { showCheckout = true }
+                    }
+
                     // ── Código de reserva ───────────────────
                     if let code = booking?.code {
                         VStack(spacing: 8) {
@@ -1031,9 +1175,16 @@ struct BookingSuccessView: View {
                                 }
                             }
                             SuccessInfoCell(label: "RESUMEN DE PAGO") {
-                                Text((booking?.totalPrice ?? 0).piumsFormatted)
-                                    .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
-                                Text("USD Total").font(.caption).foregroundStyle(.secondary)
+                                if let b = booking, b.anticipoRequired == true, let anticipo = b.anticipoAmount {
+                                    Text(anticipo.piumsFormatted)
+                                        .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
+                                    Text("Anticipo · Total \(b.totalPrice.piumsFormatted)")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                } else {
+                                    Text((booking?.totalPrice ?? 0).piumsFormatted)
+                                        .font(.title3.bold()).foregroundStyle(Color.piumsOrange)
+                                    Text("USD Total").font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
@@ -1045,7 +1196,11 @@ struct BookingSuccessView: View {
                     // ── Próximos Pasos ──────────────────────
                     VStack(alignment: .leading, spacing: 14) {
                         Text("Próximos Pasos").font(.headline)
-                        let steps = [
+                        let steps: [String] = paymentPending ? [
+                            "Completa el pago del anticipo para confirmar tu reserva.",
+                            "\(artist.artistName) será notificado cuando el pago sea recibido.",
+                            "El saldo restante se cobra automáticamente 72h antes del evento."
+                        ] : [
                             "\(artist.artistName) revisará tu solicitud de reserva en las próximas 24 horas.",
                             "Recibirás una notificación por correo una vez sea confirmada.",
                             "Podrás chatear con el profesional directamente desde tu panel."
@@ -1072,16 +1227,33 @@ struct BookingSuccessView: View {
 
                     // ── Botones ─────────────────────────────
                     VStack(spacing: 10) {
-                        Button(action: onDone) {
-                            Text("Ver Mis Reservas").font(.headline).foregroundStyle(.white)
+                        if paymentPending {
+                            Button { showCheckout = true } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "creditcard.fill")
+                                    Text("Pagar ahora").font(.headline)
+                                }
+                                .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity).padding(.vertical, 16)
                                 .background(Color.piumsOrange).clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: Color.piumsOrange.opacity(0.35), radius: 10, y: 4)
+                            }
+                        }
+                        Button(action: onDone) {
+                            Text("Ver Mis Reservas")
+                                .font(.headline)
+                                .foregroundStyle(paymentPending ? Color.piumsOrange : .white)
+                                .frame(maxWidth: .infinity).padding(.vertical, 16)
+                                .background(paymentPending
+                                    ? Color.piumsOrange.opacity(0.08)
+                                    : Color.piumsOrange)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
                         Button { dismiss() } label: {
                             Text("Ir al Dashboard").font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Color.piumsOrange)
+                                .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                .background(Color.piumsOrange.opacity(0.08))
+                                .background(Color(.tertiarySystemGroupedBackground))
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
                     }
@@ -1091,6 +1263,62 @@ struct BookingSuccessView: View {
             .scrollIndicators(.hidden)
             .navigationBarHidden(true)
         }
+        .fullScreenCover(isPresented: $showCheckout) {
+            if let b = booking {
+                PaymentCheckoutView(booking: b, artist: artist) {
+                    showCheckout = false
+                    onDone()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - PaymentCtaCard
+
+private struct PaymentCtaCard: View {
+    let anticipoRequired: Bool
+    let anticipoAmount: Int?
+    let totalPrice: Int
+    let currency: String
+    let onTap: () -> Void
+
+    private var amountLabel: String {
+        let cents = anticipoRequired ? (anticipoAmount ?? totalPrice) : totalPrice
+        let amount = Double(cents) / 100.0
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .currency; fmt.currencyCode = currency; fmt.locale = Locale(identifier: "en_US")
+        return fmt.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.piumsOrange.opacity(0.15)).frame(width: 48, height: 48)
+                    Image(systemName: "creditcard.fill")
+                        .font(.title3).foregroundStyle(Color.piumsOrange)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(anticipoRequired ? "Pagar anticipo" : "Confirmar pago")
+                        .font(.headline).foregroundStyle(.primary)
+                    Text("\(amountLabel) · Seguro con Tilopay")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.tertiarySystemGroupedBackground))
+                    .overlay(RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.piumsOrange.opacity(0.3), lineWidth: 1.5))
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
     }
 }
 

@@ -1,7 +1,21 @@
 // OnboardingViewModel.swift
 import SwiftUI
 
-enum OnboardingStep { case welcome, interests, refine }
+enum OnboardingStep { case welcome, interests, refine, identity }
+
+enum DocumentType: String, CaseIterable {
+    case dpi           = "DPI"
+    case passport      = "PASSPORT"
+    case residenceCard = "RESIDENCE_CARD"
+
+    var label: String {
+        switch self {
+        case .dpi:           return "DPI"
+        case .passport:      return "Pasaporte"
+        case .residenceCard: return "Residencia"
+        }
+    }
+}
 
 @Observable
 @MainActor
@@ -10,16 +24,26 @@ final class OnboardingViewModel {
     // ── Paso actual ───────────────────────────────────────
     var step: OnboardingStep = .welcome
 
-    // ── Selecciones ───────────────────────────────────────
+    // ── Intereses ─────────────────────────────────────────
     var selectedCategories: Set<String> = []
     var selectedTags: [String: Set<String>] = [:]
+
+    // ── Identidad ─────────────────────────────────────────
+    var documentType: DocumentType = .dpi
+    var documentNumber: String = ""
+    var docFrontUrl: String?
+    var docBackUrl: String?
+    var docSelfieUrl: String?
+    var isUploadingFront  = false
+    var isUploadingBack   = false
+    var isUploadingSelfie = false
 
     // ── Estado de red ─────────────────────────────────────
     var isFinishing = false
     var errorMessage: String?
 
     // ── Navegación ────────────────────────────────────────
-    var onFinished: (() -> Void)?   // callback que cierra el onboarding
+    var onFinished: (() -> Void)?
 
     // MARK: - Categorías helpers
 
@@ -48,7 +72,6 @@ final class OnboardingViewModel {
 
     func tagCount(catId: String) -> Int { selectedTags[catId]?.count ?? 0 }
 
-    // Categorías a mostrar en Step 3 (si eligió alguna, mostrar esas; si no, todas)
     var categoriesToRefine: [OnboardingCategory] {
         let ids = selectedCategories.isEmpty
             ? OnboardingCategory.all.map(\.id)
@@ -58,15 +81,49 @@ final class OnboardingViewModel {
 
     // MARK: - Navegación
 
-    func goToInterests() { withAnimation(.easeInOut(duration: 0.3)) { step = .interests } }
-    func goToRefine()     { withAnimation(.easeInOut(duration: 0.3)) { step = .refine    } }
+    func goToInterests() { withAnimation(.easeInOut(duration: 0.3)) { step = .interests  } }
+    func goToRefine()    { withAnimation(.easeInOut(duration: 0.3)) { step = .refine     } }
+    func goToIdentity()  { withAnimation(.easeInOut(duration: 0.3)) { step = .identity   } }
+
     func goBack() {
         withAnimation(.easeInOut(duration: 0.3)) {
             switch step {
+            case .identity:  step = .refine
             case .refine:    step = .interests
             case .interests: step = .welcome
             case .welcome:   break
             }
+        }
+    }
+
+    // MARK: - Upload de documentos
+
+    func uploadFront(_ data: Data) async {
+        isUploadingFront = true
+        defer { isUploadingFront = false }
+        docFrontUrl = await uploadDoc(data, folder: "front")
+    }
+
+    func uploadBack(_ data: Data) async {
+        isUploadingBack = true
+        defer { isUploadingBack = false }
+        docBackUrl = await uploadDoc(data, folder: "back")
+    }
+
+    func uploadSelfie(_ data: Data) async {
+        isUploadingSelfie = true
+        defer { isUploadingSelfie = false }
+        docSelfieUrl = await uploadDoc(data, folder: "selfie")
+    }
+
+    private func uploadDoc(_ data: Data, folder: String) async -> String? {
+        do {
+            let resp: AvatarUploadResponseDTO = try await APIClient.uploadMultipart(
+                .uploadDocument(folder: folder), imageData: data
+            )
+            return resp.resolvedURL
+        } catch {
+            return nil
         }
     }
 
@@ -88,17 +145,31 @@ final class OnboardingViewModel {
             interests.save()
         }
 
-        // 2 — Marcar onboarding completado en UserDefaults (ya existente)
+        // 2 — Marcar onboarding completado
         UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
 
-        // 3 — Notificar al backend (no bloquear si falla)
-        do {
-            let _: VoidResponse = try await APIClient.request(.completeOnboarding)
-        } catch {
-            // No bloqueamos la navegación si el backend falla
+        // 3 — Guardar identidad si fue completada (no bloquea si falla)
+        if !skip, let frontUrl = docFrontUrl, let selfieUrl = docSelfieUrl,
+           !documentNumber.trimmingCharacters(in: .whitespaces).isEmpty {
+            var payload: [String: Any] = [
+                "documentType": documentType.rawValue,
+                "documentNumber": documentNumber.trimmingCharacters(in: .whitespaces),
+                "documentFrontUrl": frontUrl,
+                "documentSelfieUrl": selfieUrl,
+            ]
+            if let backUrl = docBackUrl { payload["documentBackUrl"] = backUrl }
+            do {
+                let _: AuthUser = try await APIClient.request(.updateMyProfile(payload: payload))
+                UserDefaults.standard.set(true, forKey: "identityVerificationSubmitted")
+            } catch {}
         }
 
-        // 4 — Cerrar onboarding
+        // 4 — Notificar al backend (no bloquea si falla)
+        do {
+            let _: VoidResponse = try await APIClient.request(.completeOnboarding)
+        } catch {}
+
+        // 5 — Cerrar onboarding
         onFinished?()
     }
 }

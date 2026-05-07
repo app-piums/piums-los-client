@@ -483,6 +483,9 @@ struct Booking: Codable, Identifiable, Hashable {
     let location: String?
     let eventId: String?
     let createdAt: String?
+    let anticipoRequired: Bool?
+    let anticipoAmount: Int?
+    let currency: String?
 
     // Participantes — pueden venir anidados del backend
     let artist: BookingParticipant?
@@ -510,6 +513,9 @@ enum BookingStatus: String, Codable {
     case paymentPending    = "PAYMENT_PENDING"
     case paymentCompleted  = "PAYMENT_COMPLETED"
     case inProgress        = "IN_PROGRESS"
+    case delivered         = "DELIVERED"
+    case disputeOpen       = "DISPUTE_OPEN"
+    case disputeResolved   = "DISPUTE_RESOLVED"
     case completed         = "COMPLETED"
     case rescheduled       = "RESCHEDULED"
     case cancelledClient   = "CANCELLED_CLIENT"
@@ -530,6 +536,9 @@ enum BookingStatus: String, Codable {
         case .paymentPending:   return "Pago pendiente"
         case .paymentCompleted: return "Pago completado"
         case .inProgress:       return "En progreso"
+        case .delivered:        return "Entregado"
+        case .disputeOpen:      return "Disputa abierta"
+        case .disputeResolved:  return "Disputa resuelta"
         case .completed:        return "Completada"
         case .rescheduled:      return "Reprogramada"
         case .cancelledClient:  return "Cancelada por ti"
@@ -542,15 +551,35 @@ enum BookingStatus: String, Codable {
 }
 
 enum PaymentStatus: String, Codable {
-    case pending   = "PENDING"
-    case completed = "COMPLETED"
-    case refunded  = "REFUNDED"
-    case failed    = "FAILED"
-    case unknown   = "UNKNOWN"
+    case pending           = "PENDING"
+    case completed         = "COMPLETED"       // legacy
+    case anticipoPaid      = "ANTICIPO_PAID"
+    case chargingRemaining = "CHARGING_REMAINING"
+    case fullyPaid         = "FULLY_PAID"
+    case frozen            = "FROZEN"
+    case partiallyRefunded = "PARTIALLY_REFUNDED"
+    case refunded          = "REFUNDED"
+    case failed            = "FAILED"
+    case unknown           = "UNKNOWN"
 
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
         self = PaymentStatus(rawValue: raw) ?? .unknown
+    }
+
+    var displayName: String {
+        switch self {
+        case .pending:           return "Pago pendiente"
+        case .completed:         return "Pagado"
+        case .anticipoPaid:      return "Anticipo pagado"
+        case .chargingRemaining: return "Cobrando saldo"
+        case .fullyPaid:         return "Pagado completo"
+        case .frozen:            return "Congelado"
+        case .partiallyRefunded: return "Reembolso parcial"
+        case .refunded:          return "Reembolsado"
+        case .failed:            return "Fallido"
+        case .unknown:           return "Desconocido"
+        }
     }
 }
 
@@ -772,9 +801,17 @@ struct EventBooking: Codable, Identifiable, Hashable {
 }
 
 enum EventStatus: String, Codable {
-    case draft = "DRAFT"
-    case active = "ACTIVE"
+    case draft     = "DRAFT"
+    case active    = "ACTIVE"
     case cancelled = "CANCELLED"
+
+    var displayName: String {
+        switch self {
+        case .draft:     return "Borrador"
+        case .active:    return "Activo"
+        case .cancelled: return "Cancelado"
+        }
+    }
 }
 
 struct EventsResponse: Codable {
@@ -879,9 +916,10 @@ extension Artist {
 extension Booking {
     static var mock: Booking {
         Booking(id: "b1", code: "PMS-001", clientId: "c1", artistId: "1", serviceId: "s1",
-                status: .confirmed, paymentStatus: .completed, totalPrice: 15000,
+                status: .confirmed, paymentStatus: .fullyPaid, totalPrice: 15000,
                 scheduledDate: "2026-05-10", scheduledTime: "15:00", duration: 60,
                 notes: nil, location: "Salón Principal", eventId: nil, createdAt: nil,
+                anticipoRequired: nil, anticipoAmount: nil, currency: "USD",
                 artist: nil, client: nil, artistName: nil, clientName: nil)
     }
 }
@@ -1030,6 +1068,53 @@ struct PriceQuote: Codable {
     var hasTravel: Bool       { (breakdown?.travelCents ?? 0) > 0 }
 }
 
+// MARK: - PaymentIntent  (shape: POST /api/payments/payment-intents)
+
+struct PaymentIntent: Codable {
+    let id: String
+    let providerRef: String?
+    let redirectUrl: String?    // Tilopay: redirige al usuario aquí
+    let clientSecret: String?   // Stripe: se pasa al SDK nativo
+    let provider: String?       // "TILOPAY" | "STRIPE"
+    let status: String          // CREATED | REQUIRES_ACTION | SUCCEEDED | FAILED
+
+    var isTilopay: Bool { provider == "TILOPAY" || redirectUrl != nil }
+}
+
+struct PaymentIntentWrapper: Codable {
+    let paymentIntent: PaymentIntent?
+    // fallback si el backend devuelve los campos en raíz
+    let redirectUrl: String?
+    let clientSecret: String?
+    let provider: String?
+    let status: String?
+
+    var resolved: PaymentIntent? {
+        if let pi = paymentIntent { return pi }
+        guard redirectUrl != nil || clientSecret != nil else { return nil }
+        return PaymentIntent(id: "", providerRef: nil, redirectUrl: redirectUrl,
+                             clientSecret: clientSecret, provider: provider,
+                             status: status ?? "CREATED")
+    }
+}
+
+// MARK: - Credits  (shape: GET /api/payments/credits/me)
+
+struct MyCreditsResponse: Codable {
+    let totalAmount: Int    // en centavos
+    let currency: String
+
+    var totalInUnits: Double { Double(totalAmount) / 100.0 }
+
+    var formattedAmount: String {
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .currency
+        fmt.currencyCode = currency
+        fmt.locale = Locale(identifier: "en_US")
+        return fmt.string(from: NSNumber(value: totalInUnits)) ?? "$\(totalInUnits)"
+    }
+}
+
 /// Contexto que fluye entre los pasos de reserva
 struct BookingFlowContext {
     var artist: Artist
@@ -1061,5 +1146,87 @@ struct BookingFlowContext {
         if isMultiDay { return numDays * 24 * 60 }
         return service?.durationMin ?? service?.durationMax ?? 60
     }
+}
+
+// MARK: - Coupons
+
+enum CouponDiscountType: String, Codable {
+    case percentage  = "PERCENTAGE"
+    case fixedAmount = "FIXED_AMOUNT"
+}
+
+enum CouponTargetType: String, Codable {
+    case global  = "GLOBAL"
+    case artist  = "ARTIST"
+    case client  = "CLIENT"
+    case service = "SERVICE"
+}
+
+enum CouponStatus: String, Codable {
+    case active  = "ACTIVE"
+    case paused  = "PAUSED"
+    case expired = "EXPIRED"
+}
+
+struct Coupon: Codable, Identifiable {
+    let id: String
+    let code: String
+    let name: String
+    let description: String?
+    let discountType: CouponDiscountType
+    let discountValue: Int
+    let currency: String
+    let maxUses: Int?
+    let maxUsesPerUser: Int
+    let currentUses: Int
+    let targetType: CouponTargetType
+    let targetId: String?
+    let minimumAmount: Int?
+    let status: CouponStatus
+    let startsAt: String
+    let expiresAt: String?
+    let createdAt: String
+
+    var discountLabel: String {
+        switch discountType {
+        case .percentage:
+            return "\(discountValue)% OFF"
+        case .fixedAmount:
+            let amount = Double(discountValue) / 100.0
+            return String(format: "$%.2f OFF", amount)
+        }
+    }
+
+    var isExpired: Bool {
+        guard let exp = expiresAt else { return false }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let iso2 = ISO8601DateFormatter()
+        guard let date = iso.date(from: exp) ?? iso2.date(from: exp) else { return false }
+        return date < Date()
+    }
+
+    var expiryLabel: String? {
+        guard let exp = expiresAt else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let iso2 = ISO8601DateFormatter()
+        guard let date = iso.date(from: exp) ?? iso2.date(from: exp) else { return nil }
+        let f = DateFormatter(); f.dateStyle = .medium; f.locale = Locale(identifier: "es_GT")
+        return "Vence \(f.string(from: date))"
+    }
+}
+
+struct MyCouponsResponse: Codable {
+    let coupons: [Coupon]?
+    let data: [Coupon]?
+    var allCoupons: [Coupon] { coupons ?? data ?? [] }
+}
+
+struct CouponValidationResult: Codable {
+    let valid: Bool
+    let discount: Int
+    let coupon: Coupon?
+    let error: String?
 }
 

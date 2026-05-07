@@ -67,9 +67,18 @@ enum APIEndpoint {
     case checkFavorite(entityType: String, entityId: String)
 
     // ── Payments ──────────────────────────────────────────
-    case createPaymentIntent(bookingId: String)
+    case createPaymentIntent(bookingId: String, amount: Int?, currency: String?, countryCode: String?)
+    case confirmTilopayRedirect(bookingId: String, responseCode: String, orderNumber: String,
+                                amount: String, auth: String?, currency: String?, orderHash: String?)
+    case getMyCredits
+    case reportNoShow(bookingId: String, reason: String)
     case listPayments(page: Int)
     case getPayment(id: String)
+    case uploadDocument(folder: String)   // POST /api/users/documents/upload?folder=front|back|selfie
+
+    // ── Coupons ───────────────────────────────────────────
+    case getMyCoupons
+    case validateCoupon(payload: [String: Any])
 
     // ── Events ────────────────────────────────────────────
     case listEvents
@@ -106,7 +115,9 @@ extension APIEndpoint {
              .createBooking, .createReview, .createDispute, .addDisputeMessage,
              .markNotificationsRead, .registerPushToken, .forgotPassword,
              .logout, .createPaymentIntent, .calculatePrice,
-             .createEvent, .sendMessage, .addFavorite:
+             .createEvent, .sendMessage, .addFavorite,
+             .confirmTilopayRedirect, .reportNoShow, .uploadDocument,
+             .validateCoupon:
             return "POST"
         case .cancelBooking, .rescheduleBooking:
             return "POST"
@@ -146,8 +157,22 @@ extension APIEndpoint {
             return encode(["token": t, "platform": pl])
         case .changePassword(let cur, let new):
             return encode(["currentPassword": cur, "newPassword": new])
-        case .createPaymentIntent(let bId):
-            return encode(["bookingId": bId])
+        case .createPaymentIntent(let bId, let amount, let currency, let countryCode):
+            var d: [String: Any] = ["bookingId": bId]
+            if let a = amount { d["amount"] = a }
+            if let c = currency { d["currency"] = c }
+            if let cc = countryCode { d["countryCode"] = cc }
+            return try? JSONSerialization.data(withJSONObject: d)
+        case .confirmTilopayRedirect(let bId, let code, let order, let amount, let auth, let curr, let hash):
+            var d: [String: Any] = ["bookingId": bId, "responseCode": code, "orderNumber": order, "amount": amount]
+            if let auth { d["auth"] = auth }
+            if let curr { d["currency"] = curr }
+            if let hash { d["orderHash"] = hash }
+            return try? JSONSerialization.data(withJSONObject: d)
+        case .reportNoShow(_, let reason):
+            return encode(["reason": reason])
+        case .validateCoupon(let p):
+            return try? JSONSerialization.data(withJSONObject: p)
         case .createEvent(let p), .updateEvent(_, let p):
             return try? JSONSerialization.data(withJSONObject: p)
         case .sendMessage(let conversationId, let content):
@@ -271,8 +296,14 @@ extension APIEndpoint {
 
         // Payments
         case .createPaymentIntent:             return "/api/payments/payment-intents"
+        case .confirmTilopayRedirect:          return "/api/payments/tilopay-confirm"
+        case .getMyCredits:                    return "/api/payments/credits/me"
+        case .getMyCoupons:                    return "/api/coupons/my"
+        case .validateCoupon:                  return "/api/coupons/validate"
+        case .reportNoShow(let id, _):         return "/api/bookings/\(id)/no-show"
         case .listPayments(let pg):            return "/api/payments/payments?page=\(pg)&limit=20"
         case .getPayment(let id):              return "/api/payments/payments/\(id)"
+        case .uploadDocument(let folder):      return "/api/users/documents/upload?folder=\(folder)"
 
         // Events
         case .listEvents:                      return "/api/events"

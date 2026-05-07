@@ -156,7 +156,7 @@ private struct EventDetailView: View {
                         Text(event.name).font(.title2.bold()).multilineTextAlignment(.center)
                         HStack(spacing: 6) {
                             Circle().fill(statusColor).frame(width: 7, height: 7)
-                            Text(event.status.rawValue.capitalized)
+                            Text(event.status.displayName)
                                 .font(.caption.weight(.semibold)).foregroundStyle(statusColor)
                         }
                     }
@@ -335,11 +335,14 @@ private struct EventBookingRow: View {
 
     private var statusColor: Color {
         switch booking.status {
-        case .pending:   return .orange
-        case .confirmed: return .blue
-        case .completed: return .green
+        case .pending:              return .orange
+        case .confirmed:            return .blue
+        case .inProgress:           return Color.piumsOrange
+        case .delivered, .completed: return .green
+        case .disputeOpen:          return .red
+        case .disputeResolved:      return .teal
         case .cancelledClient, .cancelledArtist, .rejected: return .red
-        default:         return .secondary
+        default:                    return .secondary
         }
     }
 
@@ -656,10 +659,12 @@ private struct ExistingBookingRow: View {
     
     private var statusColor: Color {
         switch booking.status {
-        case .pending, .paymentPending: return .orange
-        case .confirmed, .inProgress: return Color.piumsOrange
-        case .completed: return .green
-        default: return .gray
+        case .pending, .paymentPending:     return .orange
+        case .confirmed, .inProgress:       return Color.piumsOrange
+        case .delivered, .completed:        return .green
+        case .disputeOpen:                  return .red
+        case .disputeResolved:              return .teal
+        default:                            return .gray
         }
     }
     

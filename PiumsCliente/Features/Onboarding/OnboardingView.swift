@@ -1,5 +1,6 @@
-// OnboardingView.swift — 3 pasos: Bienvenida · Intereses · Afinar gustos
+// OnboardingView.swift — 4 pasos: Bienvenida · Intereses · Afinar gustos · Identidad
 import SwiftUI
+import PhotosUI
 
 // MARK: - Contenedor principal
 
@@ -25,6 +26,12 @@ struct OnboardingView: View {
                     ))
             case .refine:
                 OnboardingRefineStep(vm: vm)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal:   .move(edge: .leading)
+                    ))
+            case .identity:
+                OnboardingIdentityStep(vm: vm)
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing),
                         removal:   .move(edge: .trailing)
@@ -113,7 +120,7 @@ private struct OnboardingWelcomeStep: View {
 
                 Spacer(minLength: 12)
 
-                OnboardingDots(current: 0, total: 3).padding(.bottom, 40)
+                OnboardingDots(current: 0, total: 4).padding(.bottom, 40)
             }
         }
     }
@@ -129,9 +136,9 @@ private struct OnboardingInterestsStep: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            OnboardingTopBar(step: "Paso 2 de 3", onBack: { vm.goBack() }, onSkip: { Task { await vm.skip() } })
+            OnboardingTopBar(step: "Paso 2 de 4", onBack: { vm.goBack() }, onSkip: { Task { await vm.skip() } })
 
-            ProgressBar(value: 0.66)
+            ProgressBar(value: 0.5)
                 .padding(.horizontal, 24).padding(.top, 4).padding(.bottom, 20)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -171,7 +178,7 @@ private struct OnboardingInterestsStep: View {
                 Button("Omitir por ahora") { Task { await vm.skip() } }
                     .font(.subheadline).foregroundStyle(.secondary)
 
-                OnboardingDots(current: 1, total: 3).padding(.top, 4)
+                OnboardingDots(current: 1, total: 4).padding(.top, 4)
             }
             .padding(.horizontal, 24).padding(.vertical, 16).background(.bar)
         }
@@ -187,9 +194,9 @@ private struct OnboardingRefineStep: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            OnboardingTopBar(step: "Paso 3 de 3", onBack: { vm.goBack() }, onSkip: { Task { await vm.skip() } })
+            OnboardingTopBar(step: "Paso 3 de 4", onBack: { vm.goBack() }, onSkip: { Task { await vm.skip() } })
 
-            ProgressBar(value: 1.0)
+            ProgressBar(value: 0.75)
                 .padding(.horizontal, 24).padding(.top, 4).padding(.bottom, 20)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -220,6 +227,113 @@ private struct OnboardingRefineStep: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 10) {
                 Button {
+                    vm.goToIdentity()
+                } label: {
+                    Text("Continuar →").font(.headline).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 16)
+                        .background(Color.piumsOrange)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: Color.piumsOrange.opacity(0.3), radius: 8, y: 4)
+                }
+
+                Button("Omitir por ahora") { Task { await vm.skip() } }
+                    .font(.subheadline).foregroundStyle(.secondary)
+
+                OnboardingDots(current: 2, total: 4).padding(.top, 2)
+            }
+            .padding(.horizontal, 24).padding(.vertical, 16).background(.bar)
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MARK: - Step 4 — Verificación de identidad
+// ══════════════════════════════════════════════════════════════════════════
+
+private struct OnboardingIdentityStep: View {
+    @Bindable var vm: OnboardingViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            OnboardingTopBar(step: "Paso 4 de 4", onBack: { vm.goBack() }, onSkip: { Task { await vm.skip() } })
+
+            ProgressBar(value: 1.0)
+                .padding(.horizontal, 24).padding(.top, 4).padding(.bottom, 20)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Verifica tu identidad").font(.title2.bold())
+                Text("Requerida para crear reservas. Puedes completarla después desde tu perfil.")
+                    .font(.subheadline).foregroundStyle(.secondary).lineSpacing(3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24).padding(.bottom, 20)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+
+                    // Tipo de documento
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tipo de documento").font(.subheadline.bold())
+                        Picker("Tipo", selection: $vm.documentType) {
+                            ForEach(DocumentType.allCases, id: \.self) { t in
+                                Text(t.label).tag(t)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    // Número
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Número de documento").font(.subheadline.bold())
+                        TextField("Ej. 2456789012345", text: $vm.documentNumber)
+                            .keyboardType(.numberPad)
+                            .padding(12)
+                            .background(Color(.tertiarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    // Fotografías
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Fotografías").font(.subheadline.bold())
+
+                        HStack(spacing: 10) {
+                            DocPhotoButton(
+                                label: "Frente",
+                                icon: "creditcard",
+                                url: vm.docFrontUrl,
+                                isLoading: vm.isUploadingFront
+                            ) { data in await vm.uploadFront(data) }
+
+                            if vm.documentType == .dpi {
+                                DocPhotoButton(
+                                    label: "Dorso",
+                                    icon: "creditcard.trianglebadge.exclamationmark",
+                                    url: vm.docBackUrl,
+                                    isLoading: vm.isUploadingBack
+                                ) { data in await vm.uploadBack(data) }
+                            }
+
+                            DocPhotoButton(
+                                label: "Selfie",
+                                icon: "person.crop.rectangle.badge.plus",
+                                url: vm.docSelfieUrl,
+                                isLoading: vm.isUploadingSelfie
+                            ) { data in await vm.uploadSelfie(data) }
+                        }
+
+                        Text("Toma una foto clara de tu documento. La selfie debe mostrar tu rostro y el documento.")
+                            .font(.caption).foregroundStyle(.secondary).lineSpacing(3)
+                    }
+
+                    Color.clear.frame(height: 60)
+                }
+                .padding(.horizontal, 24)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 10) {
+                Button {
                     Task { await vm.finish() }
                 } label: {
                     HStack(spacing: 8) {
@@ -237,15 +351,68 @@ private struct OnboardingRefineStep: View {
                 }
                 .disabled(vm.isFinishing)
 
-                Button("Omitir por ahora") { Task { await vm.skip() } }
+                Button("Completar después") { Task { await vm.skip() } }
                     .font(.subheadline).foregroundStyle(.secondary)
 
-                Text("Puedes cambiar estas preferencias en cualquier momento desde Configuración.")
+                Text("Puedes cambiar estas preferencias en cualquier momento desde tu perfil.")
                     .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
 
-                OnboardingDots(current: 2, total: 3).padding(.top, 2)
+                OnboardingDots(current: 3, total: 4).padding(.top, 2)
             }
             .padding(.horizontal, 24).padding(.vertical, 16).background(.bar)
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MARK: - DocPhotoButton
+// ══════════════════════════════════════════════════════════════════════════
+
+private struct DocPhotoButton: View {
+    let label: String
+    let icon: String
+    let url: String?
+    let isLoading: Bool
+    let onSelect: (Data) async -> Void
+
+    @State private var pickerItem: PhotosPickerItem?
+
+    var body: some View {
+        PhotosPicker(selection: $pickerItem, matching: .images) {
+            VStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(url != nil
+                              ? Color.piumsOrange.opacity(0.08)
+                              : Color(.tertiarySystemGroupedBackground))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(url != nil ? Color.piumsOrange : Color(.systemGray5), lineWidth: 1.5)
+                        )
+                        .frame(height: 72)
+
+                    if isLoading {
+                        ProgressView().tint(Color.piumsOrange)
+                    } else if url != nil {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2).foregroundStyle(Color.piumsOrange)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.title2).foregroundStyle(.secondary)
+                    }
+                }
+                Text(label).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .onChange(of: pickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self) {
+                    await onSelect(data)
+                }
+                pickerItem = nil
+            }
         }
     }
 }

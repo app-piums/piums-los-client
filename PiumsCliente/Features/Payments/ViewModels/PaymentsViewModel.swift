@@ -12,7 +12,9 @@ struct Payment: Codable, Identifiable {
     let status: PaymentStatusDetail
     let paymentMethod: String?
     let description: String?
-    let stripePaymentIntentId: String?
+    let stripePaymentIntentId: String?  // campo legacy; el nuevo es providerPaymentId
+    let providerPaymentId: String?
+    let provider: String?               // "STRIPE" | "TILOPAY"
     let createdAt: String
     let updatedAt: String?
 }
@@ -68,12 +70,7 @@ struct PaymentsResponse: Codable {
     var allPayments: [Payment] { payments ?? data ?? [] }
 }
 
-struct PaymentIntentResponse: Codable {
-    let clientSecret: String
-    let paymentIntentId: String
-    let amount: Int
-    let currency: String
-}
+// PaymentIntentResponse movido a Models.swift como PaymentIntentWrapper (soporta Tilopay + Stripe)
 
 // MARK: - ViewModel
 
@@ -81,6 +78,7 @@ struct PaymentIntentResponse: Codable {
 @MainActor
 final class PaymentsViewModel {
     var payments: [Payment] = []
+    var credits: MyCreditsResponse?
     var isLoading = false
     var errorMessage: String?
     var hasMore = true
@@ -90,7 +88,14 @@ final class PaymentsViewModel {
         currentPage = 1
         payments = []
         hasMore = true
-        await loadNext()
+        async let paymentsTask: () = loadNext()
+        async let creditsTask: () = loadCredits()
+        await paymentsTask
+        await creditsTask
+    }
+
+    private func loadCredits() async {
+        credits = try? await APIClient.request(.getMyCredits)
     }
 
     func loadNextIfNeeded(item: Payment) async {

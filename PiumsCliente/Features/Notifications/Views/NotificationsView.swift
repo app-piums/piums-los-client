@@ -5,22 +5,28 @@ import SwiftUI
 private enum NotifDestination: Identifiable, Hashable {
     case booking(id: String)
     case artist(id: String)
+    case dispute(id: String)
     case inbox
 
     var id: String {
         switch self {
-        case .booking(let id): return "booking-\(id)"
-        case .artist(let id):  return "artist-\(id)"
-        case .inbox:           return "inbox"
+        case .booking(let id):  return "booking-\(id)"
+        case .artist(let id):   return "artist-\(id)"
+        case .dispute(let id):  return "dispute-\(id)"
+        case .inbox:            return "inbox"
         }
     }
 }
 
 private extension PiumsNotification {
     var destination: NotifDestination? {
+        if let did = data?.disputeId, !did.isEmpty,
+           type == "DISPUTE_OPENED" || type == "DISPUTE_RESOLVED" || type == "DISPUTE_MESSAGE" {
+            return .dispute(id: did)
+        }
         if let bid = data?.bookingId, !bid.isEmpty { return .booking(id: bid) }
-        if type == "NEW_MESSAGE"                   { return .inbox }
-        if let aid = data?.artistId,  !aid.isEmpty { return .artist(id: aid) }
+        if type == "NEW_MESSAGE" || type == "SUPPORT_REPLY" { return .inbox }
+        if let aid = data?.artistId, !aid.isEmpty  { return .artist(id: aid) }
         return nil
     }
 }
@@ -91,6 +97,8 @@ struct NotificationsView: View {
                 DeepLinkBookingView(bookingId: id)
             case .artist(let id):
                 DeepLinkArtistView(artistId: id)
+            case .dispute(let id):
+                DeepLinkDisputeView(disputeId: id)
             case .inbox:
                 InboxView()
             }
@@ -153,23 +161,58 @@ struct NotificationRowView: View {
 
     private var iconName: String {
         switch notification.type {
-        case "BOOKING_CONFIRMED":   return "checkmark.circle.fill"
-        case "BOOKING_CANCELLED":   return "xmark.circle.fill"
-        case "PAYMENT_COMPLETED":   return "creditcard.fill"
-        case "NEW_REVIEW":          return "star.fill"
-        case "NEW_MESSAGE":         return "message.fill"
-        default:                    return "bell.fill"
+        // Reserva
+        case "BOOKING_CONFIRMED":           return "checkmark.circle.fill"
+        case "BOOKING_CANCELLED":           return "xmark.circle.fill"
+        case "BOOKING_IN_PROGRESS":         return "play.circle.fill"
+        case "BOOKING_DELIVERED":           return "shippingbox.fill"
+        case "BOOKING_COMPLETED",
+             "AUTO_COMPLETE":               return "checkmark.seal.fill"
+        case "BOOKING_NO_SHOW":             return "person.slash.fill"
+        // Reagendamiento
+        case "RESCHEDULE_REQUESTED":        return "calendar.badge.clock"
+        case "RESCHEDULE_APPROVED":         return "calendar.badge.checkmark"
+        case "RESCHEDULE_REJECTED":         return "calendar.badge.minus"
+        // Pagos
+        case "PAYMENT_COMPLETED",
+             "ANTICIPO_PAID":               return "creditcard.fill"
+        case "BALANCE_CHARGED",
+             "COMMISSION":                  return "banknote"
+        case "PAYMENT_FAILED":              return "creditcard.trianglebadge.exclamationmark"
+        case "REFUND_ISSUED":               return "arrow.uturn.left.circle.fill"
+        // Disputas
+        case "DISPUTE_OPENED":              return "exclamationmark.triangle.fill"
+        case "DISPUTE_RESOLVED":            return "shield.checkered"
+        // Social
+        case "NEW_REVIEW":                  return "star.fill"
+        case "NEW_MESSAGE":                 return "message.fill"
+        default:                            return "bell.fill"
         }
     }
 
     private var iconColor: Color {
         switch notification.type {
-        case "BOOKING_CONFIRMED":   return .green
-        case "BOOKING_CANCELLED":   return .red
-        case "PAYMENT_COMPLETED":   return .blue
-        case "NEW_REVIEW":          return .yellow
-        case "NEW_MESSAGE":         return .piumsOrange
-        default:                    return .secondary
+        case "BOOKING_CONFIRMED",
+             "BOOKING_COMPLETED",
+             "AUTO_COMPLETE",
+             "BOOKING_DELIVERED":           return .green
+        case "BOOKING_CANCELLED",
+             "BOOKING_NO_SHOW",
+             "RESCHEDULE_REJECTED",
+             "PAYMENT_FAILED",
+             "DISPUTE_OPENED":              return .red
+        case "BOOKING_IN_PROGRESS":         return Color.piumsOrange
+        case "RESCHEDULE_REQUESTED",
+             "RESCHEDULE_APPROVED":         return .purple
+        case "PAYMENT_COMPLETED",
+             "ANTICIPO_PAID",
+             "BALANCE_CHARGED",
+             "COMMISSION":                  return .blue
+        case "REFUND_ISSUED":               return .teal
+        case "DISPUTE_RESOLVED":            return .teal
+        case "NEW_REVIEW":                  return .yellow
+        case "NEW_MESSAGE":                 return Color.piumsOrange
+        default:                            return .secondary
         }
     }
 }
@@ -207,6 +250,44 @@ struct DeepLinkArtistView: View {
             let res: ArtistDetailResponse = try await APIClient.request(.getArtist(id: artistId))
             artist = res.artist
             if artist == nil { errorMessage = "Perfil no disponible" }
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+        isLoading = false
+    }
+}
+
+// MARK: - DeepLinkDisputeView
+
+struct DeepLinkDisputeView: View {
+    let disputeId: String
+    @State private var dispute: Dispute?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if isLoading {
+                LoadingView()
+            } else if let dispute {
+                DisputeDetailView(dispute: dispute)
+            } else {
+                EmptyStateView(
+                    systemImage: "exclamationmark.bubble.fill",
+                    title: "Queja no encontrada",
+                    description: errorMessage ?? "No pudimos cargar esta queja.",
+                    actionTitle: "Reintentar"
+                ) { Task { await load() } }
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            dispute = try await APIClient.request(.getDispute(id: disputeId))
         } catch {
             errorMessage = AppError(from: error).errorDescription
         }
