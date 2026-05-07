@@ -80,6 +80,12 @@ enum APIEndpoint {
     case getMyCoupons
     case validateCoupon(payload: [String: Any])
 
+    // ── Wallet / Payment Methods ──────────────────────────
+    case listPaymentMethods
+    case deletePaymentMethod(id: String)
+    case setDefaultPaymentMethod(id: String)
+    case savePaymentToken(payload: [String: Any])
+
     // ── Events ────────────────────────────────────────────
     case listEvents
     case createEvent(payload: [String: Any])
@@ -123,11 +129,12 @@ extension APIEndpoint {
             return "POST"
         case .rescheduleBooking:
             return "PATCH"
-        case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead:
+        case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead,
+             .setDefaultPaymentMethod:
             return "PATCH"
         case .changePassword, .addBookingToEvent:
             return "POST"
-        case .deleteEvent, .deleteFavorite:
+        case .deleteEvent, .deleteFavorite, .deletePaymentMethod:
             return "DELETE"
         default:
             return "GET"
@@ -159,6 +166,8 @@ extension APIEndpoint {
             return encode(["token": t, "platform": pl])
         case .changePassword(let cur, let new):
             return encode(["currentPassword": cur, "newPassword": new])
+        case .savePaymentToken(let p):
+            return try? JSONSerialization.data(withJSONObject: p)
         case .createPaymentIntent(let bId, let amount, let currency, let countryCode):
             var d: [String: Any] = ["bookingId": bId]
             if let a = amount { d["amount"] = a }
@@ -302,6 +311,12 @@ extension APIEndpoint {
         case .getMyCredits:                    return "/api/payments/credits/me"
         case .getMyCoupons:                    return "/api/coupons/my"
         case .validateCoupon:                  return "/api/coupons/validate"
+
+        // Wallet
+        case .listPaymentMethods:              return "/api/payments/methods"
+        case .deletePaymentMethod(let id):     return "/api/payments/methods/\(id)"
+        case .setDefaultPaymentMethod(let id): return "/api/payments/methods/\(id)/default"
+        case .savePaymentToken:                return "/api/payments/methods/save-token"
         case .reportNoShow(let id, _):         return "/api/bookings/\(id)/no-show"
         case .listPayments(let pg):            return "/api/payments/payments?page=\(pg)&limit=20"
         case .getPayment(let id):              return "/api/payments/payments/\(id)"

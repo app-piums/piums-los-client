@@ -95,6 +95,10 @@ struct ProfileView: View {
                     Label("Mis pagos", systemImage: "creditcard")
                 }
                 .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                NavigationLink(destination: WalletView()) {
+                    Label("Tarjetas guardadas", systemImage: "wallet.bifold")
+                }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
 
             // Verificación de identidad

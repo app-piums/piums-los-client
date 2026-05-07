@@ -1261,3 +1261,38 @@ struct CouponValidationResult: Codable {
     let error: String?
 }
 
+// MARK: - PaymentMethod (Wallet)
+
+struct PaymentMethod: Codable, Identifiable {
+    let id: String
+    let provider: String        // "STRIPE" | "TILOPAY"
+    let type: String            // "card"
+    let cardBrand: String?      // "visa" | "mastercard" | "amex" | "discover"
+    let cardLast4: String?
+    let cardExpMonth: Int?
+    let cardExpYear: Int?
+    let isDefault: Bool
+    let createdAt: String?
+
+    var brandLabel: String {
+        switch cardBrand?.lowercased() {
+        case "visa":       return "Visa"
+        case "mastercard": return "Mastercard"
+        case "amex":       return "Amex"
+        case "discover":   return "Discover"
+        default:           return cardBrand?.capitalized ?? "Tarjeta"
+        }
+    }
+
+    var expiryLabel: String {
+        guard let m = cardExpMonth, let y = cardExpYear else { return "" }
+        return String(format: "%02d/%02d", m, y % 100)
+    }
+}
+
+struct PaymentMethodsResponse: Codable {
+    let methods: [PaymentMethod]?
+    let data: [PaymentMethod]?
+    var all: [PaymentMethod] { methods ?? data ?? [] }
+}
+
