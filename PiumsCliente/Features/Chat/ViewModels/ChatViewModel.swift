@@ -19,15 +19,18 @@ final class ChatViewModel {
         unreadStore.startIfNeeded()
         NotificationCenter.default.addObserver(forName: .chatMessageReceived, object: nil, queue: .main) { [weak self] note in
             guard let msg = note.object as? ChatMessage else { return }
-            self?.handleIncoming(msg)
+            Task { @MainActor [weak self] in self?.handleIncoming(msg) }
         }
         NotificationCenter.default.addObserver(forName: .chatMessageRead, object: nil, queue: .main) { [weak self] note in
             guard let id = note.object as? String else { return }
-            self?.messages = self?.messages.map {
-                $0.id == id
-                ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, content: $0.content, type: $0.type, status: "READ", readAt: $0.readAt, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
-                : $0
-            } ?? []
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.messages = self.messages.map {
+                    $0.id == id
+                    ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, content: $0.content, type: $0.type, status: "READ", readAt: $0.readAt, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
+                    : $0
+                }
+            }
         }
     }
 

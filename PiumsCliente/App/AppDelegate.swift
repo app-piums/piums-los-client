@@ -95,7 +95,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
     private func handlePushUserInfo(_ userInfo: [AnyHashable: Any]) {
         if let badge = userInfo["badge"] as? Int {
-            UIApplication.shared.applicationIconBadgeNumber = badge
+            UNUserNotificationCenter.current().setBadgeCount(badge)
         }
         if let type = userInfo["type"] as? String, type == "NEW_MESSAGE" {
             NotificationCenter.default.post(name: .chatUnreadNeedsRefresh, object: nil)

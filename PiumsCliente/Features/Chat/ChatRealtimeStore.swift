@@ -43,9 +43,8 @@ final class ChatRealtimeStore {
             object: nil,
             queue: .main
         ) { [weak self] note in
-            if let count = note.object as? Int {
-                self?.unreadCount = count
-            }
+            guard let count = note.object as? Int else { return }
+            Task { @MainActor [weak self] in self?.unreadCount = count }
         }
     }
 

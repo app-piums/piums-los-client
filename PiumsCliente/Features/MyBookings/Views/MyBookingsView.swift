@@ -645,7 +645,7 @@ struct BookingDetailView: View {
             hourlyRateMin: nil, hourlyRateMax: nil,
             mainServicePrice: nil,
             mainServiceName: loadedArtistSpecialty,
-            isVerified: loadedArtistVerified ?? participant?.isVerified,
+            isVerified: participant?.isVerified ?? loadedArtistVerified,
             isActive: true, isAvailable: true, servicesCount: 0,
             serviceIds: nil, serviceTitles: nil, specialties: nil,
             createdAt: nil, baseLocationLat: nil, baseLocationLng: nil,
