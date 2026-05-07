@@ -1,6 +1,5 @@
 // WalletView.swift — Métodos de pago guardados
 import SwiftUI
-import UIKit
 
 // MARK: - ViewModel
 
@@ -174,7 +173,8 @@ struct WalletView: View {
                         MethodRow(
                             method: method,
                             isDeleting: vm.deletingId == method.id,
-                            isSettingDefault: vm.settingDefaultId == method.id
+                            isSettingDefault: vm.settingDefaultId == method.id,
+                            canDelete: vm.methods.count > 1
                         ) {
                             Task { await vm.setDefault(method) }
                         } onDelete: {
@@ -273,7 +273,7 @@ struct WalletView: View {
                     subtitle: "Toca cualquier tarjeta en el carrusel o usa «Predeterminar» para cambiar cuál se usa primero.")
             InfoRow(icon: "trash.circle.fill", color: .red,
                     title: "Control total",
-                    subtitle: "Elimina cualquier tarjeta en cualquier momento desde esta pantalla.")
+                    subtitle: "Puedes eliminar tarjetas en cualquier momento. Se requiere al menos 1 tarjeta guardada.")
         }
         .padding(16)
         .background(Color(.tertiarySystemGroupedBackground))
@@ -320,9 +320,11 @@ private struct AddCardSheet: View {
 
                     // Form
                     VStack(spacing: 0) {
-                        cardField("Nombre en la tarjeta", text: $cardholderName,
-                                  placeholder: "JUAN PÉREZ", keyboard: .default,
-                                  contentType: .name, autocap: .allCharacters)
+                        TextField("Nombre en la tarjeta", text: $cardholderName,
+                                  prompt: Text("JUAN PÉREZ").foregroundStyle(Color(.placeholderText)))
+                            .textInputAutocapitalization(.characters)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
                         Divider().padding(.leading, 16)
 
                         HStack(spacing: 0) {
@@ -532,22 +534,6 @@ private struct AddCardSheet: View {
         return digits
     }
 
-    @ViewBuilder
-    private func cardField(
-        _ label: String,
-        text: Binding<String>,
-        placeholder: String,
-        keyboard: UIKeyboardType,
-        contentType: UITextContentType? = nil,
-        autocap: TextInputAutocapitalization = .never
-    ) -> some View {
-        TextField(label, text: text, prompt: Text(placeholder).foregroundStyle(Color(.placeholderText)))
-            .keyboardType(keyboard)
-            .textInputAutocapitalization(autocap)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-    }
-
     // MARK: - Submit
 
     private func submit() async {
@@ -747,6 +733,7 @@ private struct MethodRow: View {
     let method: PaymentMethod
     let isDeleting: Bool
     let isSettingDefault: Bool
+    let canDelete: Bool
     let onSetDefault: () -> Void
     let onDelete: () -> Void
 
@@ -785,6 +772,10 @@ private struct MethodRow: View {
                 }
                 Text("Vence \(method.expiryLabel)")
                     .font(.caption).foregroundStyle(.secondary)
+                if !canDelete {
+                    Text("Mínimo 1 tarjeta requerida")
+                        .font(.caption2).foregroundStyle(.orange)
+                }
             }
 
             Spacer()
@@ -800,15 +791,17 @@ private struct MethodRow: View {
                             Label("Establecer como principal", systemImage: "star.fill")
                         }
                     }
-                    Button(role: .destructive) {
-                        onDelete()
-                    } label: {
-                        Label("Eliminar tarjeta", systemImage: "trash")
+                    if canDelete {
+                        Button(role: .destructive) {
+                            onDelete()
+                        } label: {
+                            Label("Eliminar tarjeta", systemImage: "trash")
+                        }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: canDelete ? "ellipsis.circle" : "lock.circle")
                         .font(.title3)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(canDelete ? Color.secondary : Color.orange)
                 }
             }
         }
