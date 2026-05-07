@@ -33,7 +33,7 @@ struct PaymentsView: View {
         ScrollView {
             LazyVStack(spacing: 20, pinnedViews: .sectionHeaders) {
                 // Créditos disponibles
-                if let credits = viewModel.credits, credits.availableCredits > 0 {
+                if let credits = viewModel.credits, credits.totalAmount > 0 {
                     CreditsCard(credits: credits)
                         .padding(.horizontal, 20)
                         .padding(.top, 16)
