@@ -77,6 +77,9 @@ final class ProfileViewModel {
             if res.user.hasSubmittedIdentity {
                 UserDefaults.standard.set(true, forKey: "identityVerificationSubmitted")
             }
+            if res.user.identityApproved {
+                UserDefaults.standard.set(true, forKey: "identityVerificationApproved")
+            }
         } catch {}
     }
 

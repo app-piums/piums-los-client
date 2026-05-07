@@ -11,6 +11,7 @@ struct ProfileView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var isUploadingPhoto = false
     @AppStorage("identityVerificationSubmitted") private var identitySubmitted = false
+    @AppStorage("identityVerificationApproved") private var identityApproved = false
     @EnvironmentObject private var themeManager: ThemeManager
     @Environment(\.openURL) private var openURL
 
@@ -103,27 +104,7 @@ struct ProfileView: View {
 
             // Verificación de identidad
             Section("Verificación") {
-                if viewModel.user?.hasSubmittedIdentity == true || identitySubmitted {
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Documentos enviados").font(.subheadline)
-                            Text("En revisión por nuestro equipo").font(.caption).foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "checkmark.seal.fill").foregroundStyle(Color.piumsOrange)
-                    }
-                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
-                } else {
-                    Button { showVerifyIdentity = true } label: {
-                        HStack {
-                            Label("Verificar identidad", systemImage: "person.badge.shield.checkmark")
-                            Spacer()
-                            Text("Requerida")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .listRowBackground(Color(.tertiarySystemGroupedBackground))
-                }
+                identityRow
             }
 
             // Apariencia
@@ -205,6 +186,43 @@ struct ProfileView: View {
             }
         } message: {
             Text("Se cerrará tu sesión actual y tendrás que iniciar sesión de nuevo.")
+        }
+    }
+
+    @ViewBuilder
+    private var identityRow: some View {
+        let approved  = viewModel.user?.identityApproved == true || identityApproved
+        let submitted = viewModel.user?.hasSubmittedIdentity == true || identitySubmitted
+
+        if approved {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Identidad verificada").font(.subheadline.bold())
+                    Text("Tu identidad ha sido confirmada").font(.caption).foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+            }
+            .listRowBackground(Color(.tertiarySystemGroupedBackground))
+        } else if submitted {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Documentos enviados").font(.subheadline)
+                    Text("En revisión por nuestro equipo").font(.caption).foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: "clock.badge.checkmark").foregroundStyle(Color.piumsOrange)
+            }
+            .listRowBackground(Color(.tertiarySystemGroupedBackground))
+        } else {
+            Button { showVerifyIdentity = true } label: {
+                HStack {
+                    Label("Verificar identidad", systemImage: "person.badge.shield.checkmark")
+                    Spacer()
+                    Text("Requerida").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .listRowBackground(Color(.tertiarySystemGroupedBackground))
         }
     }
 
@@ -291,6 +309,7 @@ struct ProfileView: View {
                     AuthUser(id: $0.id, email: $0.email, nombre: $0.nombre,
                              role: $0.role, avatar: newURL,
                              emailVerified: $0.emailVerified, status: $0.status,
+                             isVerified: $0.isVerified,
                              documentType: $0.documentType,
                              documentFrontUrl: $0.documentFrontUrl,
                              documentSelfieUrl: $0.documentSelfieUrl)
