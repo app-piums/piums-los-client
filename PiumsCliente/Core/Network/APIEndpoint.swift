@@ -84,7 +84,7 @@ enum APIEndpoint {
     case listPaymentMethods
     case deletePaymentMethod(id: String)
     case setDefaultPaymentMethod(id: String)
-    case savePaymentToken(payload: [String: Any])
+    case addPaymentMethod(stripePaymentMethodId: String, setAsDefault: Bool)
 
     // ── Events ────────────────────────────────────────────
     case listEvents
@@ -123,7 +123,7 @@ extension APIEndpoint {
              .logout, .createPaymentIntent, .calculatePrice,
              .createEvent, .sendMessage, .addFavorite,
              .confirmTilopayRedirect, .reportNoShow, .uploadDocument,
-             .validateCoupon:
+             .validateCoupon, .addPaymentMethod:
             return "POST"
         case .cancelBooking:
             return "POST"
@@ -166,8 +166,8 @@ extension APIEndpoint {
             return encode(["token": t, "platform": pl])
         case .changePassword(let cur, let new):
             return encode(["currentPassword": cur, "newPassword": new])
-        case .savePaymentToken(let p):
-            return try? JSONSerialization.data(withJSONObject: p)
+        case .addPaymentMethod(let pmId, let setDefault):
+            return encode(["stripePaymentMethodId": pmId, "setAsDefault": setDefault])
         case .createPaymentIntent(let bId, let amount, let currency, let countryCode):
             var d: [String: Any] = ["bookingId": bId]
             if let a = amount { d["amount"] = a }
@@ -316,7 +316,7 @@ extension APIEndpoint {
         case .listPaymentMethods:              return "/api/payments/methods"
         case .deletePaymentMethod(let id):     return "/api/payments/methods/\(id)"
         case .setDefaultPaymentMethod(let id): return "/api/payments/methods/\(id)/default"
-        case .savePaymentToken:                return "/api/payments/methods/save-token"
+        case .addPaymentMethod:                return "/api/payments/methods"
         case .reportNoShow(let id, _):         return "/api/bookings/\(id)/no-show"
         case .listPayments(let pg):            return "/api/payments/payments?page=\(pg)&limit=20"
         case .getPayment(let id):              return "/api/payments/payments/\(id)"
