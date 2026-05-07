@@ -46,7 +46,7 @@ final class MyBookingsViewModel {
 
     let statusFilters: [BookingStatus?] = [
         nil, .pending, .confirmed, .paymentPending, .inProgress,
-        .delivered, .completed, .disputeOpen, .cancelledClient
+        .reschedulePendingClient, .delivered, .completed, .disputeOpen, .cancelledClient
     ]
 
     func statusLabel(_ s: BookingStatus?) -> String {

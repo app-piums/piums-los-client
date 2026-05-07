@@ -208,7 +208,7 @@ struct BookingRowView: View {
         case .disputeOpen:      return .red
         case .disputeResolved:  return .teal
         case .cancelledClient, .cancelledArtist, .rejected, .noShow: return .red
-        case .rescheduled:      return .purple
+        case .rescheduled, .reschedulePendingArtist, .reschedulePendingClient: return .purple
         case .unknown:          return .secondary
         }
     }
@@ -226,7 +226,9 @@ struct BookingRowView: View {
         case .cancelledClient, .cancelledArtist: return "xmark.circle"
         case .rejected:         return "hand.raised"
         case .noShow:           return "person.slash"
-        case .rescheduled:      return "arrow.trianglehead.2.clockwise.rotate.90"
+        case .rescheduled:                  return "arrow.trianglehead.2.clockwise.rotate.90"
+        case .reschedulePendingArtist:      return "calendar.badge.clock"
+        case .reschedulePendingClient:      return "calendar.badge.exclamationmark"
         case .unknown:          return "questionmark.circle"
         }
     }
@@ -312,7 +314,7 @@ struct BookingDetailView: View {
         case .disputeOpen:      return .red
         case .disputeResolved:  return .teal
         case .cancelledClient, .cancelledArtist, .rejected, .noShow: return .red
-        case .rescheduled:      return .purple
+        case .rescheduled, .reschedulePendingArtist, .reschedulePendingClient: return .purple
         case .unknown:          return .secondary
         }
     }
@@ -331,7 +333,9 @@ struct BookingDetailView: View {
         case .cancelledClient, .cancelledArtist: return "xmark.circle.fill"
         case .rejected:         return "hand.raised.fill"
         case .noShow:           return "person.slash.fill"
-        case .rescheduled:      return "arrow.clockwise.circle.fill"
+        case .rescheduled:                  return "arrow.clockwise.circle.fill"
+        case .reschedulePendingArtist:      return "calendar.badge.clock"
+        case .reschedulePendingClient:      return "calendar.badge.exclamationmark"
         case .unknown:          return "questionmark.circle.fill"
         }
     }
@@ -619,7 +623,8 @@ struct BookingDetailView: View {
 
     private var canReschedule: Bool {
         switch booking.status {
-        case .pending, .confirmed, .rescheduled: return true
+        case .pending, .confirmed, .rescheduled,
+             .reschedulePendingArtist, .reschedulePendingClient: return true
         default: return false
         }
     }

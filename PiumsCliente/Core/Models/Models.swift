@@ -432,6 +432,7 @@ struct ArtistService: Codable, Identifiable, Hashable {
     let tags: [String]?
     let isMainService: Bool?
     let createdAt: String?
+    let addons: [ServiceAddon]?
 
     // Helpers para UI
     var price: Int { basePrice }
@@ -442,6 +443,20 @@ struct ArtistService: Codable, Identifiable, Hashable {
     // Hashable
     static func == (lhs: ArtistService, rhs: ArtistService) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+// MARK: - ServiceAddon
+
+struct ServiceAddon: Codable, Identifiable {
+    let id: String
+    let serviceId: String
+    let name: String
+    let description: String?
+    let price: Int          // extra cost in cents
+    let isRequired: Bool
+    let isOptional: Bool
+    let isDefault: Bool
+    let order: Int
 }
 
 // MARK: - Catalog Services Response
@@ -519,7 +534,9 @@ enum BookingStatus: String, Codable {
     case disputeOpen       = "DISPUTE_OPEN"
     case disputeResolved   = "DISPUTE_RESOLVED"
     case completed         = "COMPLETED"
-    case rescheduled       = "RESCHEDULED"
+    case rescheduled                = "RESCHEDULED"
+    case reschedulePendingArtist    = "RESCHEDULE_PENDING_ARTIST"
+    case reschedulePendingClient    = "RESCHEDULE_PENDING_CLIENT"
     case cancelledClient   = "CANCELLED_CLIENT"
     case cancelledArtist   = "CANCELLED_ARTIST"
     case rejected          = "REJECTED"
@@ -542,7 +559,9 @@ enum BookingStatus: String, Codable {
         case .disputeOpen:      return "Disputa abierta"
         case .disputeResolved:  return "Disputa resuelta"
         case .completed:        return "Completada"
-        case .rescheduled:      return "Reprogramada"
+        case .rescheduled:                  return "Reprogramada"
+        case .reschedulePendingArtist:      return "Cambio pendiente"
+        case .reschedulePendingClient:      return "Confirmar cambio"
         case .cancelledClient:  return "Cancelada por ti"
         case .cancelledArtist:  return "Cancelada por artista"
         case .rejected:         return "Rechazada"
@@ -607,6 +626,13 @@ struct BookingsResponse: Codable {
 
 // MARK: - Review  (shape: GET /api/reviews?artistId=)
 
+struct ReviewPhoto: Codable, Identifiable {
+    let id: String
+    let url: String
+    let caption: String?
+    let order: Int?
+}
+
 struct Review: Codable, Identifiable {
     let id: String
     let artistId: String
@@ -617,6 +643,7 @@ struct Review: Codable, Identifiable {
     let createdAt: String
     let clientName: String?
     let clientAvatar: String?
+    let photos: [ReviewPhoto]?
 }
 
 // MARK: - Reviews Response
@@ -930,8 +957,8 @@ extension Booking {
 extension ArtistService {
     static func mockList(artistId: String) -> [ArtistService] {
         [
-            ArtistService(id: "s1", artistId: artistId, name: "Show 1 hora", description: "Presentación de 60 min.", pricingType: "FIXED", basePrice: 15000, currency: "USD", durationMin: 60, durationMax: 60, status: "ACTIVE", isAvailable: true, isFeatured: true, whatIsIncluded: ["Equipo de sonido", "1 hora de show"], thumbnail: nil, tags: nil, isMainService: true, createdAt: nil),
-            ArtistService(id: "s2", artistId: artistId, name: "Show 30 min", description: "Mini presentación.", pricingType: "FIXED", basePrice: 9000, currency: "USD", durationMin: 30, durationMax: 30, status: "ACTIVE", isAvailable: true, isFeatured: false, whatIsIncluded: ["30 minutos de show"], thumbnail: nil, tags: nil, isMainService: false, createdAt: nil)
+            ArtistService(id: "s1", artistId: artistId, name: "Show 1 hora", description: "Presentación de 60 min.", pricingType: "FIXED", basePrice: 15000, currency: "USD", durationMin: 60, durationMax: 60, status: "ACTIVE", isAvailable: true, isFeatured: true, whatIsIncluded: ["Equipo de sonido", "1 hora de show"], thumbnail: nil, tags: nil, isMainService: true, createdAt: nil, addons: nil),
+            ArtistService(id: "s2", artistId: artistId, name: "Show 30 min", description: "Mini presentación.", pricingType: "FIXED", basePrice: 9000, currency: "USD", durationMin: 30, durationMax: 30, status: "ACTIVE", isAvailable: true, isFeatured: false, whatIsIncluded: ["30 minutos de show"], thumbnail: nil, tags: nil, isMainService: false, createdAt: nil, addons: nil)
         ]
     }
 }
@@ -939,8 +966,8 @@ extension ArtistService {
 extension Review {
     static func mockList(artistId: String) -> [Review] {
         [
-            Review(id: "r1", artistId: artistId, clientId: "c1", bookingId: "b1", rating: 5, comment: "Excelente presentación.", createdAt: "2026-03-15T10:00:00Z", clientName: "María G.", clientAvatar: nil),
-            Review(id: "r2", artistId: artistId, clientId: "c2", bookingId: "b2", rating: 4, comment: "Muy buen artista, puntual.", createdAt: "2026-02-20T14:00:00Z", clientName: "Juan P.", clientAvatar: nil)
+            Review(id: "r1", artistId: artistId, clientId: "c1", bookingId: "b1", rating: 5, comment: "Excelente presentación.", createdAt: "2026-03-15T10:00:00Z", clientName: "María G.", clientAvatar: nil, photos: nil),
+            Review(id: "r2", artistId: artistId, clientId: "c2", bookingId: "b2", rating: 4, comment: "Muy buen artista, puntual.", createdAt: "2026-02-20T14:00:00Z", clientName: "Juan P.", clientAvatar: nil, photos: nil)
         ]
     }
 }
@@ -1185,6 +1212,7 @@ struct Coupon: Codable, Identifiable {
     let targetType: CouponTargetType
     let targetId: String?
     let minimumAmount: Int?
+    let maxDiscountAmount: Int?   // cap for PERCENTAGE discounts (cents)
     let status: CouponStatus
     let startsAt: String
     let expiresAt: String?

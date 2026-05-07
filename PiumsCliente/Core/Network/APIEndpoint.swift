@@ -119,8 +119,10 @@ extension APIEndpoint {
              .confirmTilopayRedirect, .reportNoShow, .uploadDocument,
              .validateCoupon:
             return "POST"
-        case .cancelBooking, .rescheduleBooking:
+        case .cancelBooking:
             return "POST"
+        case .rescheduleBooking:
+            return "PATCH"
         case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead:
             return "PATCH"
         case .changePassword, .addBookingToEvent:
