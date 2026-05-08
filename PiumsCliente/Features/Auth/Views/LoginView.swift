@@ -221,10 +221,10 @@ struct LoginView: View {
                 SocialSignInButton(provider: .google) {
                     Task { await viewModel.loginWithGoogle() }
                 }
-                SocialSignInButton(provider: .facebook) {
+                SocialSignInButton(provider: .facebook, comingSoon: true) {
                     Task { await viewModel.loginWithFacebook() }
                 }
-                SocialSignInButton(provider: .tiktok) {
+                SocialSignInButton(provider: .tiktok, comingSoon: true) {
                     Task { await viewModel.loginWithTikTok() }
                 }
             }
@@ -491,19 +491,27 @@ private enum SocialProvider {
 
 private struct SocialSignInButton: View {
     let provider: SocialProvider
+    var comingSoon: Bool = false
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: comingSoon ? {} : action) {
             HStack(spacing: 14) {
                 SocialProviderIcon(provider: provider)
                     .frame(width: 26, height: 26)
+                    .opacity(comingSoon ? 0.4 : 1)
 
                 Text("Continuar con \(provider.displayName)")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(comingSoon ? Color.secondary : Color.primary)
 
                 Spacer()
+
+                if comingSoon {
+                    Text("Próximamente")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .frame(height: 52)
@@ -515,6 +523,7 @@ private struct SocialSignInButton: View {
                     .strokeBorder(Color.piumsSeparator, lineWidth: 1)
             )
         }
+        .disabled(comingSoon)
     }
 }
 
