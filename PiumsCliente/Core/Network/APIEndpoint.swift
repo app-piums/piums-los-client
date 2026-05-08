@@ -67,7 +67,8 @@ enum APIEndpoint {
     case checkFavorite(entityType: String, entityId: String)
 
     // ── Payments ──────────────────────────────────────────
-    case createPaymentIntent(bookingId: String, amount: Int?, currency: String?, countryCode: String?)
+    case createPaymentIntent(bookingId: String, amount: Int?, currency: String?, countryCode: String?,
+                             billingFirst: String?, billingLast: String?)
     case confirmTilopayRedirect(bookingId: String, responseCode: String, orderNumber: String,
                                 amount: String, auth: String?, currency: String?, orderHash: String?)
     case getMyCredits
@@ -168,11 +169,13 @@ extension APIEndpoint {
             return encode(["currentPassword": cur, "newPassword": new])
         case .addPaymentMethod(let pmId, let setDefault):
             return encode(["stripePaymentMethodId": pmId, "setAsDefault": setDefault])
-        case .createPaymentIntent(let bId, let amount, let currency, let countryCode):
+        case .createPaymentIntent(let bId, let amount, let currency, let countryCode, let billingFirst, let billingLast):
             var d: [String: Any] = ["bookingId": bId]
             if let a = amount { d["amount"] = a }
             if let c = currency { d["currency"] = c }
             if let cc = countryCode { d["countryCode"] = cc }
+            if let bf = billingFirst { d["billingFirst"] = bf }
+            if let bl = billingLast  { d["billingLast"]  = bl }
             return try? JSONSerialization.data(withJSONObject: d)
         case .confirmTilopayRedirect(let bId, let code, let order, let amount, let auth, let curr, let hash):
             var d: [String: Any] = ["bookingId": bId, "responseCode": code, "orderNumber": order, "amount": amount]

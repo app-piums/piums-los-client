@@ -36,6 +36,19 @@ final class PaymentCheckoutViewModel {
         return false
     }
 
+    // MARK: - Helpers
+
+    private func splitName(_ fullName: String?) -> (first: String?, last: String?) {
+        guard let name = fullName?.trimmingCharacters(in: .whitespaces), !name.isEmpty else {
+            return (nil, nil)
+        }
+        let parts = name.components(separatedBy: " ").filter { !$0.isEmpty }
+        if parts.count == 1 { return (parts[0], nil) }
+        let last  = parts.last!
+        let first = parts.dropLast().joined(separator: " ")
+        return (first, last)
+    }
+
     // MARK: - Setup
 
     func setup(booking: Booking) {
@@ -49,13 +62,17 @@ final class PaymentCheckoutViewModel {
 
     func startPayment(booking: Booking, artist: Artist) async {
         phase = .loading
+        let user = AuthManager.shared.currentUser
+        let (billingFirst, billingLast) = splitName(user?.nombre)
         do {
             let wrapper: PaymentIntentWrapper = try await APIClient.request(
                 .createPaymentIntent(
-                    bookingId:   booking.id,
-                    amount:      amountToPay,
-                    currency:    currency,
-                    countryCode: artist.country
+                    bookingId:    booking.id,
+                    amount:       amountToPay,
+                    currency:     currency,
+                    countryCode:  artist.country,
+                    billingFirst: billingFirst,
+                    billingLast:  billingLast
                 )
             )
             guard let intent = wrapper.resolved else {
