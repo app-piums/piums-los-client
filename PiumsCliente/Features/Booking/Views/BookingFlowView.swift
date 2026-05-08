@@ -1,6 +1,7 @@
 // BookingFlowView.swift — 4 pasos reales: Servicio → Fecha/Hora → Detalles → Resumen
 import SwiftUI
 import CoreLocation
+import MapKit
 
 // Haversine distance (km) between two coordinates
 private func haversineKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
@@ -244,11 +245,13 @@ final class BookingFlowViewModel {
             "artistId": context.artist.id, "serviceId": svc.id, "clientId": clientId,
             "scheduledDate": isoDate, "durationMinutes": context.durationMinutes,
         ]
-        if !context.location.isEmpty     { payload["location"] = context.location }
-        if let lat = context.locationLat { payload["locationLat"] = lat }
-        if let lng = context.locationLng { payload["locationLng"] = lng }
-        if !context.clientNotes.isEmpty  { payload["clientNotes"] = context.clientNotes }
-        if let eventId = context.eventId { payload["eventId"] = eventId }
+        if !context.location.isEmpty          { payload["location"] = context.location }
+        if let lat = context.locationLat      { payload["locationLat"] = lat }
+        if let lng = context.locationLng      { payload["locationLng"] = lng }
+        if !context.clientNotes.isEmpty       { payload["clientNotes"] = context.clientNotes }
+        if let eventId = context.eventId      { payload["eventId"] = eventId }
+        if let et = context.eventType         { payload["eventType"] = et.rawValue }
+        if !context.selectedAddons.isEmpty    { payload["selectedAddons"] = context.selectedAddons }
         if couponResult?.valid == true {
             let trimmed = couponCode.trimmingCharacters(in: .whitespaces).uppercased()
             if !trimmed.isEmpty { payload["couponCode"] = trimmed }
@@ -273,6 +276,16 @@ struct BookingFlowView: View {
     @State private var showConfirmModal = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locationStore) private var locationStore
+
+    private var locationCoordBinding: Binding<CLLocationCoordinate2D?> {
+        Binding {
+            guard let lat = vm.context.locationLat, let lng = vm.context.locationLng else { return nil }
+            return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        } set: { coord in
+            vm.context.locationLat = coord?.latitude
+            vm.context.locationLng = coord?.longitude
+        }
+    }
 
     init(context: BookingFlowContext) {
         self.context = context
@@ -477,7 +490,11 @@ struct BookingFlowView: View {
                 }
             } else {
                 ForEach(vm.services) { svc in
-                    BFSvcCard(service: svc, isSelected: vm.context.service?.id == svc.id) { vm.context.service = svc }
+                    BFSvcCard(
+                        service: svc,
+                        artist: vm.context.artist,
+                        isSelected: vm.context.service?.id == svc.id
+                    ) { vm.context.service = svc }
                 }
             }
             if let e = vm.errorMessage { ErrorBannerView(message: e) }
@@ -564,8 +581,11 @@ struct BookingFlowView: View {
             header("Detalles del Evento", sub: "Ubicación e indicaciones especiales.")
             VStack(alignment: .leading, spacing: 10) {
                 Label("Ubicación del Evento", systemImage: "mappin.circle.fill").font(.headline)
-                TextField("Ej. Salón Los Jardines, Zona 15", text: $vm.context.location)
-                    .padding(12).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
+                LocationSearchField(
+                    placeholder: "Ej. Salón Los Jardines, Zona 15",
+                    text: $vm.context.location,
+                    coordinate: locationCoordBinding
+                )
                 Button {
                     if let coord = locationStore.coordinate {
                         vm.context.locationLat = coord.latitude
@@ -582,7 +602,6 @@ struct BookingFlowView: View {
                         .foregroundStyle(vm.context.locationLat != nil ? .green : Color.piumsOrange)
                 }.buttonStyle(.plain)
                 .onChange(of: locationStore.coordinate?.latitude) { _, _ in
-                    // Auto-fill when store gets a new fix and we don't have coords yet
                     if vm.context.locationLat == nil, let coord = locationStore.coordinate {
                         vm.context.locationLat = coord.latitude
                         vm.context.locationLng = coord.longitude
@@ -919,39 +938,153 @@ struct BookingFlowView: View {
 // MARK: - BFSvcCard
 
 private struct BFSvcCard: View {
-    let service: ArtistService; let isSelected: Bool; let onTap: () -> Void
+    let service: ArtistService
+    let artist: Artist
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    @State private var isExpanded = false
+    @State private var showArtistProfile = false
+
+    private var includes: [String] { service.whatIsIncluded ?? [] }
+
     private func icon() -> String {
         let n = service.name.lowercased()
-        if n.contains("boda") { return "heart.fill" }
-        if n.contains("foto") { return "camera.fill" }
+        if n.contains("boda")   { return "heart.fill" }
+        if n.contains("foto")   { return "camera.fill" }
         if n.contains("quince") { return "sparkles" }
         if n.contains("coord") || n.contains("asesor") { return "calendar.badge.checkmark" }
         return "music.note"
     }
+
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? Color.piumsOrange : Color.piumsOrange.opacity(0.10)).frame(width: 44, height: 44)
-                    Image(systemName: icon()).font(.title3).foregroundStyle(isSelected ? .white : Color.piumsOrange)
+        VStack(spacing: 0) {
+            // ── Fila principal — selecciona el servicio ──────────────
+            Button(action: onTap) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(isSelected ? Color.piumsOrange : Color.piumsOrange.opacity(0.10))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: icon())
+                            .font(.title3)
+                            .foregroundStyle(isSelected ? .white : Color.piumsOrange)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(service.name).font(.subheadline.bold()).lineLimit(1)
+                        if let d = service.description {
+                            Text(d).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(service.basePrice.piumsFormatted)
+                            .font(.headline.bold()).foregroundStyle(Color.piumsOrange)
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.piumsOrange)
+                        }
+                    }
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(service.name).font(.subheadline.bold()).lineLimit(1)
-                    if let d = service.description { Text(d).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(service.basePrice.piumsFormatted).font(.headline.bold()).foregroundStyle(Color.piumsOrange)
-                    if isSelected { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.piumsOrange) }
-                }
+                .padding(14)
             }
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color(.tertiarySystemGroupedBackground))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(isSelected ? Color.piumsOrange : Color.clear, lineWidth: 2)))
+            .buttonStyle(.plain)
+
+            // ── Toggle despliegue ────────────────────────────────────
+            Divider().padding(.horizontal, 14)
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(isExpanded ? "Ocultar detalles" : "Ver detalles")
+                        .font(.caption.weight(.medium))
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundStyle(Color.piumsOrange)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+
+            // ── Contenido expandido ──────────────────────────────────
+            if isExpanded {
+                Divider().padding(.horizontal, 14)
+                VStack(alignment: .leading, spacing: 14) {
+
+                    // Qué incluye
+                    if !includes.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Qué incluye")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            ForEach(includes, id: \.self) { item in
+                                HStack(alignment: .top, spacing: 7) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Color.piumsOrange)
+                                        .padding(.top, 1)
+                                    Text(item).font(.caption)
+                                }
+                            }
+                        }
+                    }
+
+                    // Botón ver perfil del artista
+                    Button { showArtistProfile = true } label: {
+                        HStack(spacing: 10) {
+                            AsyncImage(url: URL(string: artist.avatar ?? "")) { img in
+                                img.resizable().scaledToFill()
+                            } placeholder: {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(artist.name).font(.caption.weight(.semibold))
+                                if let spec = artist.specialties?.first {
+                                    Text(spec).font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Label("Ver perfil", systemImage: "arrow.right")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.piumsOrange)
+                        }
+                        .padding(10)
+                        .background(Color.piumsOrange.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.tertiarySystemGroupedBackground))
+                .overlay(RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? Color.piumsOrange : Color.clear, lineWidth: 2))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .sheet(isPresented: $showArtistProfile) {
+            NavigationStack {
+                ArtistProfileView(artist: artist)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Cerrar") { showArtistProfile = false }
+                                .foregroundStyle(Color.piumsOrange)
+                        }
+                    }
+            }
+        }
     }
 }
 

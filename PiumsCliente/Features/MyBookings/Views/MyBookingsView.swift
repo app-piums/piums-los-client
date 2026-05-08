@@ -23,8 +23,11 @@ struct MyBookingsView: View {
                             ErrorBannerView(message: msg).padding(.horizontal)
                         }
                         ForEach(viewModel.bookings) { booking in
-                            BookingRowView(booking: booking,
-                                          cachedArtistName: viewModel.artistCache[booking.artistId]?.name)
+                            BookingRowView(
+                                booking: booking,
+                                cachedArtist: viewModel.artistCache[booking.artistId],
+                                cachedService: viewModel.serviceCache[booking.serviceId]
+                            )
                                 .padding(.horizontal)
                                 .contentShape(Rectangle())
                                 .onTapGesture { selectedBooking = booking }
@@ -102,87 +105,232 @@ struct MyBookingsView: View {
 
 struct BookingRowView: View {
     let booking: Booking
-    var cachedArtistName: String? = nil
+    var cachedArtist: BookingArtistInfo? = nil
+    var cachedService: BookingServiceInfo? = nil
+
+    @State private var isExpanded = false
+    @State private var showArtistProfile = false
 
     private var displayName: String {
-        cachedArtistName ?? booking.resolvedArtistName ?? "—"
+        cachedArtist?.name ?? booking.resolvedArtistName ?? "—"
+    }
+
+    private var hasExpandableContent: Bool {
+        cachedArtist != nil || cachedService != nil
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Icono estado
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(statusColor.opacity(0.12))
-                    .frame(width: 48, height: 48)
-                Image(systemName: statusIcon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(statusColor)
+        VStack(spacing: 0) {
+            // ── Fila principal ──────────────────────────────────────
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(statusColor.opacity(0.12))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: statusIcon)
+                        .font(.system(size: 20))
+                        .foregroundStyle(statusColor)
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(displayName)
+                                .font(.subheadline.bold())
+                                .lineLimit(1)
+                            // Subtítulo: nombre del servicio + código
+                            HStack(spacing: 4) {
+                                if let svcName = cachedService?.name {
+                                    Text(svcName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                if let code = booking.code {
+                                    if cachedService?.name != nil {
+                                        Text("·").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Text(code)
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            if booking.totalPrice > 0 {
+                                Text(booking.totalPrice.piumsFormatted)
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(Color.piumsOrange)
+                            }
+                            Text(shortDate)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        Text(booking.status.displayName)
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(statusColor.opacity(0.12))
+                            .foregroundStyle(statusColor)
+                            .clipShape(Capsule())
+                        if let time = booking.scheduledTime {
+                            HStack(spacing: 3) {
+                                Image(systemName: "clock").font(.caption2)
+                                Text(time)
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        }
+                        if let dur = booking.durationMinutes {
+                            HStack(spacing: 3) {
+                                Image(systemName: "timer").font(.caption2)
+                                Text("\(dur) min")
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(14)
+
+            // ── Toggle despliegue ───────────────────────────────────
+            if hasExpandableContent {
+                Divider().padding(.horizontal, 14)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(isExpanded ? "Ocultar detalles" : "Ver detalles")
+                            .font(.caption.weight(.medium))
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.piumsOrange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
             }
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        // Título principal: nombre del artista
-                        Text(displayName)
-                            .font(.subheadline.bold())
-                            .lineLimit(1)
-                        // Subtítulo: nombre + código
-                        HStack(spacing: 4) {
-                            Text(displayName)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            if let code = booking.code {
-                                Text("·").font(.caption).foregroundStyle(.secondary)
-                                Text(code)
-                                    .font(.caption2.monospaced())
+            // ── Contenido expandido ─────────────────────────────────
+            if isExpanded {
+                Divider().padding(.horizontal, 14)
+                VStack(alignment: .leading, spacing: 14) {
+
+                    // Servicio: descripción + qué incluye
+                    if let svc = cachedService {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(svc.name)
+                                .font(.subheadline.weight(.semibold))
+
+                            if let desc = svc.description, !desc.isEmpty {
+                                Text(desc)
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            if !svc.whatIsIncluded.isEmpty {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("Qué incluye")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                    ForEach(svc.whatIsIncluded, id: \.self) { item in
+                                        HStack(alignment: .top, spacing: 7) {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(Color.piumsOrange)
+                                                .padding(.top, 1)
+                                            Text(item)
+                                                .font(.caption)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        if booking.totalPrice > 0 {
-                            Text(booking.totalPrice.piumsFormatted)
-                                .font(.subheadline.bold())
-                                .foregroundStyle(Color.piumsOrange)
+
+                    // Botón Ver perfil del artista
+                    if let info = cachedArtist {
+                        Button { showArtistProfile = true } label: {
+                            HStack(spacing: 10) {
+                                AsyncImage(url: URL(string: info.avatar ?? "")) { img in
+                                    img.resizable().scaledToFill()
+                                } placeholder: {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 30))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(displayName)
+                                        .font(.caption.weight(.semibold))
+                                    if let spec = info.specialty {
+                                        Text(spec)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Label("Ver perfil", systemImage: "arrow.right")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(Color.piumsOrange)
+                            }
+                            .padding(10)
+                            .background(Color.piumsOrange.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
-                        Text(shortDate)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
                     }
                 }
-
-                HStack(spacing: 6) {
-                    Text(booking.status.displayName)
-                        .font(.caption2.bold())
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(statusColor.opacity(0.12))
-                        .foregroundStyle(statusColor)
-                        .clipShape(Capsule())
-                    if let time = booking.scheduledTime {
-                        HStack(spacing: 3) {
-                            Image(systemName: "clock").font(.caption2)
-                            Text(time)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(Color(.tertiarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .sheet(isPresented: $showArtistProfile) {
+            if let info = cachedArtist {
+                NavigationStack {
+                    ArtistProfileView(artist: minimalArtist(id: booking.artistId, info: info))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button("Cerrar") { showArtistProfile = false }
+                                    .foregroundStyle(Color.piumsOrange)
+                            }
                         }
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    }
-                    if let dur = booking.duration {
-                        HStack(spacing: 3) {
-                            Image(systemName: "timer").font(.caption2)
-                            Text("\(dur) min")
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    }
                 }
             }
         }
-        .padding(14)
-        .background(Color(.tertiarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func minimalArtist(id: String, info: BookingArtistInfo) -> Artist {
+        Artist(
+            id: id, name: info.name,
+            bio: nil, city: nil, state: nil, country: nil,
+            averageRating: nil,
+            totalReviews: 0, totalBookings: 0,
+            hourlyRateMin: nil, hourlyRateMax: nil,
+            mainServicePrice: nil, mainServiceName: nil,
+            isVerified: info.isVerified,
+            isActive: true, isAvailable: true,
+            servicesCount: 0,
+            serviceIds: nil, serviceTitles: nil,
+            specialties: info.specialty.map { [$0] },
+            createdAt: nil,
+            baseLocationLat: nil, baseLocationLng: nil,
+            avatar: info.avatar,
+            coverUrl: nil, instagram: nil, website: nil
+        )
     }
 
     // "5 abr" style
@@ -663,7 +811,7 @@ struct BookingDetailView: View {
         var comps = Calendar.current.dateComponents([.year,.month,.day], from: isoDate)
         comps.hour = h; comps.minute = 0
         guard let start = Calendar.current.date(from: comps) else { return }
-        let end = start.addingTimeInterval(Double((booking.duration ?? 60) * 60))
+        let end = start.addingTimeInterval(Double((booking.durationMinutes ?? 60) * 60))
         let startStr = start.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false))
             .replacingOccurrences(of: "-", with: "").replacingOccurrences(of: ":", with: "")
         let endStr = end.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false))

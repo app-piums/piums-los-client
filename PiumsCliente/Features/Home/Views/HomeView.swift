@@ -595,6 +595,7 @@ private struct EventLocationPickerView: View {
         MKCoordinateRegion(center: guatemalaCity, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
     )
     @State private var isGeocoding = false
+    @State private var suppressGeocode = false
 
     private var formattedDate: String {
         let f = DateFormatter()
@@ -668,28 +669,33 @@ private struct EventLocationPickerView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18))
             .padding(.horizontal, 16)
 
-            // Campo de dirección (auto-rellenado por geocoder)
-            HStack(spacing: 10) {
-                if isGeocoding {
-                    ProgressView().scaleEffect(0.75)
-                } else {
-                    Image(systemName: "mappin.and.ellipse")
-                        .foregroundStyle(coordinate != nil ? Color.piumsOrange : .secondary)
-                }
-                TextField("Mueve el mapa para fijar la ubicación", text: $locationName)
-                    .font(.subheadline)
-                if !locationName.isEmpty {
-                    Button {
-                        locationName = ""
-                        coordinate = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            // Campo de búsqueda de ubicación (autocomplete + mapa interactivo)
+            VStack(alignment: .leading, spacing: 6) {
+                LocationSearchField(
+                    placeholder: "Busca un lugar o arrastra el mapa",
+                    text: $locationName,
+                    coordinate: $coordinate,
+                    onSelect: { coord in
+                        // Suprimir el geocoder inverso para que no sobreescriba
+                        // el nombre del lugar que el usuario acaba de seleccionar
+                        suppressGeocode = true
+                        centerTo(coord)
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
+                            suppressGeocode = false
+                        }
                     }
+                )
+                if isGeocoding {
+                    HStack(spacing: 6) {
+                        ProgressView().scaleEffect(0.7)
+                        Text("Detectando dirección…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 4)
                 }
             }
-            .padding(14)
-            .background(Color(.tertiarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
             .padding(.horizontal, 16)
             .padding(.top, 14)
 
@@ -735,14 +741,21 @@ private struct EventLocationPickerView: View {
     }
 
     private func reverseGeocode(_ coord: CLLocationCoordinate2D) {
+        guard !suppressGeocode else { return }
         isGeocoding = true
+        let geocodingCoord = coord
         CLGeocoder().reverseGeocodeLocation(CLLocation(latitude: coord.latitude, longitude: coord.longitude)) { places, _ in
-            isGeocoding = false
+            self.isGeocoding = false
+            guard !self.suppressGeocode else { return }
+            // Descartar si el mapa ya se movió a otra coordenada
+            guard let cur = self.coordinate,
+                  abs(cur.latitude  - geocodingCoord.latitude)  < 0.0001,
+                  abs(cur.longitude - geocodingCoord.longitude) < 0.0001 else { return }
             guard let place = places?.first else { return }
             let parts = [place.thoroughfare, place.subLocality, place.locality]
                 .compactMap { $0 }.filter { !$0.isEmpty }
             if !parts.isEmpty {
-                locationName = parts.joined(separator: ", ")
+                self.locationName = parts.joined(separator: ", ")
             }
         }
     }

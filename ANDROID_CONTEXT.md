@@ -688,18 +688,21 @@ PromoBanner naranja
 
 ### 5.3 Search & Discovery
 
-**Estado inicial** — Grid de categorías (3 columnas):
+**Estado inicial** — Grid de categorías (5 — sincronizadas con `ArtistCategory` de piums-platform):
 ```
-Música | DJ | Fotografía | Baile | Maquillaje | Tatuajes
-Iluminación | Bodas | Quinceañeras | Corporativo | Barbería | Shows
+Música (MUSICO) | Fotografía (FOTOGRAFO) | Video (VIDEOGRAFO)
+Payaso (PAYASO) | Maestro de Ceremonia (MAESTRO_CEREMONIA)
 ```
+Al tocar una categoría → enviar `specialty=<ENUM_VALUE>` al API (no query de texto libre).
+
+**Búsquedas populares**: música en vivo · fotógrafo bodas · video boda · payaso fiesta · maestro ceremonias
 
 **Búsqueda activa** — Grid 2 columnas de `ArtistCard`
 
 **SmartSearch**: usar `GET /api/search/smart?q=&lat=&lng=` si el usuario da permisos de ubicación
 
 **Filtros sheet** (BottomSheet):
-- Especialidad (chips)
+- Especialidad (chips) — usar `displayName` en UI, enviar `rawValue` (MUSICO, FOTOGRAFO, etc.) al API
 - Rango precio (RangeSlider)
 - Rating mínimo (chips: Todos, 3.0★, 3.5★, 4.0★, 4.5★, 5.0★)
 - Ciudad (chips)
@@ -733,6 +736,8 @@ Paso 2 → Fecha: calendario + slots de tiempo
 Paso 3 → Detalles: ubicación, notas, ¿multi-día?, selector de evento (opcional)
           GET /api/events → carga eventos del cliente (excluir CANCELLED); permite vincular bookingId a eventId
           POST /api/catalog/pricing/calculate → muestra precio dinámico
+          Campo ubicación = LocationSearchField con autocompletado Places (ver §5.9)
+          Botón "Usar mi ubicación" (GPS) sigue disponible debajo del campo de búsqueda
 Paso 4 → Resumen + confirmar
           POST /api/bookings
 ```
@@ -758,6 +763,17 @@ POST /api/catalog/pricing/calculate
 - `GET /api/bookings?status=&page=`
 - Swipe-to-cancel en reservas PENDING/CONFIRMED
 
+**Tarjeta de reserva (BookingRowView) — expandible**:
+- Fila compacta: ícono de estado, nombre artista, nombre servicio + código, precio, fecha, chips de estado/hora/duración
+- Botón "Ver detalles / Ocultar detalles" con chevron (solo si hay datos cargados)
+- **Sección expandida**:
+  - Nombre y descripción del servicio
+  - Lista "Qué incluye" (`whatIsIncluded`) con íconos ✓ naranja
+  - Botón "Ver perfil del artista" → abre sheet con `ArtistProfileView`
+- Datos precargados en paralelo al cargar las reservas:
+  - Artista: `GET /api/artists/{artistId}` → `artistCache[artistId]`
+  - Servicio: `GET /api/catalog/services/{serviceId}` → `serviceCache[serviceId]`
+
 **Detalle de Reserva**:
 - Hero de estado (ícono circular + color según estado)
 - Código de reserva (monospaced, fondo naranja 8%)
@@ -768,6 +784,7 @@ POST /api/catalog/pricing/calculate
 - CRUD: `GET/POST/PATCH/DELETE /api/events`
 - Vincular reservas existentes: `POST /api/events/{eventId}/bookings/{bookingId}`
 - Mostrar total del evento = suma de reservas
+- Campo ubicación en EventForm abre sheet con LocationSearchField (ver §5.9)
 
 **Tab Favoritos**:
 - `GET /api/users/me/favorites?entityType=ARTIST`
@@ -803,7 +820,117 @@ Section Cerrar sesión (destructivo)
 - POST `/api/auth/change-password`
 - Guardar preferencia de tema en `DataStore`
 
-### 5.9 Notificaciones
+### 5.9 Búsqueda de Ubicación — LocationSearchField
+
+**Componente reutilizable** en iOS: `LocationSearchField.swift` (Components/)  
+**Android**: implementar con `Places Autocomplete SDK` (Jetpack) o `Geocoder` + `PlacesClient`
+
+#### Comportamiento
+1. El usuario escribe un nombre de lugar → sugerencias en dropdown (máx 5)
+2. Al seleccionar → se resuelven las coordenadas `(lat, lng)` y se popula el texto
+3. Región por defecto: Guatemala (`lat=15.4, lng=-90.5, span≈4.5°`) — escalable vía parámetro
+
+#### Pantallas que lo usan
+
+| Pantalla | Contexto | Coordenadas |
+|---|---|---|
+| EventLocationPickerView (Home) | Barra de búsqueda sobre el mapa; selección mueve la cámara | `$coordinate` binding directo |
+| Booking Step 3 (Detalles) | Reemplaza TextField simple; botón GPS sigue disponible | Se guarda en `locationLat/Lng` |
+| EventFormView (Crear/Editar Evento) | Abre un sheet `EventLocationPickerSheet` | `locationCoord` (no enviado al API aún) |
+
+#### Android — dependencias recomendadas
+
+```kotlin
+// build.gradle.kts
+implementation("com.google.android.libraries.places:places:3.5.0")
+// Requiere API key en AndroidManifest:
+// <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}"/>
+```
+
+#### Android — implementación sugerida
+
+```kotlin
+// LocationSearchViewModel.kt
+@HiltViewModel
+class LocationSearchViewModel @Inject constructor() : ViewModel() {
+    private val _suggestions = MutableStateFlow<List<AutocompletePrediction>>(emptyList())
+    val suggestions = _suggestions.asStateFlow()
+
+    // bias región Guatemala → escalable pasando LatLngBounds como parámetro
+    private val guatemalaBounds = RectangularBounds.newInstance(
+        LatLng(13.7, -92.2), LatLng(17.8, -88.2)
+    )
+
+    fun search(query: String, placesClient: PlacesClient) {
+        if (query.isBlank()) { _suggestions.value = emptyList(); return }
+        val request = FindAutocompletePredictionsRequest.builder()
+            .setLocationBias(guatemalaBounds)
+            .setQuery(query)
+            .build()
+        placesClient.findAutocompletePredictions(request)
+            .addOnSuccessListener { _suggestions.value = it.autocompletePredictions }
+            .addOnFailureListener { _suggestions.value = emptyList() }
+    }
+
+    fun resolve(placeId: String, placesClient: PlacesClient, onResult: (LatLng, String) -> Unit) {
+        val request = FetchPlaceRequest.newInstance(placeId, listOf(Place.Field.LAT_LNG, Place.Field.NAME))
+        placesClient.fetchPlace(request).addOnSuccessListener { resp ->
+            resp.place.latLng?.let { onResult(it, resp.place.name ?: "") }
+        }
+    }
+}
+```
+
+```kotlin
+// LocationSearchField.kt (Composable)
+@Composable
+fun LocationSearchField(
+    placeholder: String,
+    text: String,
+    onTextChange: (String) -> Unit,
+    suggestions: List<AutocompletePrediction>,
+    onSelect: (AutocompletePrediction) -> Unit,
+    coordinate: LatLng? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier) {
+        // Field row
+        OutlinedTextField(
+            value = text,
+            onValueChange = onTextChange,
+            placeholder = { Text(placeholder) },
+            leadingIcon = {
+                Icon(
+                    if (coordinate != null) Icons.Filled.LocationOn else Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = if (coordinate != null) PiumsOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            trailingIcon = if (text.isNotEmpty()) {
+                { IconButton(onClick = { onTextChange("") }) { Icon(Icons.Filled.Clear, null) } }
+            } else null,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+        // Dropdown suggestions
+        if (suggestions.isNotEmpty()) {
+            Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(8.dp)) {
+                suggestions.take(5).forEach { suggestion ->
+                    ListItem(
+                        headlineContent = { Text(suggestion.getPrimaryText(null).toString()) },
+                        supportingContent = { Text(suggestion.getSecondaryText(null).toString()) },
+                        leadingContent = { Icon(Icons.Filled.LocationOn, null, tint = PiumsOrange) },
+                        modifier = Modifier.clickable { onSelect(suggestion) }
+                    )
+                    Divider(modifier = Modifier.padding(start = 56.dp))
+                }
+            }
+        }
+    }
+}
+```
+
+### 5.11 Notificaciones
 
 - `GET /api/notifications?page=` (paginado)
 - `POST /api/notifications/read` body: `{ "notificationIds": ["id1"] }`
@@ -979,12 +1106,44 @@ data class Booking(
     val totalPrice: Int,
     val scheduledDate: String,
     val scheduledTime: String?,
-    val duration: Int?,
+    val durationMinutes: Int?,      // reemplaza "duration" — minutos de la cita
     val notes: String?,
     val location: String?,
+    val locationLat: Double?,
+    val locationLng: Double?,
+    val clientLat: Double?,         // lat del cliente al reservar (para regla 60km)
+    val clientLng: Double?,
+    val distanceKm: Double?,        // distancia artista↔cliente calculada
     val eventId: String?,
-    val createdAt: String
+    val eventType: String?,         // EventType enum value
+    val createdAt: String?,
+    val anticipoRequired: Boolean?,
+    val anticipoAmount: Int?,
+    val currency: String?,
+    val couponCode: String?,
+    val couponDiscountAmount: Int?,
+    val servicePrice: Int?,         // precio base del servicio en centavos
+    val addonsPrice: Int?,          // precio de add-ons en centavos
+    val travelPrice: Int?,          // viáticos en centavos
+    val selectedAddons: List<String>?,
+    val artist: BookingParticipant?,
+    val client: BookingParticipant?,
+    val artistName: String?,
+    val clientName: String?
 )
+
+data class BookingParticipant(
+    val id: String?,
+    val name: String?,
+    val nombre: String?,
+    val email: String?,
+    val avatar: String?,
+    val phone: String?,
+    val specialties: List<String>?,
+    val isVerified: Boolean?
+) {
+    val resolvedName: String? get() = name ?: nombre
+}
 
 enum class BookingStatus(val raw: String, val displayName: String) {
     PENDING("PENDING", "Pendiente"),
@@ -992,15 +1151,57 @@ enum class BookingStatus(val raw: String, val displayName: String) {
     PAYMENT_PENDING("PAYMENT_PENDING", "Pago pendiente"),
     PAYMENT_COMPLETED("PAYMENT_COMPLETED", "Pago completado"),
     IN_PROGRESS("IN_PROGRESS", "En progreso"),
+    DELIVERED("DELIVERED", "Entregado"),
+    DISPUTE_OPEN("DISPUTE_OPEN", "Disputa abierta"),
+    DISPUTE_RESOLVED("DISPUTE_RESOLVED", "Disputa resuelta"),
     COMPLETED("COMPLETED", "Completada"),
     RESCHEDULED("RESCHEDULED", "Reprogramada"),
+    RESCHEDULE_PENDING_ARTIST("RESCHEDULE_PENDING_ARTIST", "Cambio pendiente"),
+    RESCHEDULE_PENDING_CLIENT("RESCHEDULE_PENDING_CLIENT", "Confirmar cambio"),
     CANCELLED_CLIENT("CANCELLED_CLIENT", "Cancelada por ti"),
     CANCELLED_ARTIST("CANCELLED_ARTIST", "Cancelada por artista"),
     REJECTED("REJECTED", "Rechazada"),
-    NO_SHOW("NO_SHOW", "No se presentó");
+    NO_SHOW("NO_SHOW", "No se presentó"),
+    UNKNOWN("UNKNOWN", "Desconocido");
 
     companion object {
-        fun from(raw: String) = values().firstOrNull { it.raw == raw } ?: PENDING
+        fun from(raw: String) = values().firstOrNull { it.raw == raw } ?: UNKNOWN
+    }
+}
+
+enum class PaymentStatus(val raw: String, val displayName: String) {
+    PENDING("PENDING", "Pago pendiente"),
+    COMPLETED("COMPLETED", "Pagado"),           // legacy
+    ANTICIPO_PAID("ANTICIPO_PAID", "Anticipo pagado"),
+    DEPOSIT_PAID("DEPOSIT_PAID", "Anticipo pagado"),  // legacy alias
+    CHARGING_REMAINING("CHARGING_REMAINING", "Cobrando saldo"),
+    FULLY_PAID("FULLY_PAID", "Pagado completo"),
+    FROZEN("FROZEN", "Congelado"),
+    PARTIALLY_REFUNDED("PARTIALLY_REFUNDED", "Reembolso parcial"),
+    REFUNDED("REFUNDED", "Reembolsado"),
+    FAILED("FAILED", "Fallido"),
+    UNKNOWN("UNKNOWN", "Desconocido");
+
+    companion object {
+        fun from(raw: String) = values().firstOrNull { it.raw == raw } ?: UNKNOWN
+    }
+}
+
+enum class EventType(val raw: String, val displayName: String) {
+    CUMPLEANOS("CUMPLEANOS", "Cumpleaños"),
+    BODA("BODA", "Boda"),
+    GRADUACION("GRADUACION", "Graduación"),
+    QUINCEANERA("QUINCEANERA", "Quinceañera"),
+    CORPORATIVO("CORPORATIVO", "Corporativo"),
+    CONCIERTO("CONCIERTO", "Concierto"),
+    FIESTA("FIESTA", "Fiesta"),
+    BABY_SHOWER("BABY_SHOWER", "Baby Shower"),
+    BAUTIZO("BAUTIZO", "Bautizo"),
+    ANIVERSARIO("ANIVERSARIO", "Aniversario"),
+    OTRO("OTRO", "Otro");
+
+    companion object {
+        fun from(raw: String) = values().firstOrNull { it.raw == raw } ?: OTRO
     }
 }
 
@@ -1263,23 +1464,13 @@ data class PriceQuote(
     val hasTravel: Boolean get() = (breakdown?.travelCents ?: 0) > 0
 }
 
-// data/models/ArtistCategory.kt — categorías locales para UI (no vienen del backend en search)
-enum class ArtistCategory(val raw: String, val displayName: String, val icon: String) {
-    MUSICO("MUSICO", "Músico", "music.note"),
-    BAILARIN("BAILARIN", "Bailarín", "figure.dance"),
-    FOTOGRAFO("FOTOGRAFO", "Fotógrafo", "camera"),
-    VIDEOGRAFO("VIDEOGRAFO", "Videógrafo", "video"),
-    DISENADOR("DISENADOR", "Diseñador", "paintbrush"),
-    ESCRITOR("ESCRITOR", "Escritor", "pencil"),
-    ANIMADOR("ANIMADOR", "Animador", "face.smiling"),
-    MAGO("MAGO", "Mago", "wand.and.stars"),
-    ACROBATA("ACROBATA", "Acróbata", "figure.gymnastics"),
-    ACTOR("ACTOR", "Actor", "theatermasks"),
-    COMEDIANTE("COMEDIANTE", "Comediante", "mic"),
-    ARTE_PLASTICO("ARTE_PLASTICO", "Arte Plástico", "paintpalette"),
-    DJ("DJ", "DJ", "headphones"),
-    CHEF("CHEF", "Chef", "fork.knife"),
-    YOGA("YOGA", "Yoga", "figure.mind.and.body")
+// data/models/ArtistCategory.kt — 5 categorías oficiales del backend (ArtistCategory enum)
+enum class SpecialtyOption(val raw: String, val displayName: String, val icon: String) {
+    MUSICO("MUSICO", "Música", "music.note"),
+    FOTOGRAFO("FOTOGRAFO", "Fotografía", "camera"),
+    VIDEOGRAFO("VIDEOGRAFO", "Video", "video"),
+    PAYASO("PAYASO", "Payaso", "party.popper"),
+    MAESTRO_CEREMONIA("MAESTRO_CEREMONIA", "Maestro de Ceremonia", "mic")
 }
 ```
 
@@ -1350,13 +1541,14 @@ POST /api/bookings/{id}/cancel                  [auth]
   "artistId": "xxx",
   "serviceId": "yyy",
   "scheduledDate": "2026-05-10T15:00:00.000Z",
-  "duration": 60,
+  "durationMinutes": 60,
   "location": "Salón XYZ",
   "locationLat": 14.64,
   "locationLng": -90.51,
-  "notes": "...",
-  "numDays": 1,
-  "eventId": null
+  "clientNotes": "...",
+  "eventId": null,
+  "eventType": "BODA",
+  "selectedAddons": ["addon-uuid-1"]
 }
 ```
 

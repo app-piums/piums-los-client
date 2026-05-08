@@ -21,34 +21,32 @@ enum SearchSortOption: String, CaseIterable {
     }
 }
 
-// Especialidades reales que existen en el backend (texto libre)
+// Categorías oficiales del backend — ArtistCategory enum de piums-platform
 enum SpecialtyOption: String, CaseIterable, Identifiable {
     var id: String { rawValue }
-    case bodas         = "Bodas"
-    case dj            = "DJ"
-    case musico        = "Música"
-    case fotografia    = "Fotografía"
-    case baile         = "Baile"
-    case maquillaje    = "Maquillaje"
-    case tatuajes      = "Tatuajes"
-    case iluminacion   = "Iluminación"
-    case barberia      = "Barbería"
-    case quinces       = "Quinceañeras"
-    case corporativo   = "Corporativo"
+    case musico           = "MUSICO"
+    case fotografo        = "FOTOGRAFO"
+    case videografo       = "VIDEOGRAFO"
+    case payaso           = "PAYASO"
+    case maestroCeremonia = "MAESTRO_CEREMONIA"
+
+    var displayName: String {
+        switch self {
+        case .musico:           return "Música"
+        case .fotografo:        return "Fotografía"
+        case .videografo:       return "Video"
+        case .payaso:           return "Payaso"
+        case .maestroCeremonia: return "Maestro de Ceremonia"
+        }
+    }
 
     var icon: String {
         switch self {
-        case .bodas:       return "heart.fill"
-        case .dj:          return "headphones"
-        case .musico:      return "music.note"
-        case .fotografia:  return "camera.fill"
-        case .baile:       return "figure.dance"
-        case .maquillaje:  return "paintbrush.fill"
-        case .tatuajes:    return "pencil.tip"
-        case .iluminacion: return "lightbulb.fill"
-        case .barberia:    return "scissors"
-        case .quinces:     return "sparkles"
-        case .corporativo: return "briefcase.fill"
+        case .musico:           return "music.note"
+        case .fotografo:        return "camera.fill"
+        case .videografo:       return "film.fill"
+        case .payaso:           return "party.popper.fill"
+        case .maestroCeremonia: return "mic.fill"
         }
     }
 }

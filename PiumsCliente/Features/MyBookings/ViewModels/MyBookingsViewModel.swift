@@ -8,6 +8,14 @@ struct BookingArtistInfo {
     let isVerified: Bool
 }
 
+struct BookingServiceInfo {
+    let name: String
+    let description: String?
+    let whatIsIncluded: [String]
+    let durationMin: Int?
+    let durationMax: Int?
+}
+
 // DTO privado para decodificar /api/artists/:id
 private struct ArtistSummaryDTO: Decodable {
     let name: String?
@@ -33,11 +41,27 @@ private struct ArtistSummaryDTO: Decodable {
     var resolvedVerified: Bool     { artist?.isVerified ?? data?.isVerified ?? user?.isVerified ?? isVerified ?? false }
 }
 
+// DTO para decodificar /api/catalog/services/:id (maneja respuesta directa o envuelta)
+private struct ServiceResponseDTO: Decodable {
+    let service: ArtistService?
+    let data: ArtistService?
+    // campos directos como fallback
+    let id: String?
+    let name: String?
+    let description: String?
+    let whatIsIncluded: [String]?
+    let durationMin: Int?
+    let durationMax: Int?
+
+    var resolved: ArtistService? { service ?? data }
+}
+
 @Observable
 @MainActor
 final class MyBookingsViewModel {
     var bookings: [Booking] = []
     var artistCache: [String: BookingArtistInfo] = [:]
+    var serviceCache: [String: BookingServiceInfo] = [:]
     var isLoading = false
     var errorMessage: String?
     var selectedStatus: BookingStatus?
@@ -93,8 +117,10 @@ final class MyBookingsViewModel {
             bookings.append(contentsOf: newBookings)
             hasMore = res.hasMore
             currentPage += 1
-            // Precargar info de artistas en paralelo (deduplica por artistId)
-            await prefetchArtists(for: newBookings)
+            // Precargar info de artistas y servicios en paralelo
+            async let fetchArtists: () = prefetchArtists(for: newBookings)
+            async let fetchServices: () = prefetchServices(for: newBookings)
+            _ = await (fetchArtists, fetchServices)
         } catch {
             let err = AppError(from: error)
             print("❌ Error cargando bookings: \(err.errorDescription ?? error.localizedDescription)")
@@ -111,6 +137,15 @@ final class MyBookingsViewModel {
         }
     }
 
+    private func prefetchServices(for bookings: [Booking]) async {
+        let ids = Set(bookings.map { $0.serviceId }).filter { serviceCache[$0] == nil }
+        await withTaskGroup(of: Void.self) { group in
+            for id in ids {
+                group.addTask { await self.loadServiceInfo(id: id) }
+            }
+        }
+    }
+
     private func loadArtistInfo(id: String) async {
         if let dto: ArtistSummaryDTO = try? await APIClient.request(.getArtist(id: id)) {
             print("🎨 prefetch \(id) — resolvedName: \(dto.resolvedName ?? "nil"), artist?.name: \(dto.artist?.name ?? "nil"), data?.name: \(dto.data?.name ?? "nil"), name: \(dto.name ?? "nil")")
@@ -122,7 +157,31 @@ final class MyBookingsViewModel {
                 isVerified: dto.resolvedVerified
             )
         } else {
-            print("❌ prefetch \(id) — fetch/decode falló")
+            print("❌ prefetch artista \(id) — fetch/decode falló")
+        }
+    }
+
+    private func loadServiceInfo(id: String) async {
+        // Intenta decodificar respuesta directa (ArtistService) o envuelta
+        if let svc: ArtistService = try? await APIClient.request(.getService(id: id)) {
+            serviceCache[id] = BookingServiceInfo(
+                name: svc.name,
+                description: svc.description,
+                whatIsIncluded: svc.whatIsIncluded ?? [],
+                durationMin: svc.durationMin,
+                durationMax: svc.durationMax
+            )
+            return
+        }
+        if let dto: ServiceResponseDTO = try? await APIClient.request(.getService(id: id)),
+           let svc = dto.resolved {
+            serviceCache[id] = BookingServiceInfo(
+                name: svc.name,
+                description: svc.description,
+                whatIsIncluded: svc.whatIsIncluded ?? [],
+                durationMin: svc.durationMin,
+                durationMax: svc.durationMax
+            )
         }
     }
 }

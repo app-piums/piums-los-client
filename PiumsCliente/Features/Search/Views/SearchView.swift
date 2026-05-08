@@ -2,31 +2,24 @@
 import SwiftUI
 import CoreLocation
 
-// MARK: - Categorías del cliente (simples, igual que la web)
+// MARK: - Categorías del cliente — sincronizadas con ArtistCategory de piums-platform
 
 private struct ClientCategory: Identifiable {
     let id: String
     let label: String
     let icon: String
-    let searchQuery: String
+    let categoryId: String   // ArtistCategory enum value del backend
 }
 
 private let CLIENT_CATEGORIES: [ClientCategory] = [
-    ClientCategory(id: "musica",      label: "Música",        icon: "music.note",          searchQuery: "musica"),
-    ClientCategory(id: "dj",          label: "DJ",            icon: "headphones",           searchQuery: "DJ"),
-    ClientCategory(id: "fotografia",  label: "Fotografía",    icon: "camera.fill",          searchQuery: "fotografia"),
-    ClientCategory(id: "baile",       label: "Baile",         icon: "figure.dance",         searchQuery: "baile"),
-    ClientCategory(id: "maquillaje",  label: "Maquillaje",    icon: "paintbrush.fill",      searchQuery: "maquillaje"),
-    ClientCategory(id: "tatuajes",    label: "Tatuajes",      icon: "pencil.tip",           searchQuery: "tatuajes"),
-    ClientCategory(id: "iluminacion", label: "Iluminación",   icon: "lightbulb.fill",       searchQuery: "iluminacion"),
-    ClientCategory(id: "bodas",       label: "Bodas",         icon: "heart.fill",           searchQuery: "bodas"),
-    ClientCategory(id: "quinces",     label: "Quinceañeras",  icon: "sparkles",             searchQuery: "quinceañeras"),
-    ClientCategory(id: "corporativo", label: "Corporativo",   icon: "briefcase.fill",       searchQuery: "corporativo"),
-    ClientCategory(id: "barberia",    label: "Barbería",      icon: "scissors",             searchQuery: "barberia"),
-    ClientCategory(id: "magia",       label: "Shows",         icon: "party.popper.fill",    searchQuery: "shows animacion"),
+    ClientCategory(id: "musico",            label: "Música",               icon: "music.note",        categoryId: "MUSICO"),
+    ClientCategory(id: "fotografo",         label: "Fotografía",           icon: "camera.fill",       categoryId: "FOTOGRAFO"),
+    ClientCategory(id: "videografo",        label: "Video",                icon: "film.fill",         categoryId: "VIDEOGRAFO"),
+    ClientCategory(id: "payaso",            label: "Payaso",               icon: "party.popper.fill", categoryId: "PAYASO"),
+    ClientCategory(id: "maestro_ceremonia", label: "Maestro de Ceremonia", icon: "mic.fill",          categoryId: "MAESTRO_CEREMONIA"),
 ]
 
-private let POPULAR_SEARCHES = ["banda", "fotografía bodas", "DJ boda", "música en vivo", "maquillaje novia"]
+private let POPULAR_SEARCHES = ["música en vivo", "fotógrafo bodas", "video boda", "payaso fiesta", "maestro ceremonias"]
 
 // MARK: - SearchView
 
@@ -47,8 +40,8 @@ struct SearchView: View {
                     // ── Estado inicial: categorías de cliente ─
                     ClientExploreInitialView(
                         onCategory: { cat in
-                            viewModel.query = cat.searchQuery
-                            viewModel.selectedSpecialty = nil
+                            viewModel.query = ""
+                            viewModel.selectedSpecialty = SpecialtyOption(rawValue: cat.categoryId)
                             Task { await viewModel.search() }
                         },
                         onPopular: { term in
@@ -221,7 +214,7 @@ struct SearchView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 if let sp = viewModel.selectedSpecialty {
-                    FilterChip(label: sp.rawValue) {
+                    FilterChip(label: sp.displayName) {
                         viewModel.selectedSpecialty = nil; Task { await viewModel.search() }
                     }
                 }
@@ -415,7 +408,7 @@ struct SearchFiltersSheet: View {
                                 } label: {
                                     VStack(spacing: 4) {
                                         Image(systemName: sp.icon).font(.title3)
-                                        Text(sp.rawValue).font(.caption2).lineLimit(1)
+                                        Text(sp.displayName).font(.caption2).lineLimit(1)
                                     }
                                     .frame(maxWidth: .infinity).padding(.vertical, 10)
                                     .background(viewModel.selectedSpecialty == sp

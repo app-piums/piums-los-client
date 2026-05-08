@@ -501,16 +501,26 @@ struct Booking: Codable, Identifiable, Hashable {
     let totalPrice: Int
     let scheduledDate: String
     let scheduledTime: String?
-    let duration: Int?
+    let durationMinutes: Int?
     let notes: String?
     let location: String?
+    let locationLat: Double?
+    let locationLng: Double?
+    let clientLat: Double?
+    let clientLng: Double?
+    let distanceKm: Double?
     let eventId: String?
+    let eventType: String?
     let createdAt: String?
     let anticipoRequired: Bool?
     let anticipoAmount: Int?
     let currency: String?
     let couponCode: String?
     let couponDiscountAmount: Int?
+    let servicePrice: Int?
+    let addonsPrice: Int?
+    let travelPrice: Int?
+    let selectedAddons: [String]?
 
     // Participantes — pueden venir anidados del backend
     let artist: BookingParticipant?
@@ -583,6 +593,7 @@ enum PaymentStatus: String, Codable {
     case pending           = "PENDING"
     case completed         = "COMPLETED"       // legacy
     case anticipoPaid      = "ANTICIPO_PAID"
+    case depositPaid       = "DEPOSIT_PAID"    // legacy alias para ANTICIPO_PAID
     case chargingRemaining = "CHARGING_REMAINING"
     case fullyPaid         = "FULLY_PAID"
     case frozen            = "FROZEN"
@@ -601,6 +612,7 @@ enum PaymentStatus: String, Codable {
         case .pending:           return "Pago pendiente"
         case .completed:         return "Pagado"
         case .anticipoPaid:      return "Anticipo pagado"
+        case .depositPaid:       return "Anticipo pagado"
         case .chargingRemaining: return "Cobrando saldo"
         case .fullyPaid:         return "Pagado completo"
         case .frozen:            return "Congelado"
@@ -609,6 +621,42 @@ enum PaymentStatus: String, Codable {
         case .failed:            return "Fallido"
         case .unknown:           return "Desconocido"
         }
+    }
+}
+
+enum EventType: String, Codable, CaseIterable, Identifiable {
+    var id: String { rawValue }
+    case cumpleanos    = "CUMPLEANOS"
+    case boda          = "BODA"
+    case graduacion    = "GRADUACION"
+    case quinceanera   = "QUINCEANERA"
+    case corporativo   = "CORPORATIVO"
+    case concierto     = "CONCIERTO"
+    case fiesta        = "FIESTA"
+    case babyShower    = "BABY_SHOWER"
+    case bautizo       = "BAUTIZO"
+    case aniversario   = "ANIVERSARIO"
+    case otro          = "OTRO"
+
+    var displayName: String {
+        switch self {
+        case .cumpleanos:  return "Cumpleaños"
+        case .boda:        return "Boda"
+        case .graduacion:  return "Graduación"
+        case .quinceanera: return "Quinceañera"
+        case .corporativo: return "Corporativo"
+        case .concierto:   return "Concierto"
+        case .fiesta:      return "Fiesta"
+        case .babyShower:  return "Baby Shower"
+        case .bautizo:     return "Bautizo"
+        case .aniversario: return "Aniversario"
+        case .otro:        return "Otro"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = EventType(rawValue: raw) ?? .otro
     }
 }
 
@@ -954,10 +1002,13 @@ extension Booking {
     static var mock: Booking {
         Booking(id: "b1", code: "PMS-001", clientId: "c1", artistId: "1", serviceId: "s1",
                 status: .confirmed, paymentStatus: .fullyPaid, totalPrice: 15000,
-                scheduledDate: "2026-05-10", scheduledTime: "15:00", duration: 60,
-                notes: nil, location: "Salón Principal", eventId: nil, createdAt: nil,
+                scheduledDate: "2026-05-10", scheduledTime: "15:00", durationMinutes: 60,
+                notes: nil, location: "Salón Principal",
+                locationLat: nil, locationLng: nil, clientLat: nil, clientLng: nil, distanceKm: nil,
+                eventId: nil, eventType: nil, createdAt: nil,
                 anticipoRequired: nil, anticipoAmount: nil, currency: "USD",
                 couponCode: nil, couponDiscountAmount: nil,
+                servicePrice: nil, addonsPrice: nil, travelPrice: nil, selectedAddons: nil,
                 artist: nil, client: nil, artistName: nil, clientName: nil)
     }
 }
@@ -1166,7 +1217,9 @@ struct BookingFlowContext {
     var locationLng: Double?
     var clientNotes: String = ""
     var priceQuote: PriceQuote?
-    var eventId: String? = nil  // NEW: asociar reserva a un evento
+    var eventId: String? = nil
+    var eventType: EventType? = nil
+    var selectedAddons: [String] = []
 
     /// Fecha en formato ISO requerido por el backend: "2026-04-28T10:00:00.000Z"
     var scheduledDateISO: String? {
