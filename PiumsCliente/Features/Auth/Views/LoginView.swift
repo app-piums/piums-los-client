@@ -218,17 +218,13 @@ struct LoginView: View {
             }
 
             VStack(spacing: 12) {
-                SocialSignInButton(provider: .google) {
+                GoogleSignInButton {
                     Task { await viewModel.loginWithGoogle() }
                 }
-                SocialSignInButton(provider: .facebook, comingSoon: true) {
-                    Task { await viewModel.loginWithFacebook() }
-                }
-                SocialSignInButton(provider: .tiktok, comingSoon: true) {
-                    Task { await viewModel.loginWithTikTok() }
-                }
+                .disabled(viewModel.isLoading)
+                FacebookSignInRow()
+                TikTokSignInRow()
             }
-            .disabled(viewModel.isLoading)
 
             if let msg = viewModel.errorMessage {
                 ErrorBannerView(message: msg)
@@ -476,87 +472,102 @@ struct LoginView: View {
     }
 }
 
-// MARK: - SocialSignInButton
+// MARK: - Social Buttons (mismo estilo que app artista)
 
-private enum SocialProvider {
-    case google, facebook, tiktok
-    var displayName: String {
-        switch self {
-        case .google:   return "Google"
-        case .facebook: return "Facebook"
-        case .tiktok:   return "TikTok"
-        }
-    }
-}
-
-private struct SocialSignInButton: View {
-    let provider: SocialProvider
-    var comingSoon: Bool = false
+private struct GoogleSignInButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: comingSoon ? {} : action) {
+        Button(action: action) {
             HStack(spacing: 14) {
-                SocialProviderIcon(provider: provider)
-                    .frame(width: 26, height: 26)
-                    .opacity(comingSoon ? 0.4 : 1)
+                ZStack {
+                    Circle().fill(Color.white).frame(width: 26, height: 26)
+                    Text("G")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color(red: 0.26, green: 0.52, blue: 0.96))
+                }
+                .frame(width: 26, height: 26)
 
-                Text("Continuar con \(provider.displayName)")
+                Text("Continuar con Google")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(comingSoon ? Color.secondary : Color.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .foregroundStyle(Color.piumsLabel)
 
                 Spacer()
-
-                if comingSoon {
-                    Text("Próximamente")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(Color.secondary)
-                        .fixedSize()
-                }
             }
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .padding(.horizontal, 16)
-            .background(Color(.tertiarySystemBackground))
+            .background(Color.piumsBackgroundElevated)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(Color.piumsSeparator, lineWidth: 1)
+                    .strokeBorder(Color(.separator), lineWidth: 1)
             )
         }
-        .disabled(comingSoon)
     }
 }
 
-private struct SocialProviderIcon: View {
-    let provider: SocialProvider
-
+private struct FacebookSignInRow: View {
     var body: some View {
-        switch provider {
-        case .google:
+        HStack(spacing: 14) {
             ZStack {
-                Circle().fill(Color.white).frame(width: 26, height: 26)
-                Text("G")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color(red: 0.26, green: 0.52, blue: 0.96))
-            }
-        case .facebook:
-            ZStack {
-                Circle().fill(Color(red: 0.23, green: 0.35, blue: 0.60)).frame(width: 26, height: 26)
+                Circle()
+                    .fill(Color(red: 0.094, green: 0.463, blue: 0.949))
+                    .frame(width: 26, height: 26)
                 Text("f")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
             }
-        case .tiktok:
+            Text("Continuar con Facebook")
+                .font(.body.weight(.medium))
+                .foregroundStyle(Color.piumsLabel)
+            Spacer()
+            Text("Próximamente")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.piumsLabelSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .padding(.horizontal, 16)
+        .background(Color.piumsBackgroundElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color(.separator), lineWidth: 1)
+        )
+        .opacity(0.6)
+    }
+}
+
+private struct TikTokSignInRow: View {
+    var body: some View {
+        HStack(spacing: 14) {
             ZStack {
-                Circle().fill(Color.black).frame(width: 26, height: 26)
-                Image(systemName: "music.note")
-                    .font(.system(size: 13, weight: .bold))
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.black)
+                    .frame(width: 26, height: 26)
+                Text("♪")
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
             }
+            Text("Continuar con TikTok")
+                .font(.body.weight(.medium))
+                .foregroundStyle(Color.piumsLabel)
+            Spacer()
+            Text("Próximamente")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.piumsLabelSecondary)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .padding(.horizontal, 16)
+        .background(Color.piumsBackgroundElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color(.separator), lineWidth: 1)
+        )
+        .opacity(0.6)
     }
 }
 
