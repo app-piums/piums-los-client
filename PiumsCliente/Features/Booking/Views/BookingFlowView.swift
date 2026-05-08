@@ -1358,16 +1358,13 @@ struct BookingSuccessView: View {
                 }
             }
             .scrollIndicators(.hidden)
-            .navigationBarHidden(true)
-            .overlay(alignment: .topTrailing) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .padding(10)
-                        .background(.ultraThinMaterial, in: Circle())
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cerrar") { dismiss() }
+                        .foregroundStyle(Color.piumsOrange)
                 }
-                .padding(.top, 16).padding(.trailing, 20)
             }
         }
         .fullScreenCover(isPresented: $showCheckout) {
