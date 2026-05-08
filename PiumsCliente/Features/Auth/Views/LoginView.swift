@@ -504,6 +504,8 @@ private struct SocialSignInButton: View {
                 Text("Continuar con \(provider.displayName)")
                     .font(.body.weight(.medium))
                     .foregroundStyle(comingSoon ? Color.secondary : Color.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 Spacer()
 
@@ -511,6 +513,7 @@ private struct SocialSignInButton: View {
                     Text("Próximamente")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(Color.secondary)
+                        .fixedSize()
                 }
             }
             .frame(maxWidth: .infinity)
