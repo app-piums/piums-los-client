@@ -306,8 +306,8 @@ extension APIEndpoint {
             return "/api/users/me/favorites/check?entityType=\(type)&entityId=\(entityId)"
 
         // Payments
-        case .createPaymentIntent:             return "/api/payments/payment-intents"
-        case .confirmTilopayRedirect:          return "/api/payments/tilopay-confirm"
+        case .createPaymentIntent:             return "/api/payments/checkout"
+        case .confirmTilopayRedirect:          return "/api/payments/tilopay/confirm"
         case .getMyCredits:                    return "/api/payments/credits/me"
         case .getMyCoupons:                    return "/api/coupons/my"
         case .validateCoupon:                  return "/api/coupons/validate"

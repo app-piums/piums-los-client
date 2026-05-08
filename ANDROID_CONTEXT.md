@@ -730,7 +730,8 @@ Paso 1 → Servicio (ya viene seleccionado desde ArtistProfile)
 Paso 2 → Fecha: calendario + slots de tiempo
           GET /api/availability/calendar?artistId=&year=&month=
           GET /api/availability/time-slots?artistId=&date=
-Paso 3 → Detalles: ubicación, notas, ¿multi-día?
+Paso 3 → Detalles: ubicación, notas, ¿multi-día?, selector de evento (opcional)
+          GET /api/events → carga eventos del cliente (excluir CANCELLED); permite vincular bookingId a eventId
           POST /api/catalog/pricing/calculate → muestra precio dinámico
 Paso 4 → Resumen + confirmar
           POST /api/bookings
@@ -1384,7 +1385,10 @@ POST /api/reviews   [auth] body: {artistId, bookingId, rating (1-5), comment}
 
 ### Payments
 ```
-POST /api/payments/payment-intents          [auth] body: {bookingId}
+POST /api/payments/checkout                 [auth] body: {bookingId, amount, currency?, countryCode?}
+     → PaymentIntent { id, provider ("TILOPAY"|"STRIPE"), redirectUrl?, clientSecret?, status }
+     ⚠️ Usar ESTE endpoint (unificado Tilopay/Stripe). /payment-intents es legacy Stripe-only.
+POST /api/payments/tilopay/confirm          [auth] body: {bookingId, responseCode, orderNumber, amount, auth?, currency?, orderHash?}
 GET  /api/payments/payments?page=1&limit=20 [auth]
 GET  /api/payments/payments/{id}            [auth]
 ```

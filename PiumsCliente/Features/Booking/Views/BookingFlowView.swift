@@ -62,6 +62,10 @@ final class BookingFlowViewModel {
     var bookingResult: Booking?
     var didComplete = false
 
+    // Events
+    var events: [EventSummary] = []
+    var isLoadingEvents = false
+
     // Coupon
     var couponCode = ""
     var couponResult: CouponValidationResult?
@@ -80,6 +84,15 @@ final class BookingFlowViewModel {
             let res: _BFServicesRes = try await APIClient.request(.listServices(artistId: context.artist.id))
             services = res.services.filter { $0.status == "ACTIVE" && ($0.isAvailable ?? true) }
         } catch { errorMessage = AppError(from: error).errorDescription }
+    }
+
+    func loadEvents() async {
+        guard events.isEmpty else { return }
+        isLoadingEvents = true; defer { isLoadingEvents = false }
+        do {
+            let res: EventsResponse = try await APIClient.request(.listEvents)
+            events = res.data.filter { $0.status != .cancelled }
+        } catch {}
     }
 
     func loadCalendar() async {
@@ -320,6 +333,9 @@ struct BookingFlowView: View {
         .onChange(of: vm.context.numDays) { _, _ in
             guard vm.step == .review else { return }
             Task { await vm.calculatePrice() }
+        }
+        .onChange(of: vm.step) { _, newStep in
+            if newStep == .details { Task { await vm.loadEvents() } }
         }
         .onChange(of: locationStore.coordinate?.latitude) { _, _ in
             guard let coord = locationStore.coordinate else { return }
@@ -579,6 +595,80 @@ struct BookingFlowView: View {
                 TextEditor(text: $vm.context.clientNotes)
                     .frame(minHeight: 90).padding(10)
                     .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            eventPickerSection
+        }
+    }
+
+    // MARK: - Event picker
+
+    private var eventPickerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 4) {
+                Label("Asociar a un Evento", systemImage: "calendar.badge.plus").font(.headline)
+                Text("(Opcional)").font(.subheadline).foregroundStyle(.secondary)
+            }
+            if vm.isLoadingEvents {
+                HStack { ProgressView().scaleEffect(0.8); Text("Cargando eventos…").font(.subheadline).foregroundStyle(.secondary) }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.tertiarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else if vm.events.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.exclamationmark").foregroundStyle(.secondary)
+                    Text("No tienes eventos activos.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else if let selectedId = vm.context.eventId,
+                      let ev = vm.events.first(where: { $0.id == selectedId }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "calendar.circle.fill")
+                        .font(.title3).foregroundStyle(Color.piumsOrange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ev.name).font(.subheadline.bold())
+                        Text("\(ev.status.displayName) · \((ev.bookings ?? []).count) reservas")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button {
+                        vm.context.eventId = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(Color(.tertiaryLabel))
+                    }
+                }
+                .padding(12)
+                .background(Color.piumsOrange.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.piumsOrange.opacity(0.25), lineWidth: 1))
+            } else {
+                Menu {
+                    Button("Sin evento") { vm.context.eventId = nil }
+                    Divider()
+                    ForEach(vm.events) { ev in
+                        Button {
+                            vm.context.eventId = ev.id
+                        } label: {
+                            Label("\(ev.name) · \(ev.status.displayName)", systemImage: "calendar")
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "calendar.badge.plus").foregroundStyle(Color.piumsOrange)
+                        Text("Seleccionar evento…").foregroundStyle(.secondary)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Color(.tertiaryLabel))
+                    }
+                    .font(.subheadline)
+                    .padding(12)
+                    .background(Color(.tertiarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
             }
         }
     }

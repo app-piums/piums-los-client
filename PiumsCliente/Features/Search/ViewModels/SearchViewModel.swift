@@ -178,7 +178,10 @@ final class SearchViewModel {
             guard nonce == searchNonce else { return }
             let appErr = AppError(from: error)
             // Smart search no disponible (5xx/504) → fallback al índice rápido
-            if case .serverError = appErr {
+            let is5xx: Bool
+            if case .http(let code, _) = appErr, code >= 500 { is5xx = true }
+            else { is5xx = (appErr == .serverError) }
+            if is5xx {
                 isSmartSearch = false
                 expandedTerms = []
                 await loadNext()

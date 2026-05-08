@@ -60,6 +60,10 @@ struct APIClient {
         if http.statusCode >= 400 {
             let raw = String(data: data, encoding: .utf8) ?? "(binary)"
             print("❌ APIClient [\(http.statusCode)] \(endpoint.url.path):\n\(raw)")
+            if let body = urlRequest.httpBody,
+               let bodyStr = String(data: body, encoding: .utf8) {
+                print("   ↑ Request body: \(bodyStr)")
+            }
         }
         #endif
 
@@ -78,7 +82,8 @@ struct APIClient {
         case 404:
             throw AppError.notFound
         case 500..<600:
-            throw AppError.serverError
+            let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
+            throw AppError.http(statusCode: http.statusCode, message: msg)
         default:
             let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             throw AppError.http(statusCode: http.statusCode, message: msg)
