@@ -138,7 +138,7 @@ struct LoginView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 28)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color.piumsBackgroundSecondary)
                 .ignoresSafeArea(edges: .bottom)
         )
     }
@@ -182,7 +182,7 @@ struct LoginView: View {
                     .foregroundStyle(Color.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .background(Color(.tertiarySystemBackground))
+                    .background(Color.piumsBackgroundElevated)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
@@ -316,7 +316,7 @@ struct LoginView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 15)
-                .background(Color(.tertiarySystemBackground))
+                .background(Color.piumsBackgroundElevated)
                 .clipShape(RoundedRectangle(cornerRadius: 13))
                 .overlay(
                     RoundedRectangle(cornerRadius: 13)
@@ -365,7 +365,7 @@ struct LoginView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
-            .background(Color(.tertiarySystemBackground))
+            .background(Color.piumsBackgroundElevated)
             .clipShape(RoundedRectangle(cornerRadius: 13))
             .overlay(
                 RoundedRectangle(cornerRadius: 13)
@@ -521,10 +521,12 @@ private struct FacebookSignInRow: View {
             Text("Continuar con Facebook")
                 .font(.body.weight(.medium))
                 .foregroundStyle(Color.piumsLabel)
+                .lineLimit(1)
             Spacer()
             Text("Próximamente")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Color.piumsLabelSecondary)
+                .fixedSize()
         }
         .frame(maxWidth: .infinity)
         .frame(height: 52)
@@ -553,10 +555,12 @@ private struct TikTokSignInRow: View {
             Text("Continuar con TikTok")
                 .font(.body.weight(.medium))
                 .foregroundStyle(Color.piumsLabel)
+                .lineLimit(1)
             Spacer()
             Text("Próximamente")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Color.piumsLabelSecondary)
+                .fixedSize()
         }
         .frame(maxWidth: .infinity)
         .frame(height: 52)
