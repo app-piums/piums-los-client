@@ -550,12 +550,12 @@ struct PromoBannerView: View {
                 .offset(x: 230, y: 30)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Master the Art of\nComposition")
+                Text("¿Tienes un evento\nespecial?")
                     .font(.title3.bold())
                     .foregroundStyle(.white)
                     .lineSpacing(2)
 
-                Text("Join our upcoming workshop with\nleading curators from the MoMA.")
+                Text("Contrata artistas profesionales\ny haz tu evento único e inolvidable.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
                     .lineSpacing(2)
@@ -563,7 +563,7 @@ struct PromoBannerView: View {
                 Button {
                     showArtistSearch = true
                 } label: {
-                    Text("Register Now")
+                    Text("Explorar artistas")
                         .font(.subheadline.bold())
                         .foregroundStyle(Color.piumsOrange)
                         .padding(.horizontal, 20)
