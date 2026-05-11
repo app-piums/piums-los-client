@@ -911,6 +911,12 @@ struct EventResponse: Codable {
 
 // MARK: - Chat (chat-service)
 
+struct ChatParticipant: Codable {
+    let id: String?
+    let name: String?
+    let avatar: String?
+}
+
 struct Conversation: Codable, Identifiable, Hashable {
     let id: String
     let userId: String      // mapped from participant1Id
@@ -918,15 +924,32 @@ struct Conversation: Codable, Identifiable, Hashable {
     let bookingId: String?
     let status: String
     let lastMessageAt: String?
+    let lastMessageContent: String?
     let createdAt: String
     let updatedAt: String
     let unreadCount: Int?
     let messages: [ChatMessage]?
+    let participant1: ChatParticipant?
+    let participant2: ChatParticipant?
 
     enum CodingKeys: String, CodingKey {
-        case id, bookingId, status, lastMessageAt, createdAt, updatedAt, unreadCount, messages
-        case userId   = "participant1Id"
-        case artistId = "participant2Id"
+        case id, bookingId, status, lastMessageAt, lastMessageContent
+        case createdAt, updatedAt, unreadCount, messages
+        case userId       = "participant1Id"
+        case artistId     = "participant2Id"
+        case participant1, participant2
+    }
+
+    func otherParticipantName(myId: String) -> String {
+        if userId == myId {
+            return participant2?.name ?? "Artista"
+        }
+        return participant1?.name ?? "Artista"
+    }
+
+    func otherParticipantAvatar(myId: String) -> String? {
+        if userId == myId { return participant2?.avatar }
+        return participant1?.avatar
     }
 
     static func == (lhs: Conversation, rhs: Conversation) -> Bool { lhs.id == rhs.id }

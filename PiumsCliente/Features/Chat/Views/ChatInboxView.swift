@@ -47,37 +47,56 @@ struct ChatInboxView: View {
 private struct ConversationRow: View {
     let conversation: Conversation
 
+    private var myId: String { AuthManager.shared.currentUser?.id ?? "" }
+    private var participantName: String { conversation.otherParticipantName(myId: myId) }
+    private var avatarUrl: String? { conversation.otherParticipantAvatar(myId: myId) }
+
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
                     .fill(statusColor.opacity(0.15))
                     .frame(width: 48, height: 48)
-                Image(systemName: "person.fill")
-                    .foregroundStyle(statusColor)
-                    .font(.system(size: 20))
+                if let url = avatarUrl.flatMap(URL.init) {
+                    AsyncImage(url: url) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Image(systemName: "person.fill")
+                            .foregroundStyle(statusColor)
+                            .font(.system(size: 20))
+                    }
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.fill")
+                        .foregroundStyle(statusColor)
+                        .font(.system(size: 20))
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Artista")
+                    Text(participantName)
                         .font(.subheadline.bold())
+                        .lineLimit(1)
                     Spacer()
                     Text(relativeDate)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if let bookingId = conversation.bookingId {
-                    Text("Reserva: \(bookingId.prefix(8))...")
+                if let preview = conversation.lastMessageContent ?? conversation.messages?.last?.content {
+                    Text(preview)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Text(statusLabel)
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(statusColor.opacity(0.12))
+                        .foregroundStyle(statusColor)
+                        .clipShape(Capsule())
                 }
-                Text(conversation.status.capitalized)
-                    .font(.caption2.bold())
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(statusColor.opacity(0.12))
-                    .foregroundStyle(statusColor)
-                    .clipShape(Capsule())
             }
 
             if let unread = conversation.unreadCount, unread > 0 {
@@ -99,6 +118,15 @@ private struct ConversationRow: View {
         case "PENDING": return .blue
         case "CLOSED":  return .secondary
         default:        return .secondary
+        }
+    }
+
+    private var statusLabel: String {
+        switch conversation.status.uppercased() {
+        case "ACTIVE":  return "Activo"
+        case "PENDING": return "Pendiente"
+        case "CLOSED":  return "Cerrado"
+        default:        return conversation.status.capitalized
         }
     }
 

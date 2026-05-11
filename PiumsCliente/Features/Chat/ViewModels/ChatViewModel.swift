@@ -10,6 +10,7 @@ final class ChatViewModel {
     var errorMessage: String?
     var hasMore = true
     private var currentPage = 1
+    private(set) var currentConversationId: String?
 
     private let socket = ChatSocketManager.shared
     private let unreadStore = ChatRealtimeStore.shared
@@ -58,6 +59,7 @@ final class ChatViewModel {
     func loadMessages(conversationId: String) async {
         isLoading = true
         messages = []
+        currentConversationId = conversationId
         defer { isLoading = false }
         do {
             let res: MessagesResponse = try await APIClient.request(.listMessages(conversationId: conversationId, page: 1))
@@ -73,13 +75,14 @@ final class ChatViewModel {
             let _: VoidResponse = try await APIClient.request(.markConversationRead(id: conversationId))
             socket.markConversationRead(conversationId)
             if let idx = conversations.firstIndex(where: { $0.id == conversationId }) {
-                var conv = conversations[idx]
-                conv = Conversation(
+                let conv = conversations[idx]
+                conversations[idx] = Conversation(
                     id: conv.id, userId: conv.userId, artistId: conv.artistId, bookingId: conv.bookingId,
-                    status: conv.status, lastMessageAt: conv.lastMessageAt, createdAt: conv.createdAt,
-                    updatedAt: conv.updatedAt, unreadCount: 0, messages: conv.messages
+                    status: conv.status, lastMessageAt: conv.lastMessageAt,
+                    lastMessageContent: conv.lastMessageContent,
+                    createdAt: conv.createdAt, updatedAt: conv.updatedAt, unreadCount: 0,
+                    messages: conv.messages, participant1: conv.participant1, participant2: conv.participant2
                 )
-                conversations[idx] = conv
             }
             await unreadStore.refreshUnread()
         } catch {
@@ -111,19 +114,19 @@ final class ChatViewModel {
     }
 
     private func handleIncoming(_ msg: ChatMessage) {
-        if messages.first?.conversationId == msg.conversationId {
+        if currentConversationId == msg.conversationId {
             messages.append(msg)
         }
         if let idx = conversations.firstIndex(where: { $0.id == msg.conversationId }) {
-            var conv = conversations[idx]
+            let conv = conversations[idx]
             let myId = AuthManager.shared.currentUser?.id ?? ""
             let unread = (conv.unreadCount ?? 0) + (msg.senderId == myId ? 0 : 1)
-            conv = Conversation(
+            conversations[idx] = Conversation(
                 id: conv.id, userId: conv.userId, artistId: conv.artistId, bookingId: conv.bookingId,
-                status: conv.status, lastMessageAt: msg.createdAt, createdAt: conv.createdAt,
-                updatedAt: conv.updatedAt, unreadCount: unread, messages: conv.messages
+                status: conv.status, lastMessageAt: msg.createdAt, lastMessageContent: msg.content,
+                createdAt: conv.createdAt, updatedAt: conv.updatedAt, unreadCount: unread,
+                messages: conv.messages, participant1: conv.participant1, participant2: conv.participant2
             )
-            conversations[idx] = conv
         }
     }
 }
