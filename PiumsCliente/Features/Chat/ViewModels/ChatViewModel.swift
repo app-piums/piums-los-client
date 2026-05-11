@@ -81,7 +81,7 @@ final class ChatViewModel {
                     status: conv.status, lastMessageAt: conv.lastMessageAt,
                     lastMessageContent: conv.lastMessageContent,
                     createdAt: conv.createdAt, updatedAt: conv.updatedAt, unreadCount: 0,
-                    messages: conv.messages, participant1: conv.participant1, participant2: conv.participant2
+                    messages: conv.messages, clientName: conv.clientName, clientAvatar: conv.clientAvatar
                 )
             }
             await unreadStore.refreshUnread()
@@ -125,7 +125,7 @@ final class ChatViewModel {
                 id: conv.id, userId: conv.userId, artistId: conv.artistId, bookingId: conv.bookingId,
                 status: conv.status, lastMessageAt: msg.createdAt, lastMessageContent: msg.content,
                 createdAt: conv.createdAt, updatedAt: conv.updatedAt, unreadCount: unread,
-                messages: conv.messages, participant1: conv.participant1, participant2: conv.participant2
+                messages: conv.messages, clientName: conv.clientName, clientAvatar: conv.clientAvatar
             )
         }
     }

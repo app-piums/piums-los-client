@@ -50,7 +50,7 @@ struct ChatDetailView: View {
                 .background(.bar)
             }
         }
-        .navigationTitle(conversation.otherParticipantName(myId: AuthManager.shared.currentUser?.id ?? ""))
+        .navigationTitle(conversation.otherParticipantName)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             ChatSocketManager.shared.joinConversation(conversation.id)
@@ -101,7 +101,7 @@ private struct MessageBubble: View {
             conversation: Conversation(id: "1", userId: "u1", artistId: "a1", bookingId: nil,
                                        status: "ACTIVE", lastMessageAt: nil, lastMessageContent: nil,
                                        createdAt: "", updatedAt: "", unreadCount: 0, messages: [],
-                                       participant1: nil, participant2: ChatParticipant(id: "a1", name: "Carlos Méndez", avatar: nil)),
+                                       clientName: "Carlos Méndez", clientAvatar: nil),
             viewModel: ChatViewModel()
         )
     }

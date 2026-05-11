@@ -47,9 +47,8 @@ struct ChatInboxView: View {
 private struct ConversationRow: View {
     let conversation: Conversation
 
-    private var myId: String { AuthManager.shared.currentUser?.id ?? "" }
-    private var participantName: String { conversation.otherParticipantName(myId: myId) }
-    private var avatarUrl: String? { conversation.otherParticipantAvatar(myId: myId) }
+    private var participantName: String { conversation.otherParticipantName }
+    private var avatarUrl: String? { conversation.otherParticipantAvatar }
 
     var body: some View {
         HStack(spacing: 12) {

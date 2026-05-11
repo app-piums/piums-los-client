@@ -911,12 +911,6 @@ struct EventResponse: Codable {
 
 // MARK: - Chat (chat-service)
 
-struct ChatParticipant: Codable {
-    let id: String?
-    let name: String?
-    let avatar: String?
-}
-
 struct Conversation: Codable, Identifiable, Hashable {
     let id: String
     let userId: String      // mapped from participant1Id
@@ -929,28 +923,20 @@ struct Conversation: Codable, Identifiable, Hashable {
     let updatedAt: String
     let unreadCount: Int?
     let messages: [ChatMessage]?
-    let participant1: ChatParticipant?
-    let participant2: ChatParticipant?
+    // Backend devuelve el otro participante como campos planos
+    let clientName: String?
+    let clientAvatar: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, bookingId, status, lastMessageAt, lastMessageContent
-        case createdAt, updatedAt, unreadCount, messages
-        case userId       = "participant1Id"
-        case artistId     = "participant2Id"
-        case participant1, participant2
+        case id, bookingId, status, lastMessageAt, createdAt, updatedAt
+        case unreadCount, messages, clientName, clientAvatar
+        case userId             = "participant1Id"
+        case artistId           = "participant2Id"
+        case lastMessageContent = "lastMessagePreview"
     }
 
-    func otherParticipantName(myId: String) -> String {
-        if userId == myId {
-            return participant2?.name ?? "Artista"
-        }
-        return participant1?.name ?? "Artista"
-    }
-
-    func otherParticipantAvatar(myId: String) -> String? {
-        if userId == myId { return participant2?.avatar }
-        return participant1?.avatar
-    }
+    var otherParticipantName: String { clientName ?? "Artista" }
+    var otherParticipantAvatar: String? { clientAvatar }
 
     static func == (lhs: Conversation, rhs: Conversation) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
