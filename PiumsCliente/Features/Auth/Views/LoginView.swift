@@ -218,6 +218,10 @@ struct LoginView: View {
             }
 
             VStack(spacing: 12) {
+                AppleSignInButton {
+                    Task { await viewModel.loginWithApple() }
+                }
+                .disabled(viewModel.isLoading)
                 GoogleSignInButton {
                     Task { await viewModel.loginWithGoogle() }
                 }
@@ -473,6 +477,36 @@ struct LoginView: View {
 }
 
 // MARK: - Social Buttons (mismo estilo que app artista)
+
+private struct AppleSignInButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: "apple.logo")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(Color.piumsLabel)
+                    .frame(width: 26, height: 26)
+
+                Text("Continuar con Apple")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Color.piumsLabel)
+
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .padding(.horizontal, 16)
+            .background(Color.piumsBackgroundElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color(.separator), lineWidth: 1)
+            )
+        }
+    }
+}
 
 private struct GoogleSignInButton: View {
     let action: () -> Void

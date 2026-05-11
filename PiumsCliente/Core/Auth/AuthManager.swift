@@ -3,6 +3,8 @@ import Foundation
 import UIKit
 import GoogleSignIn
 import FirebaseAuth
+import AuthenticationServices
+import CryptoKit
 
 @Observable
 @MainActor
@@ -57,6 +59,47 @@ final class AuthManager {
         let response: AuthResponse = try await APIClient.request(.firebaseAuth(token: firebaseIdToken))
         store(response)
     }
+
+    /// Apple Sign In → Firebase credential → Firebase ID token → POST /api/auth/firebase → Piums JWT
+    func loginWithApple() async throws {
+        let nonce = Self.randomNonceString()
+        let hashedNonce = Self.sha256(nonce)
+
+        let appleCredential = try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) in
+            let handler = AppleSignInHandler(nonce: nonce, continuation: continuation)
+            self.appleSignInHandler = handler
+
+            let provider = ASAuthorizationAppleIDProvider()
+            let request = provider.createRequest()
+            request.requestedScopes = [.fullName, .email]
+            request.nonce = hashedNonce
+
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = handler
+            controller.presentationContextProvider = handler
+            controller.performRequests()
+        }
+        self.appleSignInHandler = nil
+
+        guard let appleIDTokenData = appleCredential.identityToken,
+              let appleIDToken = String(data: appleIDTokenData, encoding: .utf8) else {
+            throw AppError.http(statusCode: 401, message: "No se obtuvo el token de Apple")
+        }
+
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: appleIDToken,
+            rawNonce: nonce,
+            fullName: appleCredential.fullName
+        )
+        let firebaseResult = try await Auth.auth().signIn(with: credential)
+        let firebaseIdToken = try await firebaseResult.user.getIDToken()
+
+        let response: AuthResponse = try await APIClient.request(.firebaseAuth(token: firebaseIdToken))
+        store(response)
+    }
+
+    private var appleSignInHandler: AppleSignInHandler?
 
     /// Facebook OAuth — backend maneja Passport.js y redirige a:
     ///   https://piums.com/auth/callback?token=JWT&provider=facebook
@@ -203,6 +246,64 @@ final class AuthManager {
         TokenStorage.shared.accessToken  = response.token
         TokenStorage.shared.refreshToken = response.refreshToken
         currentUser = response.user
+    }
+}
+
+// MARK: - Apple Sign In nonce helpers (extensión privada)
+
+extension AuthManager {
+    static func randomNonceString(length: Int = 32) -> String {
+        var bytes = [UInt8](repeating: 0, count: length)
+        SecRandomCopyBytes(kSecRandomDefault, length, &bytes)
+        let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        return String(bytes.map { charset[Int($0) % charset.count] })
+    }
+
+    static func sha256(_ input: String) -> String {
+        let data = Data(input.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
+    }
+}
+
+// MARK: - AppleSignInHandler
+
+@MainActor
+private final class AppleSignInHandler: NSObject,
+    ASAuthorizationControllerDelegate,
+    ASAuthorizationControllerPresentationContextProviding
+{
+    private let nonce: String
+    private let continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>
+
+    init(nonce: String, continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) {
+        self.nonce = nonce
+        self.continuation = continuation
+    }
+
+    nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.first?.keyWindow ?? UIWindow()
+    }
+
+    nonisolated func authorizationController(controller: ASAuthorizationController,
+                                  didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            continuation.resume(throwing: AppError.http(statusCode: 401, message: "Credencial Apple inválida"))
+            return
+        }
+        continuation.resume(returning: credential)
+    }
+
+    nonisolated func authorizationController(controller: ASAuthorizationController,
+                                  didCompleteWithError error: Error) {
+        if let authError = error as? ASAuthorizationError,
+           authError.code == .canceled {
+            continuation.resume(throwing: ASAuthorizationError(.canceled))
+        } else {
+            continuation.resume(throwing: AppError.http(statusCode: 401,
+                message: "Error al autenticar con Apple: \(error.localizedDescription)"))
+        }
     }
 }
 

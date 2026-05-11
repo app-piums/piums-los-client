@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Ubicación: usada para búsqueda de artistas cercanos y autocompletar ubicación de eventos -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Piums usa tu ubicación para mostrarte artistas disponibles cerca de ti y autocompletar la dirección de tus eventos.</string>
+
 	<!-- App Transport Security: prohibir HTTP explícitamente; solo HTTPS permitido -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

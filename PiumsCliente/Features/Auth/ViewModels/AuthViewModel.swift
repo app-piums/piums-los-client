@@ -1,6 +1,7 @@
 // AuthViewModel.swift
 import Foundation
 import UIKit
+import AuthenticationServices
 
 enum AuthScreen {
     case login, register, forgotPassword
@@ -59,6 +60,21 @@ final class AuthViewModel {
             errorMessage = e.errorDescription
         } catch {
             errorMessage = AppError(from: error).errorDescription
+        }
+    }
+
+    func loginWithApple() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            try await AuthManager.shared.loginWithApple()
+        } catch let e as ASAuthorizationError where e.code == .canceled {
+            // usuario canceló — sin mensaje
+        } catch let e as AppError {
+            errorMessage = e.errorDescription
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
