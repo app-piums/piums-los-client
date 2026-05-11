@@ -83,6 +83,22 @@ final class ProfileViewModel {
         } catch {}
     }
 
+    var isDeletingAccount = false
+    var showDeleteSheet   = false
+
+    func deleteAccount() async {
+        guard let userId = user?.id else { return }
+        isDeletingAccount = true
+        errorMessage = nil
+        defer { isDeletingAccount = false }
+        do {
+            let _: EmptyResponse = try await APIClient.request(.deleteAccount(userId: userId))
+            await AuthManager.shared.logout()
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+        }
+    }
+
     func logout() async {
         await AuthManager.shared.logout()
     }

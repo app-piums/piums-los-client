@@ -1,6 +1,6 @@
 # ANDROID_CONTEXT.md — Piums Cliente Android
 > Referencia completa para replicar la app iOS en Android con Jetpack Compose.
-> Última actualización: Abril 2026
+> Última actualización: Mayo 2026
 
 ---
 
@@ -810,15 +810,62 @@ POST /api/catalog/pricing/calculate
 
 ```
 Section Avatar + nombre + email + badge "Cliente"
-Section Cuenta: Editar perfil | Cambiar contraseña | Mis pagos
+Section Cuenta: Editar perfil | Cambiar contraseña | Mis pagos | Tarjetas guardadas | Eliminar cuenta (destructivo)
+Section Verificación: Verificar identidad (estados: pendiente / en revisión / verificado)
 Section Apariencia: Toggle dark/light mode
-Section Ayuda: ¿Cómo funciona Piums? | Mis quejas | Términos | Privacidad | Soporte
+Section Ayuda: Preferencias de notificaciones | ¿Cómo funciona Piums? | Mis quejas | Términos | Privacidad | Soporte
 Section Cerrar sesión (destructivo)
 ```
 
 - PATCH `/api/auth/profile` — actualizar nombre
 - POST `/api/auth/change-password`
+- GET  `/api/notifications/preferences` — cargar preferencias
+- PUT  `/api/notifications/preferences` — guardar preferencias (campos opcionales)
+- DELETE `/api/users/:id` — eliminar cuenta (soft delete); requiere confirmación en UI: checkbox + escribir "ELIMINAR" + contraseña
 - Guardar preferencia de tema en `DataStore`
+
+#### Preferencias de notificaciones — campos del backend
+
+| Campo | Tipo | Default | Descripción |
+|---|---|---|---|
+| `emailEnabled` | bool | true | Canal email activo |
+| `smsEnabled` | bool | true | Canal SMS activo |
+| `pushEnabled` | bool | true | Canal push activo |
+| `bookingNotifications` | bool | true | Reservas y cambios |
+| `paymentNotifications` | bool | true | Pagos y cobros |
+| `reviewNotifications` | bool | true | Reseñas |
+| `marketingNotifications` | bool | false | Promociones |
+| `dndEnabled` | bool | false | No molestar |
+| `dndStartHour` | int 0–23 | 22 | Hora inicio silencio |
+| `dndEndHour` | int 0–23 | 8 | Hora fin silencio |
+
+iOS: `NotificationPreferencesView` — List con secciones Canales / Tipos / No molestar + botón "Guardar" en toolbar (deshabilitado si no hay cambios).
+
+#### Eliminar cuenta — flujo iOS (replicar en Android)
+
+Sheet modal con:
+1. Bloque de advertencia roja listando lo que se perderá
+2. Toggle "Entiendo que esta acción es irreversible"
+3. TextField: el usuario debe escribir exactamente `"ELIMINAR"` (mayúsculas)
+4. SecureField: contraseña actual (validación solo en UI, no se envía al backend)
+5. Botón rojo deshabilitado hasta que las 3 condiciones anteriores sean true
+
+```kotlin
+// screens/profile/DeleteAccountSheet.kt
+@Composable
+fun DeleteAccountSheet(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean
+) {
+    var understood by remember { mutableStateOf(false) }
+    var confirmText by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    val canDelete = understood && confirmText == "ELIMINAR" && password.isNotBlank() && !isLoading
+
+    // ... UI idéntica al patrón de sheets de la app
+}
+```
 
 ### 5.9 Búsqueda de Ubicación — LocationSearchField
 

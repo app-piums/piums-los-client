@@ -100,6 +100,13 @@ struct ProfileView: View {
                     Label("Tarjetas guardadas", systemImage: "wallet.bifold")
                 }
                 .listRowBackground(Color(.tertiarySystemGroupedBackground))
+                Button(role: .destructive) {
+                    viewModel.clearMessages()
+                    viewModel.showDeleteSheet = true
+                } label: {
+                    Label("Eliminar cuenta", systemImage: "person.crop.circle.badge.minus")
+                }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
             }
 
             // Verificación de identidad
@@ -121,6 +128,10 @@ struct ProfileView: View {
 
             // Ayuda y soporte
             Section("Ayuda y soporte") {
+                NavigationLink(destination: NotificationPreferencesView()) {
+                    Label("Preferencias de notificaciones", systemImage: "bell.badge")
+                }
+                .listRowBackground(Color(.tertiarySystemGroupedBackground))
                 Button { showHowItWorks = true } label: {
                     Label("¿Cómo funciona Piums?", systemImage: "questionmark.circle")
                 }
@@ -177,6 +188,9 @@ struct ProfileView: View {
                 identitySubmitted = true
                 showVerifyIdentity = false
             }
+        }
+        .sheet(isPresented: $viewModel.showDeleteSheet) {
+            DeleteAccountSheet(viewModel: viewModel)
         }
         .task { await viewModel.refreshProfile() }
         .alert("¿Cerrar sesión?", isPresented: $showLogoutConfirm) {
@@ -676,6 +690,138 @@ private struct IdentityPhotoButton: View {
                     await onSelect(data)
                 }
                 pickerItem = nil
+            }
+        }
+    }
+}
+
+// MARK: - DeleteAccountSheet
+
+private struct DeleteAccountSheet: View {
+    @Bindable var viewModel: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var understood  = false
+    @State private var confirmText = ""
+    @State private var password    = ""
+    @State private var showPassword = false
+
+    private var canDelete: Bool {
+        understood && confirmText == "ELIMINAR" && !password.isEmpty && !viewModel.isDeletingAccount
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+
+                    // Warning
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Acción irreversible", systemImage: "exclamationmark.triangle.fill")
+                            .font(.headline)
+                            .foregroundStyle(.red)
+                        Text("Al eliminar tu cuenta perderás permanentemente:")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach([
+                                "Todos tus datos personales y preferencias",
+                                "Tu historial de reservas y transacciones",
+                                "Tus reseñas y calificaciones",
+                                "Cualquier saldo o crédito disponible",
+                                "Acceso a mensajes y conversaciones"
+                            ], id: \.self) { item in
+                                Label(item, systemImage: "xmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.red.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    // Confirmación
+                    VStack(alignment: .leading, spacing: 16) {
+                        Toggle(isOn: $understood) {
+                            Text("Entiendo que esta acción es irreversible y perderé todos mis datos.")
+                                .font(.subheadline)
+                        }
+                        .tint(.red)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Escribe **ELIMINAR** para confirmar")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TextField("ELIMINAR", text: $confirmText)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .padding(12)
+                                .background(Color(.tertiarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .strokeBorder(confirmText == "ELIMINAR" ? Color.red.opacity(0.5) : Color.clear, lineWidth: 1.5)
+                                )
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Contraseña actual")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                if showPassword {
+                                    TextField("••••••••", text: $password)
+                                        .textContentType(.password)
+                                } else {
+                                    SecureField("••••••••", text: $password)
+                                        .textContentType(.password)
+                                }
+                                Button { showPassword.toggle() } label: {
+                                    Image(systemName: showPassword ? "eye.slash" : "eye")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(12)
+                            .background(Color(.tertiarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+
+                    if let msg = viewModel.errorMessage {
+                        ErrorBannerView(message: msg)
+                    }
+
+                    // Botón eliminar
+                    Button {
+                        Task { await viewModel.deleteAccount() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if viewModel.isDeletingAccount {
+                                ProgressView().tint(.white)
+                            } else {
+                                Text("Eliminar mi cuenta permanentemente")
+                                    .fontWeight(.semibold)
+                            }
+                            Spacer()
+                        }
+                        .frame(height: 50)
+                        .background(canDelete ? Color.red : Color.red.opacity(0.35))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(!canDelete)
+                }
+                .padding(20)
+            }
+            .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("Eliminar cuenta")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
             }
         }
     }

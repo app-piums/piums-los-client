@@ -47,6 +47,8 @@ enum APIEndpoint {
     case listNotifications(page: Int)
     case markNotificationsRead(ids: [String])   // POST /api/notifications/read
     case registerPushToken(token: String, platform: String)
+    case getNotifPreferences                                        // GET  /api/notifications/preferences
+    case updateNotifPreferences(payload: [String: Any])            // PUT  /api/notifications/preferences
 
     // ── Disputes / Quejas ─────────────────────────────────
     case listMyDisputes
@@ -59,6 +61,7 @@ enum APIEndpoint {
     case updateMyProfile(payload: [String: Any])         // PATCH /api/auth/profile
     case changePassword(current: String, new: String)    // POST /api/auth/change-password
     case uploadAvatar                                    // POST /api/users/me/avatar (multipart)
+    case deleteAccount(userId: String)                   // DELETE /api/users/:id
 
     // ── Favorites ────────────────────────────────────────
     case listFavorites(page: Int, entityType: String)
@@ -133,9 +136,11 @@ extension APIEndpoint {
         case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead,
              .setDefaultPaymentMethod:
             return "PATCH"
+        case .updateNotifPreferences:
+            return "PUT"
         case .changePassword, .addBookingToEvent:
             return "POST"
-        case .deleteEvent, .deleteFavorite, .deletePaymentMethod:
+        case .deleteEvent, .deleteFavorite, .deletePaymentMethod, .deleteAccount:
             return "DELETE"
         default:
             return "GET"
@@ -163,6 +168,8 @@ extension APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: p)
         case .markNotificationsRead(let ids):
             return encode(["notificationIds": ids])
+        case .updateNotifPreferences(let p):
+            return try? JSONSerialization.data(withJSONObject: p)
         case .registerPushToken(let t, let pl):
             return encode(["token": t, "platform": pl])
         case .changePassword(let cur, let new):
@@ -285,6 +292,8 @@ extension APIEndpoint {
         case .listNotifications(let pg):       return "/api/notifications?page=\(pg)&limit=20"
         case .markNotificationsRead:           return "/api/notifications/read"
         case .registerPushToken:               return "/api/notifications/push-token"
+        case .getNotifPreferences:             return "/api/notifications/preferences"
+        case .updateNotifPreferences:          return "/api/notifications/preferences"
 
         // Disputes
         case .listMyDisputes:                  return "/api/disputes/me"
@@ -297,6 +306,7 @@ extension APIEndpoint {
         case .updateMyProfile:                 return "/api/auth/profile"
         case .changePassword:                  return "/api/auth/change-password"
         case .uploadAvatar:                    return "/api/users/me/avatar"
+        case .deleteAccount(let userId):       return "/api/users/\(userId)"
 
         // Favorites
         case .listFavorites(let pg, let type):
