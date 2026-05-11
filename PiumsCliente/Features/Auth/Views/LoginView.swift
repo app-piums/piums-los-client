@@ -582,7 +582,7 @@ private struct TikTokSignInRow: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.black)
                     .frame(width: 26, height: 26)
-                Text("♪")
+                Image(systemName: "music.note")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
             }

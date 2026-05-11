@@ -595,7 +595,7 @@ struct BookingFlowView: View {
                         locationStore.refresh()
                     }
                 } label: {
-                    Label(vm.context.locationLat != nil ? "Ubicación detectada ✓" : "Usar mi ubicación",
+                    Label(vm.context.locationLat != nil ? "Ubicación detectada" : "Usar mi ubicación",
                           systemImage: vm.context.locationLat != nil ? "location.fill" : "location")
                         .font(.subheadline).frame(maxWidth: .infinity).padding(.vertical, 11)
                         .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))

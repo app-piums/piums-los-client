@@ -104,7 +104,7 @@ final class ArtistProfileViewModel {
         defer { isLoadingServices = false }
         do {
             let res: CatalogServicesResponse = try await APIClient.request(.listServices(artistId: artist.id))
-            services = res.services.filter { $0.isActive }
+            services = res.services.filter { $0.status != "ARCHIVED" }
         } catch {
             errorMessage = AppError(from: error).errorDescription
         }

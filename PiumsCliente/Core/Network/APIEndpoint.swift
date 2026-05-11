@@ -101,6 +101,7 @@ enum APIEndpoint {
     // ── Chat ──────────────────────────────────────────────
     case listConversations(page: Int)
     case getConversation(id: String)
+    case createConversation(artistId: String)
     case markConversationRead(id: String)
     case listMessages(conversationId: String, page: Int)
     case sendMessage(conversationId: String, content: String)
@@ -125,7 +126,7 @@ extension APIEndpoint {
              .createBooking, .createReview, .createDispute, .addDisputeMessage,
              .markNotificationsRead, .registerPushToken, .forgotPassword,
              .logout, .createPaymentIntent, .calculatePrice,
-             .createEvent, .sendMessage, .addFavorite,
+             .createEvent, .sendMessage, .createConversation, .addFavorite,
              .confirmTilopayRedirect, .reportNoShow, .uploadDocument,
              .validateCoupon, .addPaymentMethod:
             return "POST"
@@ -196,11 +197,13 @@ extension APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: p)
         case .createEvent(let p), .updateEvent(_, let p):
             return try? JSONSerialization.data(withJSONObject: p)
+        case .createConversation(let artistId):
+            return try? JSONSerialization.data(withJSONObject: ["artistId": artistId])
         case .sendMessage(let conversationId, let content):
             return try? JSONSerialization.data(withJSONObject: [
                 "conversationId": conversationId,
                 "content": content,
-                "type": "text"
+                "type": "TEXT"
             ])
         case .addFavorite(let entityType, let entityId, let notes):
             var payload: [String: Any] = ["entityType": entityType, "entityId": entityId]
@@ -238,33 +241,27 @@ extension APIEndpoint {
 
         case .searchArtists(let q, let pg, let lm, let specialty, let city,
                             let minPrice, let maxPrice, let minRating,
-                            let isVerified, let sortBy, let sortOrder):
+                            let isVerified, let sortBy, _):
             var p = "/api/search/artists?page=\(pg)&limit=\(lm)"
             if let q = q, !q.isEmpty { p += "&q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)" }
-            if let specialty = specialty, !specialty.isEmpty { p += "&specialty=\(specialty.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? specialty)" }
+            if let specialty = specialty, !specialty.isEmpty { p += "&category=\(specialty.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? specialty)" }
             if let city = city, !city.isEmpty { p += "&city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)" }
             if let minPrice = minPrice { p += "&minPrice=\(minPrice)" }
             if let maxPrice = maxPrice { p += "&maxPrice=\(maxPrice)" }
             if let minRating = minRating { p += "&minRating=\(minRating)" }
             if let isVerified = isVerified, isVerified { p += "&isVerified=true" }
             if let sortBy = sortBy, !sortBy.isEmpty { p += "&sortBy=\(sortBy)" }
-            if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
             return p
 
-        case .smartSearch(let q, let city, let lat, let lng, let page, let limit,
-                          let specialty, let minPrice, let maxPrice,
-                          let minRating, let isVerified, let sortBy, let sortOrder):
+        case .smartSearch(let q, let city, _, _, let page, let limit,
+                          _, let minPrice, let maxPrice,
+                          let minRating, let isVerified, _, _):
             var p = "/api/search/smart?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)&page=\(page)&limit=\(limit)"
             if let city = city, !city.isEmpty { p += "&city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)" }
-            if let lat = lat { p += "&lat=\(lat)" }
-            if let lng = lng { p += "&lng=\(lng)" }
-            if let specialty = specialty, !specialty.isEmpty { p += "&specialty=\(specialty.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? specialty)" }
             if let minPrice = minPrice { p += "&minPrice=\(minPrice)" }
             if let maxPrice = maxPrice { p += "&maxPrice=\(maxPrice)" }
             if let minRating = minRating { p += "&minRating=\(minRating)" }
             if let isVerified = isVerified, isVerified { p += "&isVerified=true" }
-            if let sortBy = sortBy, !sortBy.isEmpty { p += "&sortBy=\(sortBy)" }
-            if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
             return p
 
         // Catalog
@@ -347,6 +344,7 @@ extension APIEndpoint {
         // Chat
         case .listConversations(let pg):       return "/api/chat/conversations?page=\(pg)&limit=20"
         case .getConversation(let id):         return "/api/chat/conversations/\(id)"
+        case .createConversation:              return "/api/chat/conversations"
         case .markConversationRead(let id):    return "/api/chat/conversations/\(id)/read"
         case .listMessages(let cid, let pg):   return "/api/chat/messages/\(cid)?page=\(pg)&limit=50"
         case .sendMessage:                     return "/api/chat/messages"

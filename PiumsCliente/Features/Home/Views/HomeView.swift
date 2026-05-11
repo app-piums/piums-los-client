@@ -130,7 +130,7 @@ struct HomeView: View {
 
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Hola, \(viewModel.firstName) 👋")
+            Text("Hola, \(viewModel.firstName)")
                 .font(.system(size: 28, weight: .bold))
             Text("¿Qué artista necesitas para tu próximo evento?")
                 .font(.subheadline)

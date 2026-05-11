@@ -15,8 +15,7 @@ private let CLIENT_CATEGORIES: [ClientCategory] = [
     ClientCategory(id: "musico",            label: "Música",               icon: "music.note",        categoryId: "MUSICO"),
     ClientCategory(id: "fotografo",         label: "Fotografía",           icon: "camera.fill",       categoryId: "FOTOGRAFO"),
     ClientCategory(id: "videografo",        label: "Video",                icon: "film.fill",         categoryId: "VIDEOGRAFO"),
-    ClientCategory(id: "payaso",            label: "Payaso",               icon: "party.popper.fill", categoryId: "PAYASO"),
-    ClientCategory(id: "maestro_ceremonia", label: "Maestro de Ceremonia", icon: "mic.fill",          categoryId: "MAESTRO_CEREMONIA"),
+    ClientCategory(id: "animador",           label: "Animador",             icon: "party.popper.fill", categoryId: "ANIMADOR"),
 ]
 
 private let POPULAR_SEARCHES = ["música en vivo", "fotógrafo bodas", "video boda", "payaso fiesta", "maestro ceremonias"]
@@ -218,15 +217,8 @@ struct SearchView: View {
                         viewModel.selectedSpecialty = nil; Task { await viewModel.search() }
                     }
                 }
-                if let talent = viewModel.selectedTalentLabel {
-                    FilterChip(label: "🎭 \(talent)") {
-                        viewModel.selectedTalentId = nil
-                        viewModel.selectedTalentLabel = nil
-                        Task { await viewModel.search() }
-                    }
-                }
                 if viewModel.minRating > 0 {
-                    FilterChip(label: "★ \(String(format: "%.1f", viewModel.minRating))+") {
+                    FilterChip(label: "\(Int(viewModel.minRating))+ estrellas") {
                         viewModel.minRating = 0; Task { await viewModel.search() }
                     }
                 }
@@ -246,7 +238,7 @@ struct SearchView: View {
                     }
                 }
                 if viewModel.isVerified {
-                    FilterChip(label: "✓ Verificados") {
+                    FilterChip(label: "Verificados") {
                         viewModel.isVerified = false; Task { await viewModel.search() }
                     }
                 }
@@ -363,43 +355,10 @@ struct SearchFiltersSheet: View {
     @Bindable var viewModel: SearchViewModel
     let onApply: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var showTalentPicker = false
-
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    filterSection(title: "Talento específico") {
-                        Button {
-                            showTalentPicker = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "theatermasks.fill")
-                                    .foregroundStyle(Color.piumsOrange)
-                                Text(viewModel.selectedTalentLabel ?? "Seleccionar talento")
-                                    .foregroundStyle(viewModel.selectedTalentLabel != nil ? .primary : .secondary)
-                                Spacer()
-                                if viewModel.selectedTalentLabel != nil {
-                                    Button {
-                                        viewModel.selectedTalentId = nil
-                                        viewModel.selectedTalentLabel = nil
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundStyle(Color(.systemGray3))
-                                    }
-                                } else {
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .padding(12)
-                            .background(Color(.tertiarySystemGroupedBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    Divider()
                     filterSection(title: "Especialidad") {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 8) {
                             ForEach(SpecialtyOption.allCases) { sp in
@@ -437,23 +396,27 @@ struct SearchFiltersSheet: View {
                     }
                     Divider()
                     filterSection(title: "Calificación mínima") {
-                        HStack(spacing: 6) {
-                            ForEach([0.0, 3.0, 3.5, 4.0, 4.5, 5.0], id: \.self) { r in
-                                Button {
-                                    viewModel.minRating = viewModel.minRating == r ? 0 : r
-                                } label: {
-                                    Text(r == 0 ? "Todos" : "\(String(format: "%.1f", r))★")
-                                        .font(.subheadline.weight(.medium))
-                                        .padding(.horizontal, 10).padding(.vertical, 7)
-                                        .background(viewModel.minRating == r
-                                                    ? Color.piumsOrange
-                                                    : Color(.tertiarySystemGroupedBackground))
-                                        .foregroundStyle(viewModel.minRating == r ? .white : .primary)
-                                        .clipShape(Capsule())
+                        VStack(spacing: 8) {
+                            HStack(spacing: 12) {
+                                ForEach(1...5, id: \.self) { star in
+                                    Button {
+                                        let val = Double(star)
+                                        viewModel.minRating = viewModel.minRating == val ? 0 : val
+                                    } label: {
+                                        Image(systemName: Double(star) <= viewModel.minRating ? "star.fill" : "star")
+                                            .font(.title2)
+                                            .foregroundStyle(Double(star) <= viewModel.minRating ? Color.piumsOrange : Color(.systemGray3))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
+                            }
+                            if viewModel.minRating > 0 {
+                                Text("\(Int(viewModel.minRating)) estrella\(viewModel.minRating == 1 ? "" : "s") o más")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Divider()
                     filterSection(title: "Ciudad") {
@@ -517,33 +480,6 @@ struct SearchFiltersSheet: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { dismiss() }
-                }
-            }
-            .sheet(isPresented: $showTalentPicker) {
-                NavigationStack {
-                    ScrollView {
-                        TalentPickerView(
-                            selectedTalentId: $viewModel.selectedTalentId,
-                            onSelect: { talent in
-                                viewModel.selectedTalentLabel = talent.label
-                                viewModel.selectedSpecialty = nil
-                                showTalentPicker = false
-                            },
-                            onClear: {
-                                viewModel.selectedTalentId = nil
-                                viewModel.selectedTalentLabel = nil
-                                showTalentPicker = false
-                            }
-                        )
-                        .padding()
-                    }
-                    .navigationTitle("Tipo de talento")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancelar") { showTalentPicker = false }
-                        }
-                    }
                 }
             }
         }

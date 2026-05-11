@@ -6,9 +6,9 @@ import CoreLocation
 enum SearchSortOption: String, CaseIterable {
     case relevance  = ""
     case ratingDesc = "rating"
-    case priceAsc   = "price_asc"
-    case priceDesc  = "price_desc"
-    case newest     = "newest"
+    case priceAsc   = "price_low"
+    case priceDesc  = "price_high"
+    case newest     = "recent"
 
     var displayName: String {
         switch self {
@@ -24,29 +24,35 @@ enum SearchSortOption: String, CaseIterable {
 // Categorías oficiales del backend — ArtistCategory enum de piums-platform
 enum SpecialtyOption: String, CaseIterable, Identifiable {
     var id: String { rawValue }
-    case musico           = "MUSICO"
-    case fotografo        = "FOTOGRAFO"
-    case videografo       = "VIDEOGRAFO"
-    case payaso           = "PAYASO"
-    case maestroCeremonia = "MAESTRO_CEREMONIA"
+    case musico    = "MUSICO"
+    case fotografo = "FOTOGRAFO"
+    case videografo = "VIDEOGRAFO"
+    case animador  = "ANIMADOR"
 
     var displayName: String {
         switch self {
-        case .musico:           return "Música"
-        case .fotografo:        return "Fotografía"
-        case .videografo:       return "Video"
-        case .payaso:           return "Payaso"
-        case .maestroCeremonia: return "Maestro de Ceremonia"
+        case .musico:    return "Música"
+        case .fotografo: return "Fotografía"
+        case .videografo: return "Video"
+        case .animador:  return "Animador"
         }
     }
 
     var icon: String {
         switch self {
-        case .musico:           return "music.note"
-        case .fotografo:        return "camera.fill"
-        case .videografo:       return "film.fill"
-        case .payaso:           return "party.popper.fill"
-        case .maestroCeremonia: return "mic.fill"
+        case .musico:    return "music.note"
+        case .fotografo: return "camera.fill"
+        case .videografo: return "film.fill"
+        case .animador:  return "party.popper.fill"
+        }
+    }
+
+    var searchKeywords: [String] {
+        switch self {
+        case .musico:    return ["música", "musica", "músico", "musico", "music"]
+        case .fotografo: return ["fotografía", "fotografia", "fotógrafo", "fotografo", "foto"]
+        case .videografo: return ["video", "videógrafo", "videografo"]
+        case .animador:  return ["animador", "animación", "animacion", "payaso", "entretenimiento"]
         }
     }
 }
@@ -57,8 +63,6 @@ final class SearchViewModel {
     // MARK: - Filtros
     var query          = ""
     var selectedSpecialty: SpecialtyOption? = nil
-    var selectedTalentId: String? = nil
-    var selectedTalentLabel: String? = nil
     var minPrice: Double = 0        // en quetzales (se convierte a centavos para API)
     var maxPrice: Double = 50000    // Q500.00 max (en centavos)
     var minRating: Double = 0
@@ -93,7 +97,7 @@ final class SearchViewModel {
 
     func search() async {
         searchNonce += 1
-        isLoading = false   // cancela la guarda de la búsqueda anterior
+        isLoading = false
         currentPage = 1
         currentSmartPage = 1
         results = []
@@ -101,9 +105,29 @@ final class SearchViewModel {
         expandedTerms = []
         hasMore = true
         hasSearched = true
-        let effectiveQuery = query.trimmingCharacters(in: .whitespaces).isEmpty
-            ? (selectedTalentLabel ?? "")
-            : query.trimmingCharacters(in: .whitespaces)
+        let trimmedQ = query.trimmingCharacters(in: .whitespaces)
+        let effectiveQuery = trimmedQ
+
+        // Si el query es exactamente el nombre de una categoría y no hay otra categoría activa,
+        // usar búsqueda regular con filtro category= en lugar de SmartSearch — el SmartSearch
+        // hace text matching en serviceTitles/bio y puede traer artistas no relacionados.
+        let normalizedQ = effectiveQuery
+            .folding(options: .diacriticInsensitive, locale: .current)
+            .lowercased()
+        if selectedSpecialty == nil,
+           let categoryMatch = SpecialtyOption.allCases.first(where: { sp in
+               sp.searchKeywords.contains { kw in
+                   kw.folding(options: .diacriticInsensitive, locale: .current)
+                     .lowercased() == normalizedQ
+               }
+           }) {
+            selectedSpecialty = categoryMatch
+            query = ""
+            isSmartSearch = false
+            await loadNext()
+            return
+        }
+
         isSmartSearch = !effectiveQuery.isEmpty
         if isSmartSearch {
             await loadSmart()
@@ -123,8 +147,6 @@ final class SearchViewModel {
 
     func clearFilters() {
         selectedSpecialty = nil
-        selectedTalentId = nil
-        selectedTalentLabel = nil
         minPrice = 0
         maxPrice = 50000
         minRating = 0
@@ -134,7 +156,7 @@ final class SearchViewModel {
     }
 
     var hasActiveFilters: Bool {
-        selectedSpecialty != nil || selectedTalentId != nil || minPrice > 0 || maxPrice < 50000 ||
+        selectedSpecialty != nil || minPrice > 0 || maxPrice < 50000 ||
         minRating > 0 || selectedCity != nil || isVerified || sortOption != .relevance
     }
 
@@ -149,7 +171,7 @@ final class SearchViewModel {
         do {
             let res: SmartSearchResponse = try await APIClient.request(
                 .smartSearch(
-                    q: query.trimmingCharacters(in: .whitespaces).isEmpty ? (selectedTalentLabel ?? "") : query.trimmingCharacters(in: .whitespaces),
+                    q: query.trimmingCharacters(in: .whitespaces),
                     city: selectedCity,
                     lat: userLocation?.latitude,
                     lng: userLocation?.longitude,

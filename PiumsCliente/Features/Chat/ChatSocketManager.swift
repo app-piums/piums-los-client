@@ -6,6 +6,7 @@ extension Notification.Name {
     static let chatMessageReceived = Notification.Name("chat.message.received")
     static let chatMessageRead = Notification.Name("chat.message.read")
     static let chatUnreadCountUpdated = Notification.Name("chat.unread.count.updated")
+    static let chatMessageError = Notification.Name("chat.message.error")
 }
 
 @Observable
@@ -63,6 +64,12 @@ final class ChatSocketManager {
                 NotificationCenter.default.post(name: .chatMessageReceived, object: msg)
             }
         }
+        // El servidor confirma el mensaje enviado por el propio socket (message:send)
+        socket.on("message:sent") { data, _ in
+            if let msg = ChatSocketManager.decodeMessage(from: data) {
+                NotificationCenter.default.post(name: .chatMessageReceived, object: msg)
+            }
+        }
         socket.on("message:read") { data, _ in
             if let dict = data.first as? [String: Any], let id = dict["messageId"] as? String {
                 NotificationCenter.default.post(name: .chatMessageRead, object: id)
@@ -71,6 +78,12 @@ final class ChatSocketManager {
         socket.on("unread:count") { data, _ in
             if let dict = data.first as? [String: Any], let count = dict["unreadCount"] as? Int {
                 NotificationCenter.default.post(name: .chatUnreadCountUpdated, object: count)
+            }
+        }
+        socket.on("message:error") { data, _ in
+            if let dict = data.first as? [String: Any] {
+                let msg = dict["message"] as? String ?? dict["error"] as? String ?? "Error al enviar mensaje"
+                NotificationCenter.default.post(name: .chatMessageError, object: msg)
             }
         }
 
@@ -103,7 +116,7 @@ final class ChatSocketManager {
         socket?.emit("message:send", [
             "conversationId": conversationId,
             "content": content,
-            "type": "text"
+            "type": "TEXT"
         ])
     }
 

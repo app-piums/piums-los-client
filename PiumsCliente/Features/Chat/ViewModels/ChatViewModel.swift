@@ -33,6 +33,11 @@ final class ChatViewModel {
                 }
             }
         }
+        NotificationCenter.default.addObserver(forName: .chatMessageError, object: nil, queue: .main) { [weak self] note in
+            Task { @MainActor [weak self] in
+                self?.errorMessage = note.object as? String ?? "Error al enviar mensaje"
+            }
+        }
     }
 
     func loadConversations() async {
@@ -103,6 +108,16 @@ final class ChatViewModel {
             messages.append(wrapper.message)
         } catch {
             errorMessage = AppError(from: error).errorDescription
+        }
+    }
+
+    func createOrOpenConversation(artistId: String) async -> Conversation? {
+        do {
+            let wrapper: ConversationWrapper = try await APIClient.request(.createConversation(artistId: artistId))
+            return wrapper.conversation
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+            return nil
         }
     }
 

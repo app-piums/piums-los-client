@@ -28,7 +28,13 @@ struct ArtistProfileView: View {
                     Divider().frame(height: 40)
                     StatCell(value: "\(artist.reviewsCount)", label: "Reseñas")
                     Divider().frame(height: 40)
-                    StatCell(value: artist.isVerified ? "✓" : "—", label: "Verificado")
+                    VStack(spacing: 2) {
+                        Image(systemName: artist.isVerified ? "checkmark.seal.fill" : "minus")
+                            .font(.title3.bold())
+                            .foregroundStyle(Color.piumsOrange)
+                        Text("Verificado").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .padding(.vertical, 16)
                 .background(Color(.tertiarySystemGroupedBackground))

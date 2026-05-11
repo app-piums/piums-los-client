@@ -667,7 +667,7 @@ private struct ArtistFloatingCard: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(LinearGradient(colors: [Color(hex: "#1a1a2e"), Color(hex: "#16213e")], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 56, height: 56)
-                Text("🎸").font(.title2)
+                Image(systemName: "guitars.fill").font(.title2).foregroundStyle(.white)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text("Carlos M.").font(.subheadline.bold())
