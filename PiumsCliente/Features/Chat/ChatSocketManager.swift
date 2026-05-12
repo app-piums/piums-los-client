@@ -7,6 +7,7 @@ extension Notification.Name {
     static let chatMessageRead = Notification.Name("chat.message.read")
     static let chatUnreadCountUpdated = Notification.Name("chat.unread.count.updated")
     static let chatMessageError = Notification.Name("chat.message.error")
+    static let chatSocketReconnected = Notification.Name("chat.socket.reconnected")
 }
 
 @Observable
@@ -56,7 +57,10 @@ final class ChatSocketManager {
             Task { @MainActor in self?.isConnected = false }
         }
         socket.on(clientEvent: .reconnect) { [weak self] _, _ in
-            Task { @MainActor in self?.isConnected = true }
+            Task { @MainActor in
+                self?.isConnected = true
+                NotificationCenter.default.post(name: .chatSocketReconnected, object: nil)
+            }
         }
 
         socket.on("message:received") { data, _ in

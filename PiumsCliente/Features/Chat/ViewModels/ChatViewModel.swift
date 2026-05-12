@@ -38,6 +38,13 @@ final class ChatViewModel {
                 self?.errorMessage = note.object as? String ?? "Error al enviar mensaje"
             }
         }
+        // Re-fetch messages after reconnect to recover any missed during disconnect
+        NotificationCenter.default.addObserver(forName: .chatSocketReconnected, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let convId = self.currentConversationId else { return }
+                await self.loadMessages(conversationId: convId)
+            }
+        }
     }
 
     func loadConversations() async {
@@ -129,7 +136,8 @@ final class ChatViewModel {
     }
 
     private func handleIncoming(_ msg: ChatMessage) {
-        if currentConversationId == msg.conversationId {
+        if currentConversationId == msg.conversationId,
+           !messages.contains(where: { $0.id == msg.id }) {
             messages.append(msg)
         }
         if let idx = conversations.firstIndex(where: { $0.id == msg.conversationId }) {

@@ -130,8 +130,15 @@ private struct ConversationRow: View {
     }
 
     private var relativeDate: String {
-        guard let dateStr = conversation.lastMessageAt,
-              let date = ISO8601DateFormatter().date(from: dateStr) else { return "" }
+        guard let dateStr = conversation.lastMessageAt else { return "" }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = iso.date(from: dateStr) ?? {
+            // fallback without fractional seconds
+            let plain = ISO8601DateFormatter()
+            return plain.date(from: dateStr)
+        }()
+        guard let date else { return "" }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
