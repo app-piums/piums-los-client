@@ -9,6 +9,7 @@ final class HomeViewModel {
     var errorMessage: String?
     var hasMore = true
     private var currentPage = 1
+    private var lastLoadedAt: Date?
 
     // ── Datos del usuario ─────────────────────────────────
     var firstName: String {
@@ -29,10 +30,18 @@ final class HomeViewModel {
         currentPage = 1
         artists = []
         hasMore = true
+        lastLoadedAt = Date()
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadArtists() }
             group.addTask { await self.loadUpcomingBookings() }
         }
+    }
+
+    /// Refresca silenciosamente si los datos tienen más de 60 s (al volver de una navegación).
+    /// Evita reload visible en navegaciones rápidas pero garantiza fotos actualizadas.
+    func refreshIfStale() async {
+        guard let last = lastLoadedAt, Date().timeIntervalSince(last) > 60 else { return }
+        await loadInitial()
     }
 
     func loadNextIfNeeded(currentItem: Artist) async {

@@ -76,6 +76,7 @@ final class ArtistProfileViewModel {
 
     init(artist: Artist) {
         self.artist = artist
+        self.avatarURL = artist.avatarUrl  // carga inmediata desde search; loadArtistDetail lo sobreescribe si hay foto más reciente
         self.coverURL = artist.coverUrl
         self.instagram = artist.instagram
         self.website = artist.website
@@ -98,6 +99,7 @@ final class ArtistProfileViewModel {
             if let wb  = dto.resolvedWebsite   { website = wb }
         } catch {}
     }
+
 
     func loadServices() async {
         isLoadingServices = true

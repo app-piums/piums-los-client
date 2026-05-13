@@ -61,6 +61,7 @@ struct HomeView: View {
         .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .refreshable { await viewModel.loadInitial() }
         .task { await viewModel.loadInitial() }
+        .onAppear { Task { await viewModel.refreshIfStale() } }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { topBar }
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
