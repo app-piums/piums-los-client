@@ -797,8 +797,15 @@ POST /api/catalog/pricing/calculate
 - Lista conversaciones: `GET /api/chat/conversations?page=`
 - Chat detalle: `GET /api/chat/messages/{conversationId}?page=`
 - WebSocket: `ws://api.piums.com/api/chat/ws` con JWT
-- Badge counter en tab bar
+- Badge counter en tab bar (singleton `ChatRealtimeStore` / equivalente Android)
 - Mensajes propios: fondo naranja | recibidos: `CardBackground`
+
+**Deep link desde push FCM (NEW_MESSAGE)**:
+- El payload FCM `data` trae `{ type: "NEW_MESSAGE", conversationId: "uuid" }`
+- Al tocar la notificación → navegar directamente al `ChatDetailView` con ese `conversationId`
+- Si la app está cerrada: guardar el ID pendiente en un store global y consumirlo al montar `ChatInboxView`
+- Si la conversación no está en caché local → `GET /api/chat/conversations/{id}` y navegar
+- iOS resuelve esto en `ChatInboxView.openConversation(id:)` — replicar en Android
 
 **Tab Quejas**:
 - Lista: `GET /api/disputes/me`
@@ -983,6 +990,18 @@ fun LocationSearchField(
 - `POST /api/notifications/read` body: `{ "notificationIds": ["id1"] }`
 - Registro FCM token: `POST /api/notifications/push-token` body: `{ "token": "fcm_token", "platform": "android" }`
 - Filas: no leídas = fondo naranja 5% + borde naranja 20% | leídas = `CardBackground`
+
+**Badge de campana (HomeView)**:
+- Implementar un singleton `NotificationsStore` con `unreadCount: Int`
+- Al iniciar sesión y al volver a foreground → `GET /api/notifications?page=1&limit=20`, contar las no leídas (primera página, suficiente para el indicador visual)
+- Al recibir push FCM de tipo no-chat (booking, pago, etc.) → refrescar `NotificationsStore`
+- Al marcar leída(s) → decrementar / poner en cero sin fetch extra
+- El icono de campana solo muestra el badge si `unreadCount > 0`; si hay más de 1 mostrar el número
+
+**Background sync con FCM data messages**:
+- El backend ahora envía `content-available: 1` en APNs; en Android el equivalente es un FCM *data-only message* (sin clave `notification` en el payload)
+- En el `FirebaseMessagingService.onMessageReceived()`: si `data["type"] == "NEW_MESSAGE"` → refrescar unread de chat; si no → refrescar `NotificationsStore`
+- Esto permite actualizar los contadores aunque el usuario no abra la app
 
 ---
 
@@ -1656,6 +1675,12 @@ WS    /api/chat/ws  + header Authorization: Bearer {JWT}
 GET  /api/notifications?page=1&limit=20               [auth]
 POST /api/notifications/read   [auth] body: {notificationIds: ["id1", "id2"]}
 POST /api/notifications/push-token  [auth] body: {token, platform: "android"}
+```
+
+**Payload FCM data para NEW_MESSAGE** (llega en `remoteMessage.data`):
+```
+type          = "NEW_MESSAGE"
+conversationId = "uuid-de-la-conversacion"   // usar para deep link directo al chat
 ```
 
 ---
