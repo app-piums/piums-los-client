@@ -122,7 +122,7 @@ extension APIEndpoint {
 
     var method: String {
         switch self {
-        case .login, .registerClient, .firebaseAuth,
+        case .login, .registerClient, .firebaseAuth, .refreshToken,
              .createBooking, .createReview, .createDispute, .addDisputeMessage,
              .markNotificationsRead, .registerPushToken, .forgotPassword,
              .logout, .createPaymentIntent, .calculatePrice,
@@ -216,7 +216,7 @@ extension APIEndpoint {
 
     var requiresAuth: Bool {
         switch self {
-        case .login, .registerClient, .firebaseAuth, .forgotPassword,
+        case .login, .registerClient, .firebaseAuth, .refreshToken, .forgotPassword,
              .searchArtists, .smartSearch, .getArtist, .listReviews, .getArtistPortfolio:
             return false
         default:
