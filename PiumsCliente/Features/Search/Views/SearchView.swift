@@ -123,7 +123,13 @@ struct SearchView: View {
                     .padding(.horizontal)
 
                     if viewModel.isLoading {
-                        ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
+                        HStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.85)
+                            Text("Cargando más artistas...")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
                     }
                     Color.clear.frame(height: 12)
                 }

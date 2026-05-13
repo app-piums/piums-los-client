@@ -220,13 +220,18 @@ struct ProfileView: View {
             }
             .listRowBackground(Color(.tertiarySystemGroupedBackground))
         } else if submitted {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Documentos enviados").font(.subheadline)
-                    Text("En revisión por nuestro equipo").font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Documentos enviados").font(.subheadline)
+                        Text("En revisión — hasta 48 horas hábiles").font(.caption).foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "clock.badge.checkmark").foregroundStyle(Color.piumsOrange)
                 }
-            } icon: {
-                Image(systemName: "clock.badge.checkmark").foregroundStyle(Color.piumsOrange)
+                ProgressView(value: 0.6)
+                    .tint(Color.piumsOrange)
+                    .scaleEffect(x: 1, y: 0.7)
             }
             .listRowBackground(Color(.tertiarySystemGroupedBackground))
         } else {

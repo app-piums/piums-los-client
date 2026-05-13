@@ -12,6 +12,7 @@ final class PaymentCheckoutViewModel {
     var showWebView   = false
     var redirectUrl: URL?
     var confirmedBooking: Booking?
+    private(set) var pollingMessage: String = ""
 
     private(set) var amountToPay: Int = 0
     private(set) var currency: String = "USD"
@@ -128,6 +129,12 @@ final class PaymentCheckoutViewModel {
 
     private func pollUntilPaid(bookingId: String, attempt: Int = 0) async {
         guard attempt < 10 else { phase = .confirmed; return }
+        pollingMessage = switch attempt {
+        case 0...2: "Verificando tu pago..."
+        case 3...5: "Confirmando con Tilopay..."
+        case 6...8: "Esto puede tardar unos segundos más..."
+        default:    "Casi listo..."
+        }
         do {
             try await Task.sleep(for: .seconds(3))
             let booking: Booking = try await APIClient.request(.getBooking(id: bookingId))
@@ -263,27 +270,42 @@ struct PaymentCheckoutView: View {
                 Text(msg).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center)
             }
 
-            // Botón de pago
-            Button {
-                Task { await vm.startPayment(booking: booking, artist: artist) }
-            } label: {
-                HStack(spacing: 8) {
-                    if vm.isBusy {
-                        ProgressView().tint(.white).scaleEffect(0.85)
-                        Text("Iniciando...").font(.headline)
-                    } else {
-                        Image(systemName: "creditcard.fill")
-                        Text("Pagar \(formatCents(vm.amountToPay))").font(.headline)
-                    }
+            // Procesando pago — polling en curso
+            if case .processing = vm.phase {
+                VStack(spacing: 12) {
+                    ProgressView().scaleEffect(1.2)
+                    Text(vm.pollingMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .animation(.easeInOut, value: vm.pollingMessage)
                 }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity).padding(.vertical, 16)
-                .background(vm.isBusy ? Color.piumsOrange.opacity(0.6) : Color.piumsOrange)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: Color.piumsOrange.opacity(0.3), radius: 10, y: 4)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+                .padding(.bottom, 20)
+            } else {
+                // Botón de pago
+                Button {
+                    Task { await vm.startPayment(booking: booking, artist: artist) }
+                } label: {
+                    HStack(spacing: 8) {
+                        if vm.isBusy {
+                            ProgressView().tint(.white).scaleEffect(0.85)
+                            Text("Iniciando...").font(.headline)
+                        } else {
+                            Image(systemName: "creditcard.fill")
+                            Text("Pagar \(formatCents(vm.amountToPay))").font(.headline)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 16)
+                    .background(vm.isBusy ? Color.piumsOrange.opacity(0.6) : Color.piumsOrange)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: Color.piumsOrange.opacity(0.3), radius: 10, y: 4)
+                }
+                .disabled(vm.isBusy)
+                .padding(.bottom, 20)
             }
-            .disabled(vm.isBusy)
-            .padding(.bottom, 20)
         }
     }
 
