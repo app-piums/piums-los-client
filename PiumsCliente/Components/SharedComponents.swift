@@ -122,6 +122,35 @@ struct PiumsButton: View {
     }
 }
 
+// MARK: - LocationDeniedBanner
+
+struct LocationDeniedBanner: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "location.slash.fill")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Ubicación desactivada")
+                    .font(.subheadline.bold())
+                Text("Actívala para ver artistas cerca de ti")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Ajustes") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .font(.caption.bold())
+            .foregroundStyle(Color.piumsOrange)
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
 // MARK: - ErrorBannerView
 
 struct ErrorBannerView: View {

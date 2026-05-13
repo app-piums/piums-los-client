@@ -6,6 +6,10 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Piums usa tu ubicación para mostrarte artistas disponibles cerca de ti y autocompletar la dirección de tus eventos.</string>
 
+	<!-- Fotos: para actualizar la foto de perfil del cliente -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Selecciona una foto de tu galería para personalizar tu perfil en Piums.</string>
+
 	<!-- App Transport Security: prohibir HTTP explícitamente; solo HTTPS permitido -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

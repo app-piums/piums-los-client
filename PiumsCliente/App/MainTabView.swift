@@ -56,6 +56,7 @@ struct MainTabView: View {
         }
         .task { chatStore.startIfNeeded() }
         .task { NotificationsStore.shared.startIfNeeded() }
+        .task { AppDelegate.requestPushPermission() }
         .task {
             let skipTutorial = CommandLine.arguments.contains("UI_TESTING_SKIP_TUTORIAL")
             if !hasSeenHowItWorks && !skipTutorial {

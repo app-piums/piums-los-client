@@ -32,6 +32,13 @@ struct HomeView: View {
                         .padding(.bottom, 12)
                 }
 
+                // ── Ubicación denegada ───────────────────────
+                if locationStore.permissionDenied {
+                    LocationDeniedBanner()
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                }
+
                 // ── Mini calendario ─────────────────────────
                 HomeCalendarView(
                     bookingDates: viewModel.upcomingBookingDates,

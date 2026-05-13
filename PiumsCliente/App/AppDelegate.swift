@@ -14,7 +14,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         FirebaseApp.configure()
 
         UNUserNotificationCenter.current().delegate = self
-        requestPushPermission(application)
 
         // Google Sign-In — CLIENT_ID del GoogleService-Info.plist
         if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
@@ -27,15 +26,15 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         return true
     }
 
-    // MARK: - Push permission
+    // MARK: - Push permission (llamar después de que el usuario inicia sesión)
 
-    private func requestPushPermission(_ application: UIApplication) {
+    static func requestPushPermission() {
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound, .badge]
-        ) { granted, error in
+        ) { granted, _ in
             guard granted else { return }
             DispatchQueue.main.async {
-                application.registerForRemoteNotifications()
+                UIApplication.shared.registerForRemoteNotifications()
             }
         }
     }

@@ -36,6 +36,9 @@ struct SearchView: View {
                     LoadingView().frame(maxWidth: .infinity, minHeight: 300)
 
                 } else if !viewModel.hasSearched {
+                    if locationStore.permissionDenied {
+                        LocationDeniedBanner().padding(.horizontal, 16).padding(.top, 8)
+                    }
                     // ── Estado inicial: categorías de cliente ─
                     ClientExploreInitialView(
                         onCategory: { cat in

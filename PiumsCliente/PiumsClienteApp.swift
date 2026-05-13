@@ -41,7 +41,6 @@ struct PiumsClienteApp: App {
                 }
                 .onAppear {
                     themeManager.applyToWindows()
-                    LocationStore.shared.requestIfNeeded()
                 }
                 .onChange(of: themeManager.storedScheme) { _, _ in
                     themeManager.applyToWindows()
