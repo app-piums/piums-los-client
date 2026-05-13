@@ -235,29 +235,14 @@ struct StarRatingView: View {
 // MARK: - PriceText helper
 
 extension Int {
-    /// Convierte centavos a texto formateado, ej: 15000 → "$ 150.00"
+    /// Centavos → USD con separadores de miles. Ej: 250000 → "$ 2,500.00"
     var piumsFormatted: String {
         let value = Double(self) / 100.0
-        return String(format: "$ %.2f", value)
-    }
-
-    /// Igual que `piumsFormatted` pero usa el símbolo correcto según la moneda.
-    /// GTQ → "Q", USD → "$", otras → código ISO.
-    func piumsFormattedCurrency(_ currency: String) -> String {
-        let value = Double(self) / 100.0
-        let symbol: String
-        switch currency.uppercased() {
-        case "GTQ": symbol = "Q"
-        case "USD": symbol = "$"
-        case "EUR": symbol = "€"
-        case "MXN": symbol = "MX$"
-        default:    symbol = currency
-        }
         let fmt = NumberFormatter()
         fmt.numberStyle = .decimal
         fmt.minimumFractionDigits = 2
         fmt.maximumFractionDigits = 2
         let formatted = fmt.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-        return "\(symbol) \(formatted)"
+        return "$ \(formatted)"
     }
 }

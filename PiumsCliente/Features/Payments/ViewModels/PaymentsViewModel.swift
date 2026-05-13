@@ -119,11 +119,6 @@ final class PaymentsViewModel {
     }
 
     func formattedAmount(_ cents: Int, currency: String = "USD") -> String {
-        let amount = Double(cents) / 100.0
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currency
-        formatter.locale = Locale(identifier: "en_US")
-        return formatter.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+        cents.piumsFormatted
     }
 }

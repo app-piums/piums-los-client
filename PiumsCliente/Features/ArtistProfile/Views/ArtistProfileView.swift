@@ -321,7 +321,7 @@ private struct ServiceRowView: View {
     let onReserve: () -> Void
 
     private var priceLabel: String {
-        service.price.piumsFormattedCurrency(service.currency)
+        service.price.piumsFormatted
     }
 
     private var pricingTypeLabel: String? {
