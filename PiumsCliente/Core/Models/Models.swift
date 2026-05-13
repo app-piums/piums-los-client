@@ -174,7 +174,7 @@ struct MatchedService: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
-        price = try c.decodeFlexibleInt(forKey: .price)
+        price = (try c.decodeFlexibleInt(forKey: .price)) * 100
         currency = try c.decode(String.self, forKey: .currency)
         pricingType = try c.decodeIfPresent(String.self, forKey: .pricingType)
         isExactMatch = try c.decodeIfPresent(Bool.self, forKey: .isExactMatch)
@@ -292,7 +292,7 @@ extension Artist {
             totalBookings: (try? c.decode(Int.self, forKey: .totalBookings)) ?? 0,
             hourlyRateMin: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMin),
             hourlyRateMax: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMax),
-            mainServicePrice: try c.decodeFlexibleIntIfPresent(forKey: .mainServicePrice),
+            mainServicePrice: (try c.decodeFlexibleIntIfPresent(forKey: .mainServicePrice)).map { $0 * 100 },
             mainServiceName: try c.decodeIfPresent(String.self, forKey: .mainServiceName),
             isVerified: (try? c.decode(Bool.self, forKey: .isVerified)) ?? false,
             isActive: (try? c.decode(Bool.self, forKey: .isActive)) ?? true,
@@ -340,7 +340,7 @@ extension SmartArtist {
             totalBookings: try c.decode(Int.self, forKey: .totalBookings),
             hourlyRateMin: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMin),
             hourlyRateMax: try c.decodeFlexibleIntIfPresent(forKey: .hourlyRateMax),
-            mainServicePrice: try c.decodeFlexibleIntIfPresent(forKey: .mainServicePrice),
+            mainServicePrice: (try c.decodeFlexibleIntIfPresent(forKey: .mainServicePrice)).map { $0 * 100 },
             mainServiceName: try c.decodeIfPresent(String.self, forKey: .mainServiceName),
             isVerified: try c.decode(Bool.self, forKey: .isVerified),
             isActive: try c.decode(Bool.self, forKey: .isActive),
