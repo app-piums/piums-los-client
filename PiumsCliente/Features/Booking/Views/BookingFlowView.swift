@@ -238,12 +238,21 @@ final class BookingFlowViewModel {
     }
 
     func submitBooking(clientId: String) async {
-        guard let isoDate = context.scheduledDateISO else { errorMessage = "Selecciona fecha y hora."; return }
+        guard let date = context.selectedDate, let slot = context.selectedSlot else {
+            errorMessage = "Selecciona fecha y hora."; return
+        }
         guard let svc = context.service else { errorMessage = "Selecciona un servicio."; return }
         isSubmitting = true; errorMessage = nil; defer { isSubmitting = false }
+
+        // Enviar fecha y hora por separado para cumplir la validación del backend
+        let dateFmt = DateFormatter(); dateFmt.dateFormat = "yyyy-MM-dd"
+        let scheduledDateStr = dateFmt.string(from: date)
+        let scheduledTimeStr = slot.time // "HH:mm"
+
         var payload: [String: Any] = [
             "artistId": context.artist.id, "serviceId": svc.id, "clientId": clientId,
-            "scheduledDate": isoDate, "durationMinutes": context.durationMinutes,
+            "scheduledDate": scheduledDateStr, "scheduledTime": scheduledTimeStr,
+            "durationMinutes": context.durationMinutes,
         ]
         if !context.location.isEmpty          { payload["location"] = context.location }
         if let lat = context.locationLat      { payload["locationLat"] = lat }
@@ -1500,7 +1509,7 @@ struct BookingSuccessView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showCheckout) {
+        .sheet(isPresented: $showCheckout) {
             if let b = booking {
                 PaymentCheckoutView(booking: b, artist: artist) {
                     showCheckout = false
