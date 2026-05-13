@@ -54,9 +54,9 @@ struct APIClient {
             throw AppError.unknown(URLError(.badServerResponse))
         }
 
-        let backendMessage = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
+        let errorBody = try? JSONDecoder().decode(APIErrorBody.self, from: data)
+        let backendMessage = errorBody?.fullMessage
 
-        #if DEBUG
         if http.statusCode >= 400 {
             let raw = String(data: data, encoding: .utf8) ?? "(binary)"
             print("❌ APIClient [\(http.statusCode)] \(endpoint.url.path):\n\(raw)")
@@ -65,7 +65,6 @@ struct APIClient {
                 print("   ↑ Request body: \(bodyStr)")
             }
         }
-        #endif
 
         switch http.statusCode {
         case 200..<300:
@@ -91,7 +90,24 @@ struct APIClient {
     }
 }
 
-private struct APIErrorBody: Decodable { let message: String }
+private struct APIErrorBody: Decodable {
+    let message: String
+    let errors: [APIFieldError]?
+
+    struct APIFieldError: Decodable {
+        let field: String?
+        let message: String
+    }
+
+    // Construye un mensaje legible incluyendo los campos que fallaron
+    var fullMessage: String {
+        guard let errs = errors, !errs.isEmpty else { return message }
+        let detail = errs.map { e in
+            e.field.map { "\($0): \(e.message)" } ?? e.message
+        }.joined(separator: " · ")
+        return "\(message) — \(detail)"
+    }
+}
 
 extension APIClient {
     /// Sube un archivo de imagen como multipart/form-data.
