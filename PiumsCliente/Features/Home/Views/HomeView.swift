@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var pickedCoordinate: CLLocationCoordinate2D? = nil
     @State private var showNotifications = false
     @State private var notifStore = NotificationsStore.shared
+    @State private var auth = AuthManager.shared
     @Environment(\.locationStore) private var locationStore
 
     var body: some View {
@@ -94,19 +95,43 @@ struct HomeView: View {
 
     // MARK: - Top bar
 
+    @ViewBuilder
+    private var clientAvatar: some View {
+        if let urlStr = auth.currentUser?.avatar, let url = URL(string: urlStr) {
+            AsyncImage(url: url) { phase in
+                if case .success(let img) = phase {
+                    img.resizable().scaledToFill()
+                        .frame(width: 34, height: 34)
+                        .clipShape(Circle())
+                } else {
+                    avatarPlaceholder
+                }
+            }
+            .frame(width: 34, height: 34)
+        } else {
+            avatarPlaceholder
+        }
+    }
+
+    private var avatarPlaceholder: some View {
+        let initials = (auth.currentUser?.nombre ?? auth.currentUser?.email ?? "?")
+            .components(separatedBy: " ").prefix(2)
+            .compactMap { $0.first.map(String.init) }.joined().uppercased()
+        return ZStack {
+            Circle()
+                .fill(Color.piumsOrange.opacity(0.15))
+                .frame(width: 34, height: 34)
+            Text(initials.isEmpty ? "?" : initials)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.piumsOrange)
+        }
+    }
+
     @ToolbarContentBuilder
     private var topBar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             HStack(spacing: 10) {
-                // Avatar usuario
-                Circle()
-                    .fill(Color.piumsOrange.opacity(0.15))
-                    .frame(width: 34, height: 34)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.piumsOrange)
-                    )
+                clientAvatar
                 Text("Piums")
                     .font(.headline.bold())
             }
