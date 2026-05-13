@@ -1,6 +1,6 @@
 # ANDROID_CONTEXT.md — Piums Cliente Android
 > Referencia completa para replicar la app iOS en Android con Jetpack Compose.
-> Última actualización: Mayo 2026
+> Última actualización: 13 mayo 2026
 
 ---
 
@@ -1921,14 +1921,33 @@ class TokenStorage @Inject constructor(@ApplicationContext ctx: Context) {
 
 ## 10. FORMATO DE PRECIOS
 
+**La plataforma opera 100% en USD.** No usar GTQ ni ninguna otra moneda.
+
 ```kotlin
 // utils/PiumsFormatter.kt
 fun Int.piumsFormatted(): String {
-    // Backend envía precios en unidades GTQ (no centavos para montos de reserva)
-    // Ejemplo: 15000 = Q150.00 (verificar con backend)
-    return "Q${String.format("%,.2f", this / 100.0)}"
+    // Los precios en API vienen en centavos (Int).
+    // Ejemplo: 35000 → "$ 350.00"
+    val formatter = NumberFormat.getNumberInstance(Locale.US).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
+    return "$ ${formatter.format(this / 100.0)}"
 }
 ```
+
+**Normalización de precios en búsqueda (CRÍTICO):**
+El índice de búsqueda (`/api/artists/search`) devuelve `mainServicePrice` ya dividido por 100
+(en dólares enteros, e.g. `350`), mientras que el catálogo de servicios (`/api/catalog/services`)
+lo devuelve en centavos (`35000`). Al mapear el DTO de búsqueda, multiplicar por 100:
+
+```kotlin
+// En ArtistSearchDto (o SmartArtistDto):
+val mainServicePrice: Int? = rawPrice?.let { (it * 100).toInt() }
+// Así piumsFormatted() divide por 100 y muestra el valor correcto
+```
+
+Sin esta corrección el precio se mostraría como `$ 3.50` en lugar de `$ 350.00`.
 
 ---
 
@@ -2207,6 +2226,136 @@ El picker de talentos específicos ya existe en iOS y está conectado a los filt
 - Al seleccionar un talento: chip activo aparece en la barra, se limpia la especialidad
 - El chip tiene botón ✕ para limpiar el filtro
 - `clearFilters()` también limpia `selectedTalentId` y `selectedTalentLabel`
+
+### 14.9 Fixes Mayo 2026 — Replicar en Android
+
+#### 14.9.1 Timestamp vacío en mensajes de chat
+
+`createdAt` del backend puede venir con o sin fracciones de segundo (`2026-05-13T18:30:00Z` vs `2026-05-13T18:30:00.000Z`).
+Parsear con doble intento; nunca mostrar cadena vacía.
+
+```kotlin
+fun parseMessageTime(raw: String): String {
+    val formats = listOf(
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") },
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+    )
+    val date = formats.firstNotNullOfOrNull { runCatching { it.parse(raw) }.getOrNull() }
+        ?: return raw.take(5)   // fallback: mostrar "HH:mm" literal si está bien formado
+    return SimpleDateFormat("HH:mm", Locale.US).format(date)
+}
+```
+
+#### 14.9.2 Badge de chat no se limpia en deep link
+
+`markConversationRead` solo actualizaba el badge si la conversación ya estaba cargada en lista.
+En deep link (app abierta desde push) la lista puede estar vacía.
+**Siempre** llamar a `refreshUnreadCount()` después de marcar leída, independientemente de si la conversación está en caché:
+
+```kotlin
+suspend fun markConversationRead(conversationId: String) {
+    try {
+        api.markConversationRead(conversationId)
+        socketManager.markConversationRead(conversationId)
+        _conversations.update { list ->
+            list.map { if (it.id == conversationId) it.copy(unreadCount = 0) else it }
+        }
+    } catch (e: Exception) { /* log */ }
+    // SIEMPRE refrescar badge global — cubre caso deep link sin lista cargada
+    refreshUnreadCount()
+}
+```
+
+#### 14.9.3 Hora de reserva — formato 12h
+
+El backend devuelve `scheduledTime` en formato 24h (`"14:30"` o `"14:30:00"`).
+Convertir a 12h con AM/PM para mostrarlo en la pantalla de reserva exitosa:
+
+```kotlin
+fun formatScheduledTime(raw: String): String {
+    val fmt24 = SimpleDateFormat(if (raw.length > 5) "HH:mm:ss" else "HH:mm", Locale.US)
+    val date = runCatching { fmt24.parse(raw) }.getOrNull() ?: return raw
+    return SimpleDateFormat("h:mm a", Locale.US).format(date)  // e.g. "2:30 PM"
+}
+```
+
+#### 14.9.4 Feedback progresivo durante polling de pago
+
+Después de que Tilopay aprueba el pago, la app sondea el backend cada 3s hasta 10 intentos (30s max).
+Durante ese tiempo mostrar mensajes progresivos, no una pantalla congelada:
+
+```kotlin
+// En PaymentViewModel
+private suspend fun pollUntilPaid(bookingId: String, attempt: Int = 0) {
+    if (attempt >= 10) { _phase.value = Phase.Confirmed; return }
+    _pollingMessage.value = when (attempt) {
+        in 0..2 -> "Verificando tu pago..."
+        in 3..5 -> "Confirmando con Tilopay..."
+        in 6..8 -> "Esto puede tardar unos segundos más..."
+        else    -> "Casi listo..."
+    }
+    delay(3_000)
+    val booking = runCatching { api.getBooking(bookingId) }.getOrNull()
+    val paid = booking?.paymentStatus in listOf("ANTICIPO_PAID", "FULLY_PAID", "COMPLETED")
+    if (paid) { _confirmedBooking.value = booking; _phase.value = Phase.Confirmed }
+    else pollUntilPaid(bookingId, attempt + 1)
+}
+```
+
+En la UI, mientras `phase == Processing`, mostrar spinner + texto de `pollingMessage` en lugar del botón de pago.
+
+#### 14.9.5 Indicador de paginación en búsqueda
+
+Al cargar más artistas (scroll al final), mostrar texto junto al spinner para diferenciarlo de la carga inicial:
+
+```kotlin
+// En SearchScreen — al final del LazyColumn/LazyVerticalGrid
+if (viewModel.isLoading && viewModel.results.isNotEmpty()) {
+    item {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(8.dp))
+            Text("Cargando más artistas...", style = MaterialTheme.typography.bodySmall,
+                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+```
+
+#### 14.9.6 Verificación de identidad — estimación de tiempo
+
+Cuando el usuario ya envió sus documentos (`hasSubmittedIdentity == true`), mostrar estimación de revisión
+y una barra de progreso visual (no indeterminada) para reducir ansiedad:
+
+```kotlin
+// En ProfileScreen — fila de verificación
+IdentitySubmittedRow()
+
+@Composable
+fun IdentitySubmittedRow() {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        ListItem(
+            leadingContent = {
+                Icon(Icons.Default.HourglassTop, contentDescription = null,
+                     tint = PiumsOrange)
+            },
+            headlineContent = { Text("Documentos enviados") },
+            supportingContent = { Text("En revisión — hasta 48 horas hábiles",
+                                       style = MaterialTheme.typography.bodySmall) }
+        )
+        LinearProgressIndicator(
+            progress = { 0.6f },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(3.dp),
+            color = PiumsOrange,
+            trackColor = PiumsOrange.copy(alpha = 0.15f)
+        )
+    }
+}
+```
 
 ---
 
