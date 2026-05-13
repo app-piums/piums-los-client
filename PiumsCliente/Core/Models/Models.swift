@@ -8,7 +8,7 @@ struct VoidResponse: Codable {}
 
 /// El backend puede devolver precios como Int o Double (e.g. 3.5 vs 8000).
 /// Estos helpers toleran ambos, redondeando Double → Int.
-fileprivate extension KeyedDecodingContainer {
+extension KeyedDecodingContainer {
     func decodeFlexibleInt(forKey key: Key) throws -> Int {
         if let v = try? decode(Int.self, forKey: key) { return v }
         if let v = try? decode(Double.self, forKey: key) { return Int(v.rounded()) }
@@ -444,13 +444,45 @@ struct ArtistService: Codable, Identifiable, Hashable {
 
     // Helpers para UI
     var price: Int { basePrice }
-    var duration: Int { durationMin ?? 60 }
+    var duration: Int { durationMin ?? 0 }
     var isActive: Bool { status == "ACTIVE" }
     var category: String? { nil }
 
     // Hashable
     static func == (lhs: ArtistService, rhs: ArtistService) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+// Decoder resistente a precios Int/Double. La clave usa el mismo nombre camelCase que la propiedad
+// porque convertFromSnakeCase ya transforma artist_id → artistId antes del lookup.
+extension ArtistService {
+    private enum CK: String, CodingKey {
+        case id, name, description, currency, status, thumbnail, tags, createdAt, addons
+        case artistId, pricingType, basePrice, durationMin, durationMax
+        case isAvailable, isFeatured, whatIsIncluded, isMainService
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CK.self)
+        id          = try c.decode(String.self, forKey: .id)
+        artistId    = (try? c.decode(String.self, forKey: .artistId)) ?? ""
+        name        = try c.decode(String.self, forKey: .name)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        pricingType = try c.decodeIfPresent(String.self, forKey: .pricingType)
+        basePrice   = (try? c.decodeFlexibleInt(forKey: .basePrice)) ?? 0
+        currency    = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
+        durationMin = try c.decodeFlexibleIntIfPresent(forKey: .durationMin)
+        durationMax = try c.decodeFlexibleIntIfPresent(forKey: .durationMax)
+        status      = try c.decodeIfPresent(String.self, forKey: .status)
+        isAvailable = try c.decodeIfPresent(Bool.self, forKey: .isAvailable)
+        isFeatured  = try c.decodeIfPresent(Bool.self, forKey: .isFeatured)
+        whatIsIncluded = try c.decodeIfPresent([String].self, forKey: .whatIsIncluded)
+        thumbnail   = try c.decodeIfPresent(String.self, forKey: .thumbnail)
+        tags        = try c.decodeIfPresent([String].self, forKey: .tags)
+        isMainService = try c.decodeIfPresent(Bool.self, forKey: .isMainService)
+        createdAt   = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        addons      = try c.decodeIfPresent([ServiceAddon].self, forKey: .addons)
+    }
 }
 
 // MARK: - ServiceAddon
@@ -460,17 +492,87 @@ struct ServiceAddon: Codable, Identifiable {
     let serviceId: String
     let name: String
     let description: String?
-    let price: Int          // extra cost in cents
+    let price: Int
     let isRequired: Bool
     let isOptional: Bool
     let isDefault: Bool
     let order: Int
 }
 
+extension ServiceAddon {
+    private enum CK: String, CodingKey {
+        case id, name, description, isRequired, isOptional, isDefault
+        case serviceId, price, order
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CK.self)
+        id          = try c.decode(String.self, forKey: .id)
+        serviceId   = (try? c.decode(String.self, forKey: .serviceId)) ?? ""
+        name        = try c.decode(String.self, forKey: .name)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        price       = (try? c.decodeFlexibleInt(forKey: .price)) ?? 0
+        isRequired  = (try? c.decode(Bool.self, forKey: .isRequired)) ?? false
+        isOptional  = (try? c.decode(Bool.self, forKey: .isOptional)) ?? true
+        isDefault   = (try? c.decode(Bool.self, forKey: .isDefault)) ?? false
+        order       = (try? c.decodeFlexibleInt(forKey: .order)) ?? 0
+    }
+}
+
 // MARK: - Catalog Services Response
 
-struct CatalogServicesResponse: Codable {
+struct CatalogServicesResponse: Decodable {
     let services: [ArtistService]
+
+    private enum CodingKeys: String, CodingKey {
+        case services, data, items
+    }
+
+    init(from decoder: Decoder) throws {
+        // Tolera { services: [...] }, { data: [...] }, { items: [...] }, o array directo.
+        // Cada ítem se decodifica individualmente para no perder los válidos si uno falla.
+        if let c = try? decoder.container(keyedBy: CodingKeys.self) {
+            for key in [CodingKeys.services, .data, .items] {
+                if var ac = try? c.nestedUnkeyedContainer(forKey: key) {
+                    var result: [ArtistService] = []
+                    while !ac.isAtEnd {
+                        if let s = try? ac.decode(ArtistService.self) {
+                            result.append(s)
+                        } else {
+                            _ = try? ac.decode(AnyDecodable.self)  // avanza el cursor
+                        }
+                    }
+                    if !result.isEmpty || ((try? c.decodeNil(forKey: key)) == false) {
+                        services = result; return
+                    }
+                }
+            }
+        }
+        // Array directo en raíz
+        var ac = try decoder.unkeyedContainer()
+        var result: [ArtistService] = []
+        while !ac.isAtEnd {
+            if let s = try? ac.decode(ArtistService.self) { result.append(s) }
+            else { _ = try? ac.decode(AnyDecodable.self) }
+        }
+        services = result
+    }
+}
+
+// Decodable genérico para avanzar el cursor sobre items desconocidos
+private struct AnyDecodable: Decodable {
+    init(from decoder: Decoder) throws {
+        if let _ = try? decoder.singleValueContainer().decode(String.self) { return }
+        if let _ = try? decoder.singleValueContainer().decode(Int.self)    { return }
+        if let _ = try? decoder.singleValueContainer().decode(Bool.self)   { return }
+        _ = try? decoder.container(keyedBy: AnyCodingKey.self)
+    }
+}
+private struct AnyCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { self.intValue = intValue; self.stringValue = "\(intValue)" }
 }
 
 // MARK: - BookingParticipant  (nested en respuesta de booking)

@@ -100,11 +100,14 @@ struct HomeView: View {
     private var clientAvatar: some View {
         if let urlStr = auth.currentUser?.avatar, let url = URL(string: urlStr) {
             AsyncImage(url: url) { phase in
-                if case .success(let img) = phase {
+                switch phase {
+                case .success(let img):
                     img.resizable().scaledToFill()
                         .frame(width: 34, height: 34)
                         .clipShape(Circle())
-                } else {
+                case .failure:
+                    avatarPlaceholder
+                default:
                     avatarPlaceholder
                 }
             }
@@ -517,12 +520,15 @@ struct RecommendedArtistCard: View {
                     .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
                 if let url = artist.avatarUrl, let imageURL = URL(string: url) {
                     AsyncImage(url: imageURL) { phase in
-                        if case .success(let img) = phase {
+                        switch phase {
+                        case .success(let img):
                             img.resizable().scaledToFill()
                                 .frame(width: 36, height: 36)
                                 .clipShape(Circle())
-                        } else {
+                        case .failure:
                             Text(initials).font(.caption.bold()).foregroundStyle(.white)
+                        default:
+                            Color.clear
                         }
                     }
                     .frame(width: 36, height: 36)

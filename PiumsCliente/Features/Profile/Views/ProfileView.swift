@@ -192,6 +192,7 @@ struct ProfileView: View {
         .sheet(isPresented: $viewModel.showDeleteSheet) {
             DeleteAccountSheet(viewModel: viewModel)
         }
+        .refreshable { await viewModel.refreshProfile() }
         .task { await viewModel.refreshProfile() }
         .alert("¿Cerrar sesión?", isPresented: $showLogoutConfirm) {
             Button("Cancelar", role: .cancel) {}

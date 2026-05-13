@@ -126,6 +126,7 @@ struct SearchView: View {
                 }
             }
         }
+        .refreshable { if viewModel.hasSearched { await viewModel.search() } }
         .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
         .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())

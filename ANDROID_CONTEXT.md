@@ -9,7 +9,7 @@
 **App**: Piums Cliente — marketplace de servicios creativos  
 **Rol del usuario**: Cliente que busca y reserva artistas para eventos  
 **Stack Android**: Kotlin + Jetpack Compose + MVVM + Hilt  
-**Backend**: REST API en `https://api.piums.com` (dev: `http://localhost:3005`)  
+**Backend**: REST API en `https://client.piums.io` (proxy cliente — dev/prod: misma URL via Cloudflare tunnel)  
 **Auth**: JWT Bearer Token + Google Firebase OAuth
 
 ---
@@ -796,7 +796,7 @@ POST /api/catalog/pricing/calculate
 **Tab Mensajes**:
 - Lista conversaciones: `GET /api/chat/conversations?page=`
 - Chat detalle: `GET /api/chat/messages/{conversationId}?page=`
-- WebSocket: `ws://api.piums.com/api/chat/ws` con JWT
+- WebSocket (Socket.IO): conectar a `https://client.piums.io` con auth payload `{ token: JWT }`
 - Badge counter en tab bar (singleton `ChatRealtimeStore` / equivalente Android)
 - Mensajes propios: fondo naranja | recibidos: `CardBackground`
 
@@ -1546,8 +1546,8 @@ enum class SpecialtyOption(val raw: String, val displayName: String, val icon: S
 
 ### Base URL
 ```
-DEV:  https://backend.piums.io   (Cloudflare tunnel — misma URL dev y prod por ahora)
-PROD: https://backend.piums.io
+DEV:  https://client.piums.io   (proxy cliente — misma URL dev y prod por ahora)
+PROD: https://client.piums.io
 
 OAuth callback host (Facebook/TikTok): client.piums.io
 
@@ -1882,7 +1882,7 @@ object NetworkModule {
     @Provides @Singleton
     fun provideRetrofit(client: OkHttpClient): Retrofit =
         Retrofit.Builder()
-            .baseUrl("https://api.piums.com")
+            .baseUrl("https://client.piums.io")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -1942,8 +1942,11 @@ class WebSocketManager @Inject constructor(private val tokenStorage: TokenStorag
 
     fun connect(onMessage: (String) -> Unit) {
         val token = tokenStorage.getToken() ?: return
+        // IMPORTANTE: el backend usa Socket.IO (no WebSocket raw).
+        // Usar la librería socket.io-client-java en lugar de OkHttp WebSocket.
+        // URL base: https://client.piums.io  (auth via handshake payload { token: JWT })
         val req = Request.Builder()
-            .url("wss://api.piums.com/api/chat/ws")
+            .url("wss://client.piums.io/api/chat/ws")
             .addHeader("Authorization", "Bearer $token")
             .build()
         ws = client.newWebSocket(req, object : WebSocketListener() {
@@ -2294,7 +2297,7 @@ redirects HTTPS sin backend changes. Android NO tiene esta capacidad nativa — 
 **custom scheme** registrado en el AndroidManifest para capturar el callback.
 
 **Flujo Android**:
-1. App abre `CustomTabsIntent` con `https://api.piums.com/api/auth/facebook`
+1. App abre `CustomTabsIntent` con `https://client.piums.io/api/auth/facebook`
 2. Backend Passport.js ejecuta OAuth con Facebook/TikTok
 3. Backend redirige a `piums://auth/callback?token=JWT` (custom scheme)
 4. Android intercepta el intent en `MainActivity`
@@ -2322,12 +2325,12 @@ class SocialAuthManager @Inject constructor(
     private val apiService: PiumsApiService
 ) {
     fun launchFacebookAuth(context: Context) {
-        val url = "https://api.piums.com/api/auth/facebook"
+        val url = "https://client.piums.io/api/auth/facebook"
         CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
     }
 
     fun launchTikTokAuth(context: Context) {
-        val url = "https://api.piums.com/api/auth/tiktok"
+        val url = "https://client.piums.io/api/auth/tiktok"
         CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
     }
 

@@ -13,10 +13,19 @@ struct PortfolioItem: Codable, Identifiable {
     let createdAt: String?
 }
 
-struct PortfolioResponse: Codable {
-    let portfolio: [PortfolioItem]?
-    let items: [PortfolioItem]?
-    var allItems: [PortfolioItem] { portfolio ?? items ?? [] }
+struct PortfolioResponse: Decodable {
+    let allItems: [PortfolioItem]
+
+    private enum CK: String, CodingKey { case portfolio, items, data }
+
+    init(from decoder: Decoder) throws {
+        if let c = try? decoder.container(keyedBy: CK.self) {
+            if let s = try? c.decode([PortfolioItem].self, forKey: .portfolio) { allItems = s; return }
+            if let d = try? c.decode([PortfolioItem].self, forKey: .data)      { allItems = d; return }
+            if let i = try? c.decode([PortfolioItem].self, forKey: .items)     { allItems = i; return }
+        }
+        allItems = []
+    }
 }
 
 // MARK: - Lightweight DTO for avatar (resilient to shape changes in /api/artists/:id)
@@ -106,8 +115,15 @@ final class ArtistProfileViewModel {
         defer { isLoadingServices = false }
         do {
             let res: CatalogServicesResponse = try await APIClient.request(.listServices(artistId: artist.id))
-            services = res.services.filter { $0.status != "ARCHIVED" }
+            #if DEBUG
+            print("🎨 Services raw count: \(res.services.count) for artistId=\(artist.id)")
+            for s in res.services { print("  • [\(s.status ?? "nil")] \(s.name) — \(s.basePrice) \(s.currency) available=\(s.isAvailable ?? true)") }
+            #endif
+            services = res.services.filter { $0.status == "ACTIVE" }
         } catch {
+            #if DEBUG
+            print("❌ loadServices error for artistId=\(artist.id): \(error)")
+            #endif
             errorMessage = AppError(from: error).errorDescription
         }
     }
@@ -129,6 +145,14 @@ final class ArtistProfileViewModel {
         do {
             let res: PortfolioResponse = try await APIClient.request(.getArtistPortfolio(id: artist.id))
             portfolio = res.allItems
-        } catch { portfolio = [] }
+            #if DEBUG
+            print("🖼 Portfolio: \(portfolio.count) items for artistId=\(artist.id)")
+            #endif
+        } catch {
+            #if DEBUG
+            print("❌ loadPortfolio error for artistId=\(artist.id): \(error)")
+            #endif
+            portfolio = []
+        }
     }
 }

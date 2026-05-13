@@ -113,7 +113,7 @@ enum APIEndpoint {
 
 extension APIEndpoint {
     private static var base: String {
-        Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://backend.piums.io"
+        Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://client.piums.io"
     }
 
     var url: URL {
@@ -241,7 +241,7 @@ extension APIEndpoint {
 
         case .searchArtists(let q, let pg, let lm, let specialty, let city,
                             let minPrice, let maxPrice, let minRating,
-                            let isVerified, let sortBy, _):
+                            let isVerified, let sortBy, let sortOrder):
             var p = "/api/search/artists?page=\(pg)&limit=\(lm)"
             if let q = q, !q.isEmpty { p += "&q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)" }
             if let specialty = specialty, !specialty.isEmpty { p += "&category=\(specialty.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? specialty)" }
@@ -251,17 +251,23 @@ extension APIEndpoint {
             if let minRating = minRating { p += "&minRating=\(minRating)" }
             if let isVerified = isVerified, isVerified { p += "&isVerified=true" }
             if let sortBy = sortBy, !sortBy.isEmpty { p += "&sortBy=\(sortBy)" }
+            if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
             return p
 
-        case .smartSearch(let q, let city, _, _, let page, let limit,
-                          _, let minPrice, let maxPrice,
-                          let minRating, let isVerified, _, _):
+        case .smartSearch(let q, let city, let lat, let lng, let page, let limit,
+                          let specialty, let minPrice, let maxPrice,
+                          let minRating, let isVerified, let sortBy, let sortOrder):
             var p = "/api/search/smart?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)&page=\(page)&limit=\(limit)"
             if let city = city, !city.isEmpty { p += "&city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)" }
+            if let lat = lat { p += "&lat=\(lat)" }
+            if let lng = lng { p += "&lng=\(lng)" }
+            if let specialty = specialty, !specialty.isEmpty { p += "&specialty=\(specialty.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? specialty)" }
             if let minPrice = minPrice { p += "&minPrice=\(minPrice)" }
             if let maxPrice = maxPrice { p += "&maxPrice=\(maxPrice)" }
             if let minRating = minRating { p += "&minRating=\(minRating)" }
             if let isVerified = isVerified, isVerified { p += "&isVerified=true" }
+            if let sortBy = sortBy, !sortBy.isEmpty { p += "&sortBy=\(sortBy)" }
+            if let sortOrder = sortOrder, !sortOrder.isEmpty { p += "&sortOrder=\(sortOrder)" }
             return p
 
         // Catalog

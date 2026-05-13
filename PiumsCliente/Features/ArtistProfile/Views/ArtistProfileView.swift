@@ -62,10 +62,18 @@ struct ArtistProfileView: View {
                     if viewModel.isLoadingServices {
                         ProgressView().frame(maxWidth: .infinity).padding()
                     } else if viewModel.services.isEmpty {
-                        Text("Sin servicios disponibles")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
+                        VStack(spacing: 6) {
+                            Text("Sin servicios disponibles")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            if let err = viewModel.errorMessage {
+                                Text(err)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        .padding(.horizontal)
                     } else {
                         ForEach(viewModel.services) { service in
                             ServiceRowView(service: service) {
@@ -118,15 +126,11 @@ struct ArtistProfileView: View {
 
                 Divider().padding(.horizontal)
 
-                // Información de Contacto + Redes Sociales
+                // Redes Sociales
                 ContactInfoView(
                     instagram: viewModel.instagram,
                     website: viewModel.website
-                ) {
-                    if let first = viewModel.services.first {
-                        bookingService = first
-                    }
-                }
+                )
 
                 Divider().padding(.horizontal)
 
@@ -177,6 +181,7 @@ struct ArtistProfileView: View {
                 }
             }
         }
+        .refreshable { await viewModel.loadAll() }
         .task { await viewModel.loadAll() }
         .onChange(of: favorites.errorMessage) { _, msg in showFavError = msg != nil }
         .alert("No se pudo actualizar favoritos", isPresented: $showFavError) {
@@ -214,27 +219,13 @@ struct ArtistProfileView: View {
 private struct ContactInfoView: View {
     let instagram: String?
     let website: String?
-    let onReserve: () -> Void
 
     var hasSocialLinks: Bool { instagram != nil || website != nil }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Button(action: onReserve) {
-                Text("Reservar Ahora")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-                    .background(Color.piumsOrange)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal)
-
-            if hasSocialLinks {
-                Divider().padding(.horizontal)
-
+        guard hasSocialLinks else { return AnyView(EmptyView()) }
+        return AnyView(
+            VStack(alignment: .leading, spacing: 14) {
                 Text("Redes Sociales")
                     .font(.headline)
                     .padding(.horizontal)
@@ -257,8 +248,8 @@ private struct ContactInfoView: View {
                 }
                 .padding(.horizontal)
             }
-        }
-        .padding(.vertical)
+            .padding(.vertical)
+        )
     }
 }
 
@@ -329,19 +320,53 @@ private struct ServiceRowView: View {
     let service: ArtistService
     let onReserve: () -> Void
 
+    private var priceLabel: String {
+        service.price.piumsFormattedCurrency(service.currency)
+    }
+
+    private var pricingTypeLabel: String? {
+        switch service.pricingType {
+        case "FIXED":   return "Precio fijo"
+        case "HOURLY":  return "Por hora"
+        case "PACKAGE": return "Paquete"
+        default:        return nil
+        }
+    }
+
+    private var durationLabel: String? {
+        let mins = service.duration
+        guard mins > 0 else { return nil }
+        if mins < 60 { return "\(mins) min" }
+        let h = mins / 60
+        let m = mins % 60
+        return m == 0 ? "\(h) h" : "\(h) h \(m) min"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(service.name).font(.subheadline.bold())
                     if let desc = service.description {
                         Text(desc).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
-                    Label("\(service.duration) min", systemImage: "clock")
-                        .font(.caption).foregroundStyle(.secondary)
+                    if durationLabel != nil || pricingTypeLabel != nil {
+                        HStack(spacing: 10) {
+                            if let dur = durationLabel {
+                                Label(dur, systemImage: "clock")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            if let type = pricingTypeLabel {
+                                if durationLabel != nil {
+                                    Text("·").foregroundStyle(.secondary).font(.caption)
+                                }
+                                Text(type).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
                 Spacer()
-                Text(service.price.piumsFormatted)
+                Text(priceLabel)
                     .font(.subheadline.bold())
                     .foregroundStyle(Color.piumsOrange)
             }

@@ -6,10 +6,10 @@ import CryptoKit
 /// cuyo hash SHA-256 (DER) coincida con los valores fijados.
 ///
 /// Cómo rotar hashes cuando el certificado vence:
-///   $ echo | openssl s_client -connect backend.piums.io:443 2>/dev/null \
+///   $ echo | openssl s_client -connect client.piums.io:443 2>/dev/null \
 ///       | openssl x509 -outform der | openssl dgst -sha256 -binary | base64
 ///
-/// Hashes actuales:
+/// Hashes actuales (client.piums.io y backend.piums.io comparten el mismo certificado):
 ///   Leaf cert:    vence 2026-07-21  →  bXcinqCEgWfTR8vYpEctiYO9Tq7YLAfUtvWLZJKvNhI=
 ///   Intermediate: Let's Encrypt E8  →  g2JP0zjI2bAjwYpny3qcBRnaQ9EXdbTGy9rUXD2ZfFI=
 final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
@@ -20,7 +20,7 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
     ]
 
     // Solo aplicar pinning a nuestros propios hosts; CDN / Firebase / Stripe pasan normal
-    private static let pinnedHosts: Set<String> = ["backend.piums.io"]
+    private static let pinnedHosts: Set<String> = ["client.piums.io", "backend.piums.io"]
 
     func urlSession(
         _ session: URLSession,
