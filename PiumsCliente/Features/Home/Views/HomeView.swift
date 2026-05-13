@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var pickedLocationName: String = ""
     @State private var pickedCoordinate: CLLocationCoordinate2D? = nil
     @State private var showNotifications = false
+    @State private var notifStore = NotificationsStore.shared
     @Environment(\.locationStore) private var locationStore
 
     var body: some View {
@@ -118,9 +119,20 @@ struct HomeView: View {
                     .font(.system(size: 18))
                     .foregroundStyle(.primary)
                     .overlay(alignment: .topTrailing) {
-                        Circle().fill(Color.piumsOrange)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 2, y: -2)
+                        if notifStore.unreadCount > 0 {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.piumsOrange)
+                                    .frame(width: notifStore.unreadCount > 9 ? 16 : 10,
+                                           height: notifStore.unreadCount > 9 ? 16 : 10)
+                                if notifStore.unreadCount > 1 {
+                                    Text(notifStore.unreadCount > 99 ? "99+" : "\(notifStore.unreadCount)")
+                                        .font(.system(size: 7, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .offset(x: 5, y: -5)
+                        }
                     }
             }
         }

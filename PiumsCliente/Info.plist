@@ -13,6 +13,13 @@
 		<false/>
 	</dict>
 
+	<!-- Background modes: remote-notifications permite procesar silent push (content-available:1)
+	     para sincronizar contadores de mensajes y notificaciones sin que el usuario abra la app -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notifications</string>
+	</array>
+
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

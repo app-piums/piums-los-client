@@ -72,7 +72,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         completionHandler([.banner, .sound, .badge])
     }
 
-    // MARK: - Deep link desde notificación
+    // MARK: - Deep link desde notificación (tap del usuario)
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -82,8 +82,16 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let userInfo = response.notification.request.content.userInfo
         handlePushUserInfo(userInfo)
 
-        // Navegar a reserva si viene bookingId
-        if let bookingId = userInfo["bookingId"] as? String {
+        // Backend envía "chatId"; cuando cambies la clave a "conversationId" ambas funcionan
+        let conversationId = (userInfo["conversationId"] as? String)
+                          ?? (userInfo["chatId"] as? String)
+        if let conversationId {
+            NotificationCenter.default.post(
+                name: .navigateToConversation,
+                object: nil,
+                userInfo: ["conversationId": conversationId]
+            )
+        } else if let bookingId = userInfo["bookingId"] as? String {
             NotificationCenter.default.post(
                 name: .navigateToBooking,
                 object: nil,
@@ -93,15 +101,32 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         completionHandler()
     }
 
+    // MARK: - Silent push / background fetch
+    // Llamado cuando el backend envía content-available:1 con la app en background.
+    // Permite sincronizar contadores sin que el usuario abra la app.
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        handlePushUserInfo(userInfo)
+        Task {
+            await ChatRealtimeStore.shared.refreshUnread()
+            await NotificationsStore.shared.refresh()
+            completionHandler(.newData)
+        }
+    }
+
     private func handlePushUserInfo(_ userInfo: [AnyHashable: Any]) {
         if let badge = userInfo["badge"] as? Int {
             UNUserNotificationCenter.current().setBadgeCount(badge)
         }
-        if let type = userInfo["type"] as? String, type == "NEW_MESSAGE" {
+        let type = userInfo["type"] as? String ?? ""
+        if type == "NEW_MESSAGE" || userInfo["conversationId"] != nil || userInfo["chatId"] != nil {
             NotificationCenter.default.post(name: .chatUnreadNeedsRefresh, object: nil)
-        }
-        if userInfo["conversationId"] != nil {
-            NotificationCenter.default.post(name: .chatUnreadNeedsRefresh, object: nil)
+        } else {
+            // Notificación no-chat (booking, pago, etc.) → refrescar campana
+            NotificationCenter.default.post(name: .notificationsNeedRefresh, object: nil)
         }
     }
 }
@@ -109,6 +134,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 // MARK: - Notification names
 
 extension Notification.Name {
-    static let navigateToBooking = Notification.Name("navigateToBooking")
-    static let navigateToMySpace = Notification.Name("navigateToMySpace")
+    static let navigateToBooking      = Notification.Name("navigateToBooking")
+    static let navigateToMySpace      = Notification.Name("navigateToMySpace")
+    // Deep link push → conversación específica del chat
+    static let navigateToConversation = Notification.Name("navigateToConversation")
+    // Push no-chat recibido → refrescar contador de campana
+    static let notificationsNeedRefresh = Notification.Name("notifications.needs.refresh")
 }

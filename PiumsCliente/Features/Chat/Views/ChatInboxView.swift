@@ -4,6 +4,7 @@ import SwiftUI
 struct ChatInboxView: View {
     @State private var viewModel = ChatViewModel()
     @State private var selectedConversation: Conversation?
+    private let chatStore = ChatRealtimeStore.shared
 
     var body: some View {
         Group {
@@ -40,7 +41,35 @@ struct ChatInboxView: View {
         .navigationDestination(item: $selectedConversation) {
             ChatDetailView(conversation: $0, viewModel: viewModel)
         }
-        .task { await viewModel.loadConversations() }
+        .task {
+            await viewModel.loadConversations()
+            // Consume el deep link guardado al venir de una push con la app cerrada/background
+            if let id = chatStore.pendingDeepLinkConversationId {
+                chatStore.pendingDeepLinkConversationId = nil
+                await openConversation(id: id)
+            }
+        }
+        // Consume el deep link mientras la vista ya está activa
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToConversation)) { note in
+            if let id = note.userInfo?["conversationId"] as? String {
+                Task { await openConversation(id: id) }
+            }
+        }
+    }
+
+    // Busca la conversación en la lista cargada; si no está, la pide al backend.
+    // Evita un fetch de red innecesario cuando la conversación ya está en memoria.
+    private func openConversation(id: String) async {
+        if let existing = viewModel.conversations.first(where: { $0.id == id }) {
+            selectedConversation = existing
+            return
+        }
+        do {
+            let wrapper: ConversationWrapper = try await APIClient.request(.getConversation(id: id))
+            selectedConversation = wrapper.conversation
+        } catch {
+            // Silently ignore — el usuario puede encontrar la conversación en la lista
+        }
     }
 }
 

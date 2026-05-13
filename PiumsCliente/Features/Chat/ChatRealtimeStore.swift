@@ -16,6 +16,8 @@ final class ChatRealtimeStore {
 
     var unreadCount: Int = 0
     var isConnected: Bool { socket.isConnected }
+    // ID de conversación pendiente de abrir por deep link desde push
+    var pendingDeepLinkConversationId: String?
 
     func startIfNeeded() {
         guard !isStarted else { return }
@@ -45,6 +47,17 @@ final class ChatRealtimeStore {
         ) { [weak self] note in
             guard let count = note.object as? Int else { return }
             Task { @MainActor [weak self] in self?.unreadCount = count }
+        }
+
+        // Guarda el ID para que ChatInboxView lo consuma al montarse,
+        // incluso si la notificación llega antes de que la vista exista.
+        NotificationCenter.default.addObserver(
+            forName: .navigateToConversation,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let id = note.userInfo?["conversationId"] as? String
+            Task { @MainActor [weak self] in self?.pendingDeepLinkConversationId = id }
         }
     }
 

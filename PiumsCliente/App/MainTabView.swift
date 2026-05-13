@@ -40,6 +40,9 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToMySpace)) { _ in
             selectedTab = 2
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToConversation)) { _ in
+            selectedTab = 3
+        }
         .onChange(of: deepLinkBookingId) { _, bookingId in
             guard let bookingId else { return }
             selectedTab = 2
@@ -52,6 +55,7 @@ struct MainTabView: View {
             chatStore.setActive(newPhase == .active)
         }
         .task { chatStore.startIfNeeded() }
+        .task { NotificationsStore.shared.startIfNeeded() }
         .task {
             let skipTutorial = CommandLine.arguments.contains("UI_TESTING_SKIP_TUTORIAL")
             if !hasSeenHowItWorks && !skipTutorial {
