@@ -96,10 +96,12 @@ final class ChatViewModel {
                     messages: conv.messages, clientName: conv.clientName, clientAvatar: conv.clientAvatar
                 )
             }
-            await unreadStore.refreshUnread()
         } catch {
             errorMessage = AppError(from: error).errorDescription
         }
+        // Siempre refrescar el badge global, incluso si la conversación no estaba en lista
+        // (cubre deep link directo sin lista cargada)
+        await unreadStore.refreshUnread()
     }
 
     func sendMessage(conversationId: String, content: String) async {

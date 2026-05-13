@@ -86,9 +86,14 @@ private struct MessageBubble: View {
     }
 
     private var formattedTime: String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = formatter.date(from: message.createdAt) else { return "" }
+        let iso = ISO8601DateFormatter()
+        let raw = message.createdAt
+        let date = iso.date(from: raw)
+            ?? {
+                iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return iso.date(from: raw)
+            }()
+        guard let date else { return String(raw.prefix(5)) }
         let df = DateFormatter()
         df.dateFormat = "HH:mm"
         return df.string(from: date)

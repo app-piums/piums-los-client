@@ -1302,12 +1302,12 @@ struct BookingSuccessView: View {
 
     private var formattedTime: String {
         guard let t = booking?.scheduledTime else { return "" }
-        let parts = t.split(separator: ":").compactMap { Int($0) }
-        guard parts.count >= 2 else { return t }
-        let h = parts[0]; let m = parts[1]
-        let suffix = h >= 12 ? "PM" : "AM"
-        let h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h)
-        return String(format: "%d:%02d %@", h12, m, suffix)
+        let df24 = DateFormatter()
+        df24.dateFormat = t.count > 5 ? "HH:mm:ss" : "HH:mm"
+        guard let date = df24.date(from: t) else { return t }
+        let df12 = DateFormatter()
+        df12.dateFormat = "h:mm a"
+        return df12.string(from: date)
     }
 
     private var initials: String {
