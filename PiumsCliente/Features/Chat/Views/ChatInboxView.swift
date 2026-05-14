@@ -38,6 +38,16 @@ struct ChatInboxView: View {
                 .refreshable { await viewModel.loadConversations() }
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if let msg = viewModel.errorMessage {
+                ErrorBannerView(message: msg)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onTapGesture { viewModel.errorMessage = nil }
+            }
+        }
+        .animation(.spring(response: 0.35), value: viewModel.errorMessage)
         .navigationDestination(item: $selectedConversation) {
             ChatDetailView(conversation: $0, viewModel: viewModel)
         }

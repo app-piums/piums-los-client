@@ -69,6 +69,12 @@ struct APIClient {
         switch http.statusCode {
         case 200..<300:
             return data
+        case 429:
+            let retryAfter = (http.allHeaderFields["Retry-After"] as? String).flatMap(Int.init)
+            let msg = retryAfter.map { LoginRateLimiter.countdownMessage(seconds: $0) }
+                ?? backendMessage
+                ?? "Demasiados intentos. Espera un momento e inténtalo de nuevo."
+            throw AppError.http(statusCode: 429, message: msg)
         case 401 where retryOnUnauthorized && endpoint.requiresAuth:
             try await AuthManager.shared.refreshIfNeeded()
             return try await rawRequest(endpoint, retryOnUnauthorized: false)

@@ -14,37 +14,51 @@ final class ChatViewModel {
 
     private let socket = ChatSocketManager.shared
     private let unreadStore = ChatRealtimeStore.shared
+    nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
     init() {
         socket.connect()
         unreadStore.startIfNeeded()
-        NotificationCenter.default.addObserver(forName: .chatMessageReceived, object: nil, queue: .main) { [weak self] note in
-            guard let msg = note.object as? ChatMessage else { return }
-            Task { @MainActor [weak self] in self?.handleIncoming(msg) }
-        }
-        NotificationCenter.default.addObserver(forName: .chatMessageRead, object: nil, queue: .main) { [weak self] note in
-            guard let id = note.object as? String else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.messages = self.messages.map {
-                    $0.id == id
-                    ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, content: $0.content, type: $0.type, status: "READ", readAt: $0.readAt, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
-                    : $0
+
+        observers.append(
+            NotificationCenter.default.addObserver(forName: .chatMessageReceived, object: nil, queue: .main) { [weak self] note in
+                guard let msg = note.object as? ChatMessage else { return }
+                Task { @MainActor [weak self] in self?.handleIncoming(msg) }
+            }
+        )
+        observers.append(
+            NotificationCenter.default.addObserver(forName: .chatMessageRead, object: nil, queue: .main) { [weak self] note in
+                guard let id = note.object as? String else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.messages = self.messages.map {
+                        $0.id == id
+                        ? ChatMessage(id: $0.id, conversationId: $0.conversationId, senderId: $0.senderId, content: $0.content, type: $0.type, status: "READ", readAt: $0.readAt, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
+                        : $0
+                    }
                 }
             }
-        }
-        NotificationCenter.default.addObserver(forName: .chatMessageError, object: nil, queue: .main) { [weak self] note in
-            Task { @MainActor [weak self] in
-                self?.errorMessage = note.object as? String ?? "Error al enviar mensaje"
+        )
+        observers.append(
+            NotificationCenter.default.addObserver(forName: .chatMessageError, object: nil, queue: .main) { [weak self] note in
+                Task { @MainActor [weak self] in
+                    self?.errorMessage = note.object as? String ?? "Error al enviar mensaje"
+                }
             }
-        }
+        )
         // Re-fetch messages after reconnect to recover any missed during disconnect
-        NotificationCenter.default.addObserver(forName: .chatSocketReconnected, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self, let convId = self.currentConversationId else { return }
-                await self.loadMessages(conversationId: convId)
+        observers.append(
+            NotificationCenter.default.addObserver(forName: .chatSocketReconnected, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self, let convId = self.currentConversationId else { return }
+                    await self.loadMessages(conversationId: convId)
+                }
             }
-        }
+        )
+    }
+
+    deinit {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     func loadConversations() async {
@@ -152,6 +166,9 @@ final class ChatViewModel {
                 createdAt: conv.createdAt, updatedAt: conv.updatedAt, unreadCount: unread,
                 messages: conv.messages, clientName: conv.clientName, clientAvatar: conv.clientAvatar
             )
+        } else {
+            // Conversación nueva (no está en la lista cargada) — refrescar inbox
+            Task { await loadConversations() }
         }
     }
 }

@@ -24,19 +24,36 @@ final class LoginRateLimiter {
             let key = email.lowercased()
             guard var rec = records[key] else { return nil }
 
-            // Verificar lockout activo
             if let until = rec.lockedUntil, until > Date() {
                 let remaining = Int(until.timeIntervalSinceNow.rounded(.up))
-                return "Demasiados intentos. Espera \(remaining) segundos antes de continuar."
+                return LoginRateLimiter.countdownMessage(seconds: remaining)
             }
 
-            // Limpiar lockout expirado y limpiar intentos viejos (ventana 15 min)
             rec.lockedUntil = nil
             rec.attempts = rec.attempts.filter { Date().timeIntervalSince($0) < 900 }
             records[key] = rec
 
             return lockoutMessage(for: rec.attempts.count)
         }
+    }
+
+    /// Fecha exacta en que expira el bloqueo, para mostrar countdown en vivo.
+    func lockedUntil(email: String) -> Date? {
+        lock.withLock {
+            let key = email.lowercased()
+            guard let until = records[key]?.lockedUntil, until > Date() else { return nil }
+            return until
+        }
+    }
+
+    static func countdownMessage(seconds: Int) -> String {
+        if seconds >= 3600 {
+            return "Demasiados intentos. Vuelve a intentarlo en \(seconds / 3600)h."
+        } else if seconds >= 60 {
+            let mins = (seconds + 59) / 60
+            return "Demasiados intentos. Vuelve a intentarlo en \(mins) min."
+        }
+        return "Demasiados intentos. Intenta de nuevo en \(seconds)s ⏱"
     }
 
     /// Registra un intento fallido y aplica lockout si corresponde.
@@ -67,9 +84,9 @@ final class LoginRateLimiter {
     private func lockoutMessage(for count: Int) -> String? {
         switch count {
         case ..<3:   return nil
-        case 3..<5:  return "Demasiados intentos. Espera 30 segundos antes de volver a intentarlo."
-        case 5..<10: return "Cuenta temporalmente bloqueada por intentos fallidos. Espera 5 minutos."
-        default:     return "Demasiados intentos fallidos. Espera 15 minutos o usa ¿Olvidaste tu contraseña?"
+        case 3..<5:  return "Contraseña incorrecta. Te quedan \(5 - count) intento(s) antes del bloqueo."
+        case 5..<10: return "Cuenta bloqueada temporalmente. Espera 5 minutos e inténtalo de nuevo."
+        default:     return "Demasiados intentos fallidos. Espera 15 minutos o recupera tu contraseña."
         }
     }
 }

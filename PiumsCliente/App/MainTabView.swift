@@ -69,6 +69,7 @@ struct MainTabView: View {
                 onDismiss: {
                     hasSeenHowItWorks = true
                     showHowItWorks = false
+                    TutorialManager.shared.startIfFirstTime()
                 },
                 onNavigate: { tab in
                     hasSeenHowItWorks = true
@@ -76,6 +77,7 @@ struct MainTabView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         selectedTab = tab
                     }
+                    TutorialManager.shared.startIfFirstTime()
                 }
             )
         }

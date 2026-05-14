@@ -8,6 +8,11 @@ final class TutorialManager: ObservableObject {
 
     @Published var isActive = false
     @Published var currentStep = 0
+    @Published var stepDirection: StepDirection = .forward
+
+    @AppStorage("hasSeenTour") private var hasSeenTour = false
+
+    enum StepDirection { case forward, backward }
 
     struct TourStep {
         let tab: Int
@@ -71,10 +76,18 @@ final class TutorialManager: ObservableObject {
 
     func start() {
         currentStep = 0
+        stepDirection = .forward
         isActive = true
     }
 
+    func startIfFirstTime() {
+        guard !hasSeenTour else { return }
+        hasSeenTour = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.start() }
+    }
+
     func next() {
+        stepDirection = .forward
         if isLastStep { end() } else {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { currentStep += 1 }
         }
@@ -82,10 +95,12 @@ final class TutorialManager: ObservableObject {
 
     func previous() {
         guard currentStep > 0 else { return }
+        stepDirection = .backward
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { currentStep -= 1 }
     }
 
     func end() {
+        hasSeenTour = true
         withAnimation(.easeOut(duration: 0.25)) { isActive = false }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.currentStep = 0 }
     }

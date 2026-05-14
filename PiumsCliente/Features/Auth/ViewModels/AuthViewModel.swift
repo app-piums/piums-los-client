@@ -22,13 +22,17 @@ final class AuthViewModel {
     var successMessage: String?
     var activeScreen: AuthScreen = .login
 
+    private var countdownTask: Task<Void, Never>?
+
     // MARK: - Acciones
 
     func login() async {
         guard validate(for: .login) else { return }
         let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
         if let blocked = LoginRateLimiter.shared.shouldBlock(email: normalizedEmail) {
-            errorMessage = blocked; return
+            errorMessage = blocked
+            startBlockCountdown(email: normalizedEmail)
+            return
         }
         isLoading = true
         errorMessage = nil
@@ -123,7 +127,9 @@ final class AuthViewModel {
         guard !email.isEmpty else { errorMessage = "Ingresa tu correo electrónico"; return }
         let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
         if let blocked = LoginRateLimiter.shared.shouldBlock(email: "forgot:\(normalizedEmail)") {
-            errorMessage = blocked; return
+            errorMessage = blocked
+            startBlockCountdown(email: "forgot:\(normalizedEmail)")
+            return
         }
         isLoading = true
         errorMessage = nil
@@ -143,8 +149,28 @@ final class AuthViewModel {
     }
 
     func clearMessages() {
+        countdownTask?.cancel()
         errorMessage = nil
         successMessage = nil
+    }
+
+    // MARK: - Countdown
+
+    private func startBlockCountdown(email: String) {
+        guard let until = LoginRateLimiter.shared.lockedUntil(email: email) else { return }
+        countdownTask?.cancel()
+        countdownTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let remaining = max(0, Int(until.timeIntervalSinceNow.rounded(.up)))
+                if remaining <= 0 {
+                    self.errorMessage = nil
+                    return
+                }
+                self.errorMessage = LoginRateLimiter.countdownMessage(seconds: remaining)
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     // MARK: - Validaciones

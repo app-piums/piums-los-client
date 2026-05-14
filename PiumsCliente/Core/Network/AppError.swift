@@ -24,7 +24,19 @@ enum AppError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .network:              return "Sin conexión a internet"
+        case .network(let e):
+            switch e.code {
+            case .timedOut:                  return "La solicitud tardó demasiado. Intenta de nuevo."
+            case .notConnectedToInternet,
+                 .networkConnectionLost,
+                 .dataNotAllowed:            return "Sin conexión a internet"
+            case .cannotConnectToHost,
+                 .cannotFindHost,
+                 .dnsLookupFailed:           return "No se puede conectar al servidor"
+            case .secureConnectionFailed,
+                 .serverCertificateUntrusted: return "Error de seguridad en la conexión"
+            default:                         return "Error de red. Intenta de nuevo."
+            }
         case .http(_, let m):       return m
         case .decoding:             return "Error al procesar la respuesta"
         case .unauthorized:         return "Sesión expirada. Inicia sesión de nuevo"
