@@ -1,6 +1,6 @@
 # ANDROID_CONTEXT.md — Piums Cliente Android
 > Referencia completa para replicar la app iOS en Android con Jetpack Compose.
-> Última actualización: 13 mayo 2026
+> Última actualización: 14 mayo 2026
 
 ---
 
@@ -2353,6 +2353,257 @@ fun IdentitySubmittedRow() {
             color = PiumsOrange,
             trackColor = PiumsOrange.copy(alpha = 0.15f)
         )
+    }
+}
+```
+
+#### 14.10 Fixes Mayo 2026 (segunda tanda) — Replicar en Android
+
+##### 14.10.1 Chat Inbox — conversaciones nuevas no aparecían en tiempo real
+
+`handleIncoming` solo actualizaba conversaciones ya cargadas en la lista. Si llegaba un mensaje de una conversación nueva (no en caché), no ocurría nada.
+**Fix**: cuando llega un mensaje cuya conversación no está en la lista → recargar el inbox completo.
+
+```kotlin
+// En ChatViewModel
+private fun handleIncoming(msg: ChatMessage) {
+    // Agregar mensaje si la conversación está abierta
+    if (_currentConversationId.value == msg.conversationId) {
+        _messages.update { list ->
+            if (list.none { it.id == msg.id }) list + msg else list
+        }
+    }
+    // Actualizar preview en la lista si la conversación ya estaba cargada
+    val idx = _conversations.value.indexOfFirst { it.id == msg.conversationId }
+    if (idx >= 0) {
+        _conversations.update { list ->
+            list.toMutableList().also { it[idx] = it[idx].copy(
+                lastMessageAt = msg.createdAt,
+                lastMessagePreview = msg.content,
+                unreadCount = if (msg.senderId == currentUserId) it[idx].unreadCount
+                              else (it[idx].unreadCount ?: 0) + 1
+            )}
+        }
+    } else {
+        // Conversación nueva — refrescar la lista completa
+        viewModelScope.launch { loadConversations() }
+    }
+}
+```
+
+También limpiar los observers/flows al destruir el ViewModel para evitar fugas:
+```kotlin
+override fun onCleared() {
+    super.onCleared()
+    webSocketManager.disconnect()
+}
+```
+
+##### 14.10.2 ErrorBanner en ChatInboxScreen
+
+El error de red en el inbox de chat no se mostraba en ningún lugar.
+Agregar un `Snackbar` o banner flotante en la parte inferior de `ChatInboxScreen`:
+
+```kotlin
+// En ChatInboxScreen
+val error by viewModel.errorMessage.collectAsState()
+
+Box(modifier = Modifier.fillMaxSize()) {
+    // ... contenido principal ...
+
+    AnimatedVisibility(
+        visible = error != null,
+        enter = slideInVertically { it },
+        exit  = slideOutVertically { it },
+        modifier = Modifier.align(Alignment.BottomCenter)
+    ) {
+        error?.let { msg ->
+            ErrorBanner(
+                message = msg,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clickable { viewModel.clearError() }
+            )
+        }
+    }
+}
+```
+
+##### 14.10.3 AppError — mensajes de red específicos según tipo de error
+
+No mostrar siempre "Sin conexión a internet" para cualquier `IOException`.
+Distinguir por tipo de excepción:
+
+```kotlin
+fun Exception.toUserMessage(): String = when (this) {
+    is java.net.SocketTimeoutException ->
+        "La solicitud tardó demasiado. Intenta de nuevo."
+    is java.net.UnknownHostException,
+    is java.net.ConnectException ->
+        "No se puede conectar al servidor"
+    is javax.net.ssl.SSLException ->
+        "Error de seguridad en la conexión"
+    is java.io.IOException ->
+        if (message?.contains("No address") == true) "Sin conexión a internet"
+        else "Error de red. Intenta de nuevo."
+    is retrofit2.HttpException -> when (code()) {
+        401  -> "Sesión expirada. Inicia sesión de nuevo"
+        404  -> "Recurso no encontrado"
+        429  -> {
+            val retryAfter = response()?.headers()?.get("Retry-After")?.toIntOrNull()
+            retryAfter?.let { LoginRateLimiter.countdownMessage(it) }
+                ?: response()?.errorBody()?.string()?.let { parseBackendMessage(it) }
+                ?: "Demasiados intentos. Espera un momento e inténtalo de nuevo."
+        }
+        in 500..599 -> "Error del servidor. Intenta más tarde"
+        else -> "Error inesperado (${code()})"
+    }
+    else -> localizedMessage ?: "Error desconocido"
+}
+```
+
+##### 14.10.4 Tour interactivo — mejoras de UX
+
+**Auto-show en primer login**: lanzar el tour automáticamente la primera vez que el usuario cierra `HowItWorksScreen`. Usar `SharedPreferences` / `DataStore` con clave `hasSeenTour`.
+
+```kotlin
+// En MainViewModel o el Composable raíz
+val hasSeenTour by dataStore.data.map { it[HAS_SEEN_TOUR_KEY] ?: false }
+    .collectAsState(initial = true)
+
+// En HowItWorksScreen — al cerrar
+onDismiss = {
+    navController.popBackStack()
+    if (!hasSeenTour) {
+        dataStore.edit { it[HAS_SEEN_TOUR_KEY] = true }
+        // delay para que la sheet cierre antes de mostrar el overlay
+        scope.launch {
+            delay(500)
+            tutorialManager.startIfFirstTime()
+        }
+    }
+}
+```
+
+**Swipe para navegar entre pasos**: añadir `detectHorizontalDragGestures` en el card del tour:
+
+```kotlin
+var dragX = 0f
+Box(
+    modifier = Modifier.pointerInput(currentStep) {
+        detectHorizontalDragGestures(
+            onDragEnd = {
+                if (dragX < -80) tutorialManager.next()
+                else if (dragX > 80) tutorialManager.previous()
+                dragX = 0f
+            },
+            onHorizontalDrag = { _, delta -> dragX += delta }
+        )
+    }
+) { /* card content */ }
+```
+
+**Animación de slide direccional entre pasos**: en lugar de reemplazar la card completa con fade, animar solo el contenido con `AnimatedContent` y transición asimétrica según la dirección:
+
+```kotlin
+// En TutorialManager
+var stepDirection: StepDirection = StepDirection.FORWARD
+    private set
+
+enum class StepDirection { FORWARD, BACKWARD }
+
+fun next() {
+    stepDirection = StepDirection.FORWARD
+    if (isLastStep) end() else currentStep++
+}
+fun previous() {
+    if (currentStep > 0) {
+        stepDirection = StepDirection.BACKWARD
+        currentStep--
+    }
+}
+```
+
+```kotlin
+// En TourOverlayCard
+val direction = tutorialManager.stepDirection
+AnimatedContent(
+    targetState = tutorialManager.currentStep,
+    transitionSpec = {
+        if (direction == StepDirection.FORWARD) {
+            slideInHorizontally { it } + fadeIn() togetherWith
+            slideOutHorizontally { -it } + fadeOut()
+        } else {
+            slideInHorizontally { -it } + fadeIn() togetherWith
+            slideOutHorizontally { it } + fadeOut()
+        }
+    }
+) { step ->
+    TourStepContent(step = tutorialManager.steps[step])
+}
+```
+
+##### 14.10.5 Rate Limit — mensajes amigables y countdown en vivo
+
+**Mensajes progresivos según intentos restantes** (en lugar del genérico "Demasiados intentos"):
+
+```kotlin
+object LoginRateLimiter {
+    fun lockoutMessage(attemptsCount: Int): String? = when (attemptsCount) {
+        in 0..2  -> null
+        in 3..4  -> "Contraseña incorrecta. Te quedan ${5 - attemptsCount} intento(s) antes del bloqueo."
+        in 5..9  -> "Cuenta bloqueada temporalmente. Espera 5 minutos e inténtalo de nuevo."
+        else     -> "Demasiados intentos fallidos. Espera 15 minutos o recupera tu contraseña."
+    }
+
+    fun countdownMessage(seconds: Int): String = when {
+        seconds >= 3600 -> "Demasiados intentos. Vuelve a intentarlo en ${seconds / 3600}h."
+        seconds >= 60   -> "Demasiados intentos. Vuelve a intentarlo en ${(seconds + 59) / 60} min."
+        else            -> "Demasiados intentos. Intenta de nuevo en ${seconds}s ⏱"
+    }
+}
+```
+
+**Countdown en vivo** que actualiza el mensaje cada segundo hasta desbloqueo automático:
+
+```kotlin
+// En AuthViewModel
+private var countdownJob: Job? = null
+
+fun startBlockCountdown(unlockedAt: Long) {
+    countdownJob?.cancel()
+    countdownJob = viewModelScope.launch {
+        while (isActive) {
+            val remaining = ((unlockedAt - System.currentTimeMillis()) / 1000).toInt()
+            if (remaining <= 0) { _errorMessage.value = null; return@launch }
+            _errorMessage.value = LoginRateLimiter.countdownMessage(remaining)
+            delay(1_000)
+        }
+    }
+}
+
+// Cancelar al limpiar
+fun clearMessages() {
+    countdownJob?.cancel()
+    _errorMessage.value = null
+}
+```
+
+**HTTP 429 del servidor con `Retry-After` header**:
+```kotlin
+// En ApiClient / interceptor de errores
+429 -> {
+    val retryAfter = response.headers["Retry-After"]?.toIntOrNull()
+    throw RateLimitException(retryAfterSeconds = retryAfter)
+}
+
+// En AuthViewModel al capturar
+} catch (e: RateLimitException) {
+    e.retryAfterSeconds?.let { seconds ->
+        val unlockedAt = System.currentTimeMillis() + seconds * 1000L
+        startBlockCountdown(unlockedAt)
+    } ?: run {
+        _errorMessage.value = "Demasiados intentos. Espera un momento e inténtalo de nuevo."
     }
 }
 ```
