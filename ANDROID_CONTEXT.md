@@ -1,6 +1,6 @@
 # ANDROID_CONTEXT.md — Piums Cliente Android
 > Referencia completa para replicar la app iOS en Android con Jetpack Compose.
-> Última actualización: 14 mayo 2026
+> Última actualización: 14 mayo 2026 (tarde)
 
 ---
 
@@ -2606,6 +2606,160 @@ fun clearMessages() {
         _errorMessage.value = "Demasiados intentos. Espera un momento e inténtalo de nuevo."
     }
 }
+```
+
+#### 14.11 Fixes Mayo 2026 (tercera tanda) — Replicar en Android
+
+##### 14.11.1 Sesión persiste al cerrar la app — no cerrar por errores de red
+
+**Problema original**: `AuthManager.loadFromStorage()` llamaba `GET /api/auth/me` al arrancar. Si fallaba por cualquier error (sin internet, timeout, 5xx), borraba los tokens y cerraba sesión.
+
+**Fix en iOS**:
+1. `AuthUser` se serializa a `UserDefaults` en cada login/refresh.
+2. Al arrancar, se restaura desde caché **instantáneamente** (sin red).
+3. `verify()` solo llama a `logout()` si el error es **401 explícito**. Errores de red, timeout y 5xx mantienen la sesión activa.
+4. Si el access token está expirado al arrancar, intenta refresh primero; solo logout si el refresh también devuelve 401.
+
+**Implementar en Android**:
+
+```kotlin
+// data/auth/AuthManager.kt
+private val USER_CACHE_KEY = "piums.currentUser"
+
+// Llamar en init{} o en Application.onCreate()
+suspend fun loadFromStorage() {
+    // 1. Restaurar usuario desde caché local — sin red, instantáneo
+    val cached = prefs.getString(USER_CACHE_KEY, null)
+        ?.let { runCatching { json.decodeFromString<AuthUser>(it) }.getOrNull() }
+    if (cached != null) _currentUser.value = cached
+
+    val refreshToken = tokenStorage.refreshToken
+    if (refreshToken == null) {
+        if (cached != null) _currentUser.value = null
+        return
+    }
+
+    // 2. Si el access token expiró, refresh antes de verificar
+    if (tokenStorage.isAccessTokenExpired) {
+        runCatching { refreshIfNeeded() }.onFailure { e ->
+            if (e is UnauthorizedException) logout()
+            return
+        }
+    }
+
+    // 3. Verificar en background — errores de red NO cierran sesión
+    verify()
+}
+
+private suspend fun verify() {
+    runCatching { api.getMe() }
+        .onSuccess { user ->
+            _currentUser.value = user
+            saveUserLocally(user)
+        }
+        .onFailure { e ->
+            // Solo logout en 401 explícito
+            if (e is HttpException && e.code() == 401) logout()
+            // Red, timeout, 5xx → mantener sesión
+        }
+}
+
+private fun saveUserLocally(user: AuthUser) {
+    prefs.edit().putString(USER_CACHE_KEY, json.encodeToString(user)).apply()
+}
+
+// Limpiar caché en logout
+suspend fun logout() {
+    tokenStorage.clearAll()
+    prefs.edit().remove(USER_CACHE_KEY).apply()
+    _currentUser.value = null
+}
+```
+
+**Tabla de comportamiento por escenario**:
+
+| Situación | Antes | Ahora |
+|---|---|---|
+| Sin internet al abrir | Cierra sesión | Restaura usuario desde caché ✓ |
+| Servidor caído (5xx) | Cierra sesión | Mantiene sesión activa ✓ |
+| Access token expirado | Cierra sesión | Hace refresh automático ✓ |
+| Token revocado (401) | Cierra sesión | Cierra sesión ✓ |
+| Con internet normal | Funciona | Funciona + actualiza datos en background ✓ |
+
+##### 14.11.2 Rate limit persiste al cerrar y reabrir la app
+
+**Problema**: `LoginRateLimiter` guardaba el bloqueo solo en memoria — al matar la app el contador desaparecía.
+
+**Fix**: persistir `lockedUntil` en `SharedPreferences` (Android) al registrar cada fallo; restaurar al arrancar.
+
+```kotlin
+object LoginRateLimiter {
+    private const val PREF_PREFIX = "rl.lock."
+    private lateinit var prefs: SharedPreferences
+
+    fun init(context: Context) {
+        prefs = context.getSharedPreferences("rate_limiter", Context.MODE_PRIVATE)
+    }
+
+    private fun prefKey(email: String) = "$PREF_PREFIX${email.lowercase()}"
+
+    /** Devuelve fecha de desbloqueo guardada, si sigue vigente. */
+    fun lockedUntil(email: String): Long? {
+        val ts = prefs.getLong(prefKey(email), 0L)
+        return if (ts > System.currentTimeMillis()) ts else null
+    }
+
+    fun recordFailure(email: String, attempts: Int) {
+        val lockMs = when {
+            attempts >= 10 -> 15 * 60 * 1000L   // 15 min
+            attempts >= 5  ->  5 * 60 * 1000L   //  5 min
+            attempts >= 3  ->       30 * 1000L   // 30 s
+            else           -> return
+        }
+        val until = System.currentTimeMillis() + lockMs
+        prefs.edit().putLong(prefKey(email), until).apply()
+    }
+
+    fun reset(email: String) {
+        prefs.edit().remove(prefKey(email)).apply()
+    }
+}
+```
+
+En `AuthViewModel`, al detectar bloqueo persistido al arrancar la pantalla de login:
+
+```kotlin
+init {
+    val email = savedEmail  // email del último intento (guardar en prefs)
+    if (email != null) {
+        val until = LoginRateLimiter.lockedUntil(email)
+        if (until != null) startBlockCountdown(until)
+    }
+}
+```
+
+##### 14.11.3 Navegación desde avatar del cliente al tab Perfil
+
+Tapping el avatar circular del cliente en la barra superior del Home navega al tab Perfil (tab 4).
+
+```kotlin
+// En HomeScreen — TopAppBar
+@Composable
+fun HomeTopBar(user: AuthUser?, onAvatarClick: () -> Unit) {
+    TopAppBar(
+        title = { Text("Piums", fontWeight = FontWeight.Bold) },
+        navigationIcon = {
+            IconButton(onClick = onAvatarClick) {
+                ClientAvatar(user = user, size = 34.dp)
+            }
+        }
+    )
+}
+
+// En MainScreen — pasar callback que cambia de tab
+HomeScreen(
+    onAvatarClick = { selectedTab = 4 }
+)
 ```
 
 ---
