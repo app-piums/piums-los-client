@@ -217,6 +217,7 @@ final class AuthManager {
             let _: EmptyResponse = try await APIClient.request(.logout)
         }.value
         TokenStorage.shared.clearAll()
+        UserDefaults.standard.removeObject(forKey: Self.userCacheKey)
         currentUser = nil
     }
 
@@ -228,8 +229,31 @@ final class AuthManager {
 
     // MARK: - Private
 
+    private static let userCacheKey = "piums.currentUser"
+
     private func loadFromStorage() async {
-        guard TokenStorage.shared.accessToken != nil else { return }
+        // 1. Restaurar usuario desde caché local — sin red, instantáneo
+        if let data = UserDefaults.standard.data(forKey: Self.userCacheKey),
+           let cached = try? JSONDecoder().decode(AuthUser.self, from: data) {
+            currentUser = cached
+        }
+
+        guard TokenStorage.shared.refreshToken != nil else {
+            if currentUser != nil { currentUser = nil }
+            return
+        }
+
+        // 2. Si el access token expiró, intentar refresh antes de verificar
+        if TokenStorage.shared.isAccessTokenExpired {
+            do { try await refreshIfNeeded() }
+            catch {
+                // Solo cerrar sesión si el refresh devuelve 401 (token revocado)
+                if case .unauthorized = AppError(from: error) { await logout() }
+                return
+            }
+        }
+
+        // 3. Verificar en background — errores de red NO cierran sesión
         await verify()
     }
 
@@ -237,15 +261,24 @@ final class AuthManager {
         do {
             let wrapper: MeResponse = try await APIClient.request(.getMe)
             currentUser = wrapper.user
-        } catch {
-            TokenStorage.shared.clearAll()
+            saveUserLocally(wrapper.user)
+        } catch let e as AppError where e == .unauthorized {
+            await logout()
         }
+        // Cualquier otro error (red, timeout, 5xx) → mantener sesión activa
     }
 
     private func store(_ response: AuthResponse) {
         TokenStorage.shared.accessToken  = response.token
         TokenStorage.shared.refreshToken = response.refreshToken
         currentUser = response.user
+        saveUserLocally(response.user)
+    }
+
+    private func saveUserLocally(_ user: AuthUser) {
+        if let data = try? JSONEncoder().encode(user) {
+            UserDefaults.standard.set(data, forKey: Self.userCacheKey)
+        }
     }
 }
 
