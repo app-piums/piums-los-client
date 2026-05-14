@@ -87,10 +87,9 @@ struct APIClient {
         case 404:
             throw AppError.notFound
         case 500..<600:
-            let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
-            throw AppError.http(statusCode: http.statusCode, message: msg)
+            throw AppError.serverError
         default:
-            let msg = backendMessage ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
+            let msg = backendMessage ?? "Error inesperado. Intenta de nuevo."
             throw AppError.http(statusCode: http.statusCode, message: msg)
         }
     }
