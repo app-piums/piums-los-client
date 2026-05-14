@@ -74,7 +74,9 @@ final class ChatViewModel {
         defer { isLoading = false }
         do {
             let res: ConversationsResponse = try await APIClient.request(.listConversations(page: currentPage))
-            conversations.append(contentsOf: res.conversations)
+            conversations.append(contentsOf: res.conversations.filter {
+                $0.status != "CLOSED" && $0.status != "CANCELLED"
+            })
             hasMore = res.page < res.totalPages
             currentPage += 1
         } catch {
