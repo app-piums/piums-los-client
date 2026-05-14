@@ -142,7 +142,12 @@ struct HomeView: View {
     private var topBar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             HStack(spacing: 10) {
-                clientAvatar
+                Button {
+                    NotificationCenter.default.post(name: .navigateToProfile, object: nil)
+                } label: {
+                    clientAvatar
+                }
+                .buttonStyle(.plain)
                 Text("Piums")
                     .font(.headline.bold())
             }

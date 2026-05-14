@@ -135,6 +135,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 extension Notification.Name {
     static let navigateToBooking      = Notification.Name("navigateToBooking")
     static let navigateToMySpace      = Notification.Name("navigateToMySpace")
+    static let navigateToProfile      = Notification.Name("navigateToProfile")
     // Deep link push → conversación específica del chat
     static let navigateToConversation = Notification.Name("navigateToConversation")
     // Push no-chat recibido → refrescar contador de campana

@@ -43,6 +43,9 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToConversation)) { _ in
             selectedTab = 3
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToProfile)) { _ in
+            selectedTab = 4
+        }
         .onChange(of: deepLinkBookingId) { _, bookingId in
             guard let bookingId else { return }
             selectedTab = 2
