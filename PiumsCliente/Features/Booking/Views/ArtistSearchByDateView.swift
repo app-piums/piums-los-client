@@ -290,6 +290,7 @@ struct ArtistSearchByDateView: View {
     @State private var viewModel = ArtistSearchByDateViewModel()
     @State private var selectedArtist: Artist?
     @State private var bookingContext: BookingFlowContext?
+    @State private var showCategoryPicker = false
     @Environment(\.locationStore) private var locationStore
 
     // MARK: - Date strip helpers
@@ -363,9 +364,39 @@ struct ArtistSearchByDateView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .sheet(isPresented: $showCategoryPicker) {
+            CategoryPickerSheet(selected: $viewModel.categoryFilter)
+                .presentationDetents([.fraction(0.45)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 8) {
+                    // Buscador tappable (abre selector de categoría)
+                    Button { showCategoryPicker = true } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                            Text(categoryBarLabel)
+                                .foregroundStyle(viewModel.categoryFilter != nil ? .primary : Color(.placeholderText))
+                            Spacer()
+                            if viewModel.categoryFilter != nil {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.15)) { viewModel.categoryFilter = nil }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                                }
+                            } else {
+                                Image(systemName: "slider.horizontal.3").foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(12)
+                        .background(Color(.tertiarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+
                     // Encabezado mes
                     HStack {
                         Text("SELECCIONAR FECHA")
@@ -469,6 +500,77 @@ struct ArtistSearchByDateView: View {
         }
         .navigationDestination(item: $bookingContext) { ctx in
             BookingFlowView(context: ctx)
+        }
+    }
+
+    private var categoryBarLabel: String {
+        guard let f = viewModel.categoryFilter else { return "Buscar artistas..." }
+        return SearchByDateCategory.all.first(where: { $0.filterValue == f })?.label ?? f
+    }
+}
+
+// MARK: - CategoryPickerSheet
+
+private struct CategoryPickerSheet: View {
+    @Binding var selected: String?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Especialidad")
+                .font(.headline)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(SearchByDateCategory.all) { cat in
+                    let isSelected = selected == cat.filterValue
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            selected = isSelected ? nil : cat.filterValue
+                        }
+                        dismiss()
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: cat.icon)
+                                .font(.title2)
+                                .foregroundStyle(isSelected ? .white : Color.piumsOrange)
+                            Text(cat.label)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(isSelected ? .white : .primary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(isSelected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
+                                .overlay(RoundedRectangle(cornerRadius: 14)
+                                    .stroke(isSelected ? Color.clear : Color(.systemGray5), lineWidth: 1))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            if selected != nil {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { selected = nil }
+                    dismiss()
+                } label: {
+                    Text("Limpiar filtro")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.piumsOrange)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.piumsOrange.opacity(0.10))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+            }
+
+            Spacer()
         }
     }
 }
