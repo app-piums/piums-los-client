@@ -195,6 +195,8 @@ extension APIEndpoint {
             return encode(["reason": reason])
         case .validateCoupon(let p):
             return try? JSONSerialization.data(withJSONObject: p)
+        case .calculatePrice(let p):
+            return try? JSONSerialization.data(withJSONObject: p)
         case .createEvent(let p), .updateEvent(_, let p):
             return try? JSONSerialization.data(withJSONObject: p)
         case .createConversation(let artistId):
