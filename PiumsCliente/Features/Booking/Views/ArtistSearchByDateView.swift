@@ -38,22 +38,6 @@ struct ArtistWithAvailability: Identifiable {
     var id: String { artist.id }
 }
 
-// MARK: - Category filter model
-
-private struct SearchByDateCategory: Identifiable {
-    let id: String
-    let label: String
-    let icon: String
-    let filterValue: String
-
-    static let all: [SearchByDateCategory] = [
-        SearchByDateCategory(id: "musico",     label: "Música",      icon: "music.note",        filterValue: "musico"),
-        SearchByDateCategory(id: "fotografo",  label: "Fotografía",  icon: "camera.fill",       filterValue: "fotografo"),
-        SearchByDateCategory(id: "videografo", label: "Video",       icon: "film.fill",         filterValue: "videografo"),
-        SearchByDateCategory(id: "animador",   label: "Animador",    icon: "party.popper.fill", filterValue: "animador"),
-    ]
-}
-
 // MARK: - ViewModel
 
 @Observable
@@ -68,7 +52,7 @@ final class ArtistSearchByDateViewModel {
     var isSmartLoading = false
     var errorMessage: String?
     var showOnlyAvailable = true
-    var categoryFilter: String?
+    var selectedSpecialty: SpecialtyOption?
     var searchQuery = ""
     var isSmartSearch: Bool { !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -79,9 +63,9 @@ final class ArtistSearchByDateViewModel {
         let base = isSmartSearch && !smartArtists.isEmpty ? smartArtists : artists
         return base.filter { item in
             if showOnlyAvailable && !item.available { return false }
-            if let cat = categoryFilter {
-                let sp = item.artist.specialties?.joined(separator: " ").lowercased() ?? ""
-                if !sp.contains(cat.lowercased()) { return false }
+            if let sp = selectedSpecialty {
+                let specialties = item.artist.specialties?.joined(separator: " ").lowercased() ?? ""
+                if !specialties.contains(sp.rawValue.lowercased()) { return false }
             }
             // Local text filter only as fallback while SmartSearch is loading
             if isSmartSearch && smartArtists.isEmpty && !searchQuery.isEmpty {
@@ -365,7 +349,7 @@ struct ArtistSearchByDateView: View {
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showCategoryPicker) {
-            CategoryPickerSheet(selected: $viewModel.categoryFilter)
+            CategoryPickerSheet(selected: $viewModel.selectedSpecialty)
                 .presentationDetents([.fraction(0.45)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
@@ -378,11 +362,11 @@ struct ArtistSearchByDateView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                             Text(categoryBarLabel)
-                                .foregroundStyle(viewModel.categoryFilter != nil ? .primary : Color(.placeholderText))
+                                .foregroundStyle(viewModel.selectedSpecialty != nil ? .primary : Color(.placeholderText))
                             Spacer()
-                            if viewModel.categoryFilter != nil {
+                            if viewModel.selectedSpecialty != nil {
                                 Button {
-                                    withAnimation(.easeInOut(duration: 0.15)) { viewModel.categoryFilter = nil }
+                                    withAnimation(.easeInOut(duration: 0.15)) { viewModel.selectedSpecialty = nil }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                                 }
@@ -448,32 +432,6 @@ struct ArtistSearchByDateView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain).padding(.horizontal, 16)
-
-                    // Filtro de especialidad por categoría (chips horizontales)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(SearchByDateCategory.all) { cat in
-                                let selected = viewModel.categoryFilter == cat.filterValue
-                                Button {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        viewModel.categoryFilter = selected ? nil : cat.filterValue
-                                    }
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: cat.icon).font(.caption)
-                                        Text(cat.label).font(.subheadline.weight(.medium))
-                                    }
-                                    .padding(.horizontal, 14).padding(.vertical, 8)
-                                    .background(selected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
-                                    .foregroundStyle(selected ? .white : .primary)
-                                    .clipShape(Capsule())
-                                    .overlay(Capsule().stroke(selected ? Color.clear : Color(.systemGray5), lineWidth: 1))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    }
                 }
                 .padding(.top, 12).padding(.bottom, 10)
                 .background(.ultraThinMaterial)
@@ -504,15 +462,14 @@ struct ArtistSearchByDateView: View {
     }
 
     private var categoryBarLabel: String {
-        guard let f = viewModel.categoryFilter else { return "Buscar artistas..." }
-        return SearchByDateCategory.all.first(where: { $0.filterValue == f })?.label ?? f
+        viewModel.selectedSpecialty?.displayName ?? "Buscar artistas..."
     }
 }
 
 // MARK: - CategoryPickerSheet
 
 private struct CategoryPickerSheet: View {
-    @Binding var selected: String?
+    @Binding var selected: SpecialtyOption?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -523,19 +480,19 @@ private struct CategoryPickerSheet: View {
                 .padding(.top, 20)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(SearchByDateCategory.all) { cat in
-                    let isSelected = selected == cat.filterValue
+                ForEach(SpecialtyOption.allCases) { sp in
+                    let isSelected = selected == sp
                     Button {
                         withAnimation(.easeInOut(duration: 0.15)) {
-                            selected = isSelected ? nil : cat.filterValue
+                            selected = isSelected ? nil : sp
                         }
                         dismiss()
                     } label: {
                         VStack(spacing: 8) {
-                            Image(systemName: cat.icon)
+                            Image(systemName: sp.icon)
                                 .font(.title2)
                                 .foregroundStyle(isSelected ? .white : Color.piumsOrange)
-                            Text(cat.label)
+                            Text(sp.displayName)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(isSelected ? .white : .primary)
                         }
