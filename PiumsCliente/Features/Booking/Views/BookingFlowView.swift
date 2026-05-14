@@ -615,7 +615,64 @@ struct BookingFlowView: View {
                     .frame(minHeight: 90).padding(10)
                     .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            eventTypeSection
             eventPickerSection
+        }
+    }
+
+    // MARK: - Event type picker
+
+    private var eventTypeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 4) {
+                Label("¿Para qué es el evento?", systemImage: "sparkles").font(.headline)
+                Text("(Opcional)").font(.subheadline).foregroundStyle(.secondary)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 10) {
+                ForEach(EventType.allCases) { type in
+                    let selected = vm.context.eventType == type
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            vm.context.eventType = selected ? nil : type
+                        }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: eventTypeIcon(type))
+                                .font(.title3)
+                                .foregroundStyle(selected ? .white : Color.piumsOrange)
+                            Text(type.displayName)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(selected ? .white : .primary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(selected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
+                                .overlay(RoundedRectangle(cornerRadius: 12)
+                                    .stroke(selected ? Color.clear : Color(.systemGray5), lineWidth: 1))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func eventTypeIcon(_ type: EventType) -> String {
+        switch type {
+        case .cumpleanos:  return "birthday.cake.fill"
+        case .boda:        return "heart.fill"
+        case .graduacion:  return "graduationcap.fill"
+        case .quinceanera: return "crown.fill"
+        case .corporativo: return "building.2.fill"
+        case .concierto:   return "music.note"
+        case .fiesta:      return "party.popper.fill"
+        case .babyShower:  return "figure.2.and.child.holdinghands"
+        case .bautizo:     return "drop.fill"
+        case .aniversario: return "wineglass.fill"
+        case .otro:        return "questionmark.circle.fill"
         }
     }
 
