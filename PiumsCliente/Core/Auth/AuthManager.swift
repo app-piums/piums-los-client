@@ -222,25 +222,42 @@ final class AuthManager {
     }
 
     func refreshIfNeeded() async throws {
-        // Si ya hay un refresh en curso, esperar su resultado en vez de lanzar otro
+        // Cooldown: si el último refresh fue rechazado por rate limit, no reintentar hasta que expire
+        if let blocked = refreshBlockedUntil, blocked > Date() {
+            throw AppError.http(statusCode: 429, message: "Demasiadas solicitudes. Intenta en unos segundos.")
+        }
+
+        // Deduplicar: si ya hay un refresh en curso, esperar su resultado
         if let existing = refreshTask {
             try await existing.value
             return
         }
+
         let task = Task { @MainActor [self] in
             guard let refresh = TokenStorage.shared.refreshToken else { throw AppError.unauthorized }
             let response: AuthResponse = try await APIClient.request(.refreshToken(token: refresh), retryOnUnauthorized: false)
             store(response)
         }
         refreshTask = task
-        defer { refreshTask = nil }
-        try await task.value
+        do {
+            try await task.value
+            refreshTask = nil
+            refreshBlockedUntil = nil
+        } catch {
+            refreshTask = nil
+            // Rate limit del backend → cooldown 30s para no seguir reintentando en cascada
+            if case .http(429, _) = error as? AppError {
+                refreshBlockedUntil = Date().addingTimeInterval(30)
+            }
+            throw error
+        }
     }
 
     // MARK: - Private
 
     private static let userCacheKey = "piums.currentUser"
     private var refreshTask: Task<Void, Error>?
+    private var refreshBlockedUntil: Date?
 
     private func loadFromStorage() async {
         // 1. Restaurar usuario desde caché local — sin red, instantáneo
