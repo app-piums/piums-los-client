@@ -207,7 +207,7 @@ struct ArtistProfileView: View {
             }
         }
         .sheet(item: $detailService) { service in
-            ServiceDetailSheet(service: service) {
+            ServiceDetailSheet(service: service, artist: artist) {
                 detailService = nil
                 bookingService = service
             }
@@ -633,7 +633,9 @@ private struct WriteReviewSheet: View {
 
 private struct ServiceDetailSheet: View {
     let service: ArtistService
+    let artist: Artist
     let onReserve: () -> Void
+    @State private var showDetails = true
     @Environment(\.dismiss) private var dismiss
 
     private var pricingTypeLabel: String? {
@@ -655,64 +657,135 @@ private struct ServiceDetailSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Name + price
-                HStack(alignment: .top, spacing: 8) {
-                    Text(service.name)
-                        .font(.title3.bold())
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text(service.price.piumsFormatted)
-                        .font(.title3.bold())
-                        .foregroundStyle(Color.piumsOrange)
-                }
+            VStack(alignment: .leading, spacing: 0) {
 
-                // Metadata pills
-                HStack(spacing: 10) {
-                    if let dur = durationLabel {
-                        Label(dur, systemImage: "clock")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                // ── Cabecera servicio ─────────────────────────
+                HStack(alignment: .top, spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.piumsOrange.opacity(0.15))
+                            .frame(width: 48, height: 48)
+                        Image(systemName: "music.note")
+                            .font(.title3).foregroundStyle(Color.piumsOrange)
                     }
-                    if let type = pricingTypeLabel {
-                        if durationLabel != nil {
-                            Text("·").foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(service.name).font(.headline)
+                        if let desc = service.description, !desc.isEmpty {
+                            Text(desc).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         }
-                        Text(type).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(service.price.piumsFormatted)
+                        .font(.headline).foregroundStyle(Color.piumsOrange)
+                }
+                .padding(16)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .padding(16)
+
+                // ── Toggle detalles ───────────────────────────
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showDetails.toggle() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(showDetails ? "Ocultar detalles" : "Ver detalles")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.piumsOrange)
+                        Image(systemName: showDetails ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.piumsOrange)
                     }
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
-                // Description
-                if let desc = service.description, !desc.isEmpty {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Descripción")
-                            .font(.headline)
-                        Text(desc)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                if showDetails {
+                    Divider().padding(.horizontal, 16)
+
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Duración + tipo precio
+                        if durationLabel != nil || pricingTypeLabel != nil {
+                            HStack(spacing: 10) {
+                                if let dur = durationLabel {
+                                    Label(dur, systemImage: "clock")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                }
+                                if let type = pricingTypeLabel {
+                                    if durationLabel != nil {
+                                        Text("·").foregroundStyle(.secondary)
+                                    }
+                                    Text(type).font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        // Qué incluye
+                        if let included = service.whatIsIncluded, !included.isEmpty {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Qué incluye")
+                                    .font(.subheadline.weight(.semibold))
+                                ForEach(included, id: \.self) { item in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(Color.piumsOrange)
+                                            .font(.subheadline)
+                                        Text(item)
+                                            .font(.subheadline).foregroundStyle(.primary)
+                                    }
+                                }
+                            }
+                        }
                     }
+                    .padding(16)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                Spacer(minLength: 20)
+                Divider().padding(.horizontal, 16)
 
-                // Reserve button
+                // ── Fila artista ──────────────────────────────
+                HStack(spacing: 12) {
+                    AsyncImage(url: URL(string: artist.avatarUrl ?? "")) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        Image(systemName: "person.fill").foregroundStyle(.secondary)
+                    }
+                    .frame(width: 40, height: 40)
+                    .background(Color(.systemGray5))
+                    .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(artist.artistName).font(.subheadline.weight(.semibold))
+                        if let spec = artist.specialties?.first {
+                            Text(spec).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("Ver perfil").font(.caption.weight(.medium)).foregroundStyle(Color.piumsOrange)
+                        Image(systemName: "arrow.right").font(.caption).foregroundStyle(Color.piumsOrange)
+                    }
+                    .onTapGesture { dismiss() }
+                }
+                .padding(16)
+
+                // ── Reservar ──────────────────────────────────
                 Button {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { onReserve() }
                 } label: {
                     Text("Reservar este servicio")
-                        .font(.headline)
-                        .foregroundStyle(.white)
+                        .font(.headline).foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(Color.piumsOrange)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
             }
-            .padding(24)
         }
-        .navigationTitle("Detalle del servicio")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

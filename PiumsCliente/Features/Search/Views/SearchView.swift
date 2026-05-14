@@ -162,60 +162,38 @@ struct SearchView: View {
         }
     }
 
-    // MARK: - Search bar (category chips + filter button)
+    // MARK: - Search bar (tap to open filters)
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(CLIENT_CATEGORIES) { cat in
-                        let selected = viewModel.selectedSpecialty?.rawValue == cat.categoryId
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                if selected {
-                                    viewModel.selectedSpecialty = nil
-                                    viewModel.results = []
-                                    viewModel.smartResults = []
-                                    viewModel.expandedTerms = []
-                                    viewModel.hasSearched = false
-                                } else {
-                                    viewModel.query = ""
-                                    viewModel.selectedSpecialty = SpecialtyOption(rawValue: cat.categoryId)
-                                    Task { await viewModel.search() }
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: cat.icon).font(.caption)
-                                Text(cat.label).font(.subheadline.weight(.medium))
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 8)
-                            .background(selected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
-                            .foregroundStyle(selected ? .white : .primary)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(selected ? Color.clear : Color(.systemGray5), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
+        Button { showFilters = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                Text(searchBarLabel)
+                    .foregroundStyle(viewModel.hasActiveFilters ? .primary : Color(.placeholderText))
+                Spacer()
+                if viewModel.hasActiveFilters {
+                    ZStack {
+                        Circle().fill(Color.piumsOrange).frame(width: 20, height: 20)
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
                     }
+                } else {
+                    Image(systemName: "slider.horizontal.3").foregroundStyle(.secondary)
                 }
             }
-
-            Button { showFilters = true } label: {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.title3).padding(12)
-                        .background(viewModel.hasActiveFilters
-                                    ? Color.piumsOrange.opacity(0.15)
-                                    : Color(.tertiarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    if viewModel.hasActiveFilters {
-                        Circle().fill(Color.piumsOrange)
-                            .frame(width: 10, height: 10).offset(x: 2, y: -2)
-                    }
-                }
-            }
-            .foregroundStyle(viewModel.hasActiveFilters ? Color.piumsOrange : .primary)
+            .padding(12)
+            .background(Color(.tertiarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .buttonStyle(.plain)
+    }
+
+    private var searchBarLabel: String {
+        var parts: [String] = []
+        if let sp = viewModel.selectedSpecialty { parts.append(sp.displayName) }
+        if let city = viewModel.selectedCity { parts.append(city) }
+        if viewModel.minRating > 0 { parts.append("\(Int(viewModel.minRating))+ ★") }
+        return parts.isEmpty ? "¿Qué estás buscando?" : parts.joined(separator: " · ")
     }
 
     // MARK: - Active filters bar
