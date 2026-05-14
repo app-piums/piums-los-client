@@ -53,8 +53,21 @@ final class ArtistSearchByDateViewModel {
     var errorMessage: String?
     var showOnlyAvailable = true
     var selectedSpecialty: SpecialtyOption?
+    var minPrice: Double = 0
+    var maxPrice: Double = 50000
     var searchQuery = ""
     var isSmartSearch: Bool { !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var hasActiveFilters: Bool {
+        selectedSpecialty != nil || minPrice > 0 || maxPrice < 50000 || !showOnlyAvailable
+    }
+
+    func clearFilters() {
+        selectedSpecialty = nil
+        minPrice = 0
+        maxPrice = 50000
+        showOnlyAvailable = true
+    }
 
     private var debounceTask: Task<Void, Never>? = nil
 
@@ -67,7 +80,8 @@ final class ArtistSearchByDateViewModel {
                 let specialties = item.artist.specialties?.joined(separator: " ").lowercased() ?? ""
                 if !specialties.contains(sp.rawValue.lowercased()) { return false }
             }
-            // Local text filter only as fallback while SmartSearch is loading
+            if minPrice > 0, let price = item.mainServicePrice, price < Int(minPrice) { return false }
+            if maxPrice < 50000, let price = item.mainServicePrice, price > Int(maxPrice) { return false }
             if isSmartSearch && smartArtists.isEmpty && !searchQuery.isEmpty {
                 let q = searchQuery.lowercased()
                 let name = item.artist.artistName.lowercased()
@@ -274,7 +288,7 @@ struct ArtistSearchByDateView: View {
     @State private var viewModel = ArtistSearchByDateViewModel()
     @State private var selectedArtist: Artist?
     @State private var bookingContext: BookingFlowContext?
-    @State private var showCategoryPicker = false
+    @State private var showFilters = false
     @Environment(\.locationStore) private var locationStore
 
     // MARK: - Date strip helpers
@@ -348,9 +362,8 @@ struct ArtistSearchByDateView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .sheet(isPresented: $showCategoryPicker) {
-            CategoryPickerSheet(selected: $viewModel.selectedSpecialty)
-                .presentationDetents([.fraction(0.45)])
+        .sheet(isPresented: $showFilters) {
+            SearchByDateFiltersSheet(viewModel: viewModel)
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
         }
@@ -358,17 +371,17 @@ struct ArtistSearchByDateView: View {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 8) {
                     // Buscador tappable (abre selector de categoría)
-                    Button { showCategoryPicker = true } label: {
+                    Button { showFilters = true } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                             Text(categoryBarLabel)
-                                .foregroundStyle(viewModel.selectedSpecialty != nil ? .primary : Color(.placeholderText))
+                                .foregroundStyle(viewModel.hasActiveFilters ? .primary : Color(.placeholderText))
                             Spacer()
-                            if viewModel.selectedSpecialty != nil {
-                                Button {
-                                    withAnimation(.easeInOut(duration: 0.15)) { viewModel.selectedSpecialty = nil }
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                            if viewModel.hasActiveFilters {
+                                ZStack {
+                                    Circle().fill(Color.piumsOrange).frame(width: 20, height: 20)
+                                    Image(systemName: "slider.horizontal.3")
+                                        .font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
                                 }
                             } else {
                                 Image(systemName: "slider.horizontal.3").foregroundStyle(.secondary)
@@ -462,72 +475,104 @@ struct ArtistSearchByDateView: View {
     }
 
     private var categoryBarLabel: String {
-        viewModel.selectedSpecialty?.displayName ?? "Buscar artistas..."
+        var parts: [String] = []
+        if let sp = viewModel.selectedSpecialty { parts.append(sp.displayName) }
+        if viewModel.minPrice > 0 { parts.append("Desde \(Int(viewModel.minPrice).piumsFormatted)") }
+        if viewModel.maxPrice < 50000 { parts.append("Hasta \(Int(viewModel.maxPrice).piumsFormatted)") }
+        if !viewModel.showOnlyAvailable { parts.append("Todos") }
+        return parts.isEmpty ? "Filtrar artistas..." : parts.joined(separator: " · ")
     }
 }
 
-// MARK: - CategoryPickerSheet
+// MARK: - SearchByDateFiltersSheet
 
-private struct CategoryPickerSheet: View {
-    @Binding var selected: SpecialtyOption?
+private struct SearchByDateFiltersSheet: View {
+    @Bindable var viewModel: ArtistSearchByDateViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Especialidad")
-                .font(.headline)
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(SpecialtyOption.allCases) { sp in
-                    let isSelected = selected == sp
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            selected = isSelected ? nil : sp
+                    filterSection(title: "Especialidad") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 8) {
+                            ForEach(SpecialtyOption.allCases) { sp in
+                                Button {
+                                    viewModel.selectedSpecialty = viewModel.selectedSpecialty == sp ? nil : sp
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: sp.icon).font(.title3)
+                                        Text(sp.displayName).font(.caption2).lineLimit(1)
+                                    }
+                                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+                                    .background(viewModel.selectedSpecialty == sp
+                                                ? Color.piumsOrange
+                                                : Color(.tertiarySystemGroupedBackground))
+                                    .foregroundStyle(viewModel.selectedSpecialty == sp ? .white : .primary)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
-                        dismiss()
-                    } label: {
-                        VStack(spacing: 8) {
-                            Image(systemName: sp.icon)
-                                .font(.title2)
-                                .foregroundStyle(isSelected ? .white : Color.piumsOrange)
-                            Text(sp.displayName)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(isSelected ? .white : .primary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 18)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(isSelected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
-                                .overlay(RoundedRectangle(cornerRadius: 14)
-                                    .stroke(isSelected ? Color.clear : Color(.systemGray5), lineWidth: 1))
-                        )
                     }
-                    .buttonStyle(.plain)
+
+                    Divider()
+
+                    filterSection(title: "Disponibilidad") {
+                        Toggle("Mostrar solo artistas disponibles", isOn: $viewModel.showOnlyAvailable)
+                            .tint(.piumsOrange)
+                    }
+
+                    Divider()
+
+                    filterSection(title: "Rango de precio") {
+                        VStack(spacing: 12) {
+                            HStack {
+                                Text("Mínimo: \(Int(viewModel.minPrice).piumsFormatted)")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                                Spacer()
+                                Text("Máximo: \(viewModel.maxPrice >= 50000 ? "Sin límite" : Int(viewModel.maxPrice).piumsFormatted)")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            Slider(value: $viewModel.minPrice, in: 0...49000, step: 100).tint(.piumsOrange)
+                            Slider(value: $viewModel.maxPrice, in: 1000...50000, step: 100).tint(.piumsOrange)
+                        }
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        viewModel.clearFilters()
+                    } label: {
+                        Text("Limpiar todos los filtros")
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: .infinity).padding(.vertical, 12)
+                            .background(Color(.tertiarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle("Filtros")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Aplicar") { dismiss() }
+                        .fontWeight(.bold).foregroundStyle(Color.piumsOrange)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
                 }
             }
-            .padding(.horizontal, 20)
+        }
+    }
 
-            if selected != nil {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { selected = nil }
-                    dismiss()
-                } label: {
-                    Text("Limpiar filtro")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color.piumsOrange)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.piumsOrange.opacity(0.10))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 20)
-            }
-
-            Spacer()
+    @ViewBuilder
+    private func filterSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline)
+            content()
         }
     }
 }
