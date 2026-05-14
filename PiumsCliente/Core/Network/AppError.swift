@@ -37,6 +37,8 @@ enum AppError: LocalizedError, Equatable {
                  .serverCertificateUntrusted: return "Error de seguridad en la conexión"
             default:                         return "Error de red. Intenta de nuevo."
             }
+        case .http(401, _):         return "Necesitas iniciar sesión de nuevo"
+        case .http(429, _):         return "Demasiadas solicitudes. Espera un momento e intenta de nuevo"
         case .http(_, let m):       return m
         case .decoding:             return "Error al procesar la respuesta"
         case .unauthorized:         return "Sesión expirada. Inicia sesión de nuevo"

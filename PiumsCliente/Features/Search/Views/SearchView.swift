@@ -344,7 +344,8 @@ struct SearchFiltersSheet: View {
     @Bindable var viewModel: SearchViewModel
     let onApply: () -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var cityQuery = ""
+    @State private var cityText: String = ""
+    @State private var cityCoordinate: CLLocationCoordinate2D?
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -409,46 +410,14 @@ struct SearchFiltersSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Divider()
-                    filterSection(title: "Ciudad") {
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                                TextField("Buscar ciudad...", text: $cityQuery)
-                                    .autocorrectionDisabled()
-                                if !cityQuery.isEmpty {
-                                    Button { cityQuery = "" } label: {
-                                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .padding(10)
-                            .background(Color(.tertiarySystemGroupedBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                            let filtered = cityQuery.isEmpty
-                                ? viewModel.cities
-                                : viewModel.cities.filter { $0.localizedCaseInsensitiveContains(cityQuery) }
-                            if !filtered.isEmpty {
-                                VStack(spacing: 0) {
-                                    ForEach(filtered, id: \.self) { city in
-                                        Button {
-                                            viewModel.selectedCity = viewModel.selectedCity == city ? nil : city
-                                        } label: {
-                                            HStack {
-                                                Text(city).font(.subheadline).foregroundStyle(.primary)
-                                                Spacer()
-                                                if viewModel.selectedCity == city {
-                                                    Image(systemName: "checkmark").foregroundStyle(Color.piumsOrange)
-                                                }
-                                            }
-                                            .padding(.vertical, 10)
-                                        }
-                                        .buttonStyle(.plain)
-                                        if city != filtered.last { Divider() }
-                                    }
-                                }
-                                .padding(.horizontal, 4)
-                            }
+                    filterSection(title: "Ciudad o zona") {
+                        LocationSearchField(
+                            placeholder: "Buscar ciudad o zona...",
+                            text: $cityText,
+                            coordinate: $cityCoordinate
+                        )
+                        .onChange(of: cityText) { _, newVal in
+                            viewModel.selectedCity = newVal.isEmpty ? nil : newVal
                         }
                     }
                     Divider()
@@ -487,6 +456,7 @@ struct SearchFiltersSheet: View {
             }
             .navigationTitle("Filtros")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { cityText = viewModel.selectedCity ?? "" }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Aplicar") { onApply(); dismiss() }
