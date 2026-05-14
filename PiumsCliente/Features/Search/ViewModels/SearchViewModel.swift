@@ -187,7 +187,7 @@ final class SearchViewModel {
                 )
             )
             guard nonce == searchNonce else { return }
-            smartResults.append(contentsOf: res.artists)
+            smartResults.append(contentsOf: res.artists.filter { $0.servicesCount > 0 })
             if currentSmartPage == 1 {
                 expandedTerms = res.expandedTerms ?? []
             }
@@ -233,7 +233,7 @@ final class SearchViewModel {
             )
             let res: SearchArtistsResponse = try await APIClient.request(endpoint)
             guard nonce == searchNonce else { return }
-            results.append(contentsOf: res.artists)
+            results.append(contentsOf: res.artists.filter { $0.servicesCount > 0 })
             hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {

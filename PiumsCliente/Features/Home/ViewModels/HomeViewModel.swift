@@ -63,7 +63,7 @@ final class HomeViewModel {
                                minPrice: nil, maxPrice: nil, minRating: nil,
                                isVerified: nil, sortBy: nil, sortOrder: nil)
             )
-            artists.append(contentsOf: res.artists)
+            artists.append(contentsOf: res.artists.filter { $0.servicesCount > 0 })
             hasMore = res.pagination.hasMore
             currentPage += 1
         } catch {
