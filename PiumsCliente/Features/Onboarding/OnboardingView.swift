@@ -38,6 +38,7 @@ struct OnboardingView: View {
                     ))
             }
         }
+        .background(Color(.systemBackground).ignoresSafeArea())
         .animation(.easeInOut(duration: 0.35), value: vm.step)
         .onAppear { vm.onFinished = onFinish }
     }

@@ -222,14 +222,25 @@ final class AuthManager {
     }
 
     func refreshIfNeeded() async throws {
-        guard let refresh = TokenStorage.shared.refreshToken else { throw AppError.unauthorized }
-        let response: AuthResponse = try await APIClient.request(.refreshToken(token: refresh), retryOnUnauthorized: false)
-        store(response)
+        // Si ya hay un refresh en curso, esperar su resultado en vez de lanzar otro
+        if let existing = refreshTask {
+            try await existing.value
+            return
+        }
+        let task = Task { @MainActor [self] in
+            guard let refresh = TokenStorage.shared.refreshToken else { throw AppError.unauthorized }
+            let response: AuthResponse = try await APIClient.request(.refreshToken(token: refresh), retryOnUnauthorized: false)
+            store(response)
+        }
+        refreshTask = task
+        defer { refreshTask = nil }
+        try await task.value
     }
 
     // MARK: - Private
 
     private static let userCacheKey = "piums.currentUser"
+    private var refreshTask: Task<Void, Error>?
 
     private func loadFromStorage() async {
         // 1. Restaurar usuario desde caché local — sin red, instantáneo
@@ -264,8 +275,9 @@ final class AuthManager {
             saveUserLocally(wrapper.user)
         } catch let e as AppError where e == .unauthorized {
             await logout()
+        } catch {
+            // Errores de red, timeout, 5xx → mantener sesión activa
         }
-        // Cualquier otro error (red, timeout, 5xx) → mantener sesión activa
     }
 
     private func store(_ response: AuthResponse) {
