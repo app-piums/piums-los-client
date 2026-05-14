@@ -55,26 +55,33 @@ final class ArtistSearchByDateViewModel {
     var selectedSpecialty: SpecialtyOption?
     var minPrice: Double = 0
     var maxPrice: Double = 50000
+    var minRating: Double = 0
+    var selectedCity: String?
+    var isVerified: Bool = false
+    var sortOption: SearchSortOption = .relevance
     var searchQuery = ""
     var isSmartSearch: Bool { !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var hasActiveFilters: Bool {
-        selectedSpecialty != nil || minPrice > 0 || maxPrice < 50000 || !showOnlyAvailable
+        selectedSpecialty != nil || minPrice > 0 || maxPrice < 50000 ||
+        minRating > 0 || selectedCity != nil || isVerified ||
+        sortOption != .relevance || !showOnlyAvailable
     }
 
     func clearFilters() {
         selectedSpecialty = nil
-        minPrice = 0
-        maxPrice = 50000
+        minPrice = 0; maxPrice = 50000
+        minRating = 0; selectedCity = nil
+        isVerified = false; sortOption = .relevance
         showOnlyAvailable = true
     }
 
     private var debounceTask: Task<Void, Never>? = nil
 
-    // What the grid shows: smart results (when query active) or date-filtered list
+    // What the grid shows: filtered + sorted client-side
     var displayed: [ArtistWithAvailability] {
         let base = isSmartSearch && !smartArtists.isEmpty ? smartArtists : artists
-        return base.filter { item in
+        var result = base.filter { item in
             if showOnlyAvailable && !item.available { return false }
             if let sp = selectedSpecialty {
                 let specialties = item.artist.specialties?.joined(separator: " ").lowercased() ?? ""
@@ -82,6 +89,12 @@ final class ArtistSearchByDateViewModel {
             }
             if minPrice > 0, let price = item.mainServicePrice, price < Int(minPrice) { return false }
             if maxPrice < 50000, let price = item.mainServicePrice, price > Int(maxPrice) { return false }
+            if minRating > 0, let rating = item.artist.averageRating, rating < minRating { return false }
+            if let city = selectedCity {
+                let artistCity = (item.artist.city ?? "").lowercased()
+                if !artistCity.localizedCaseInsensitiveContains(city) { return false }
+            }
+            if isVerified && !(item.artist.isVerified) { return false }
             if isSmartSearch && smartArtists.isEmpty && !searchQuery.isEmpty {
                 let q = searchQuery.lowercased()
                 let name = item.artist.artistName.lowercased()
@@ -91,6 +104,20 @@ final class ArtistSearchByDateViewModel {
             }
             return true
         }
+        // Apply sort override when not using default distance sort
+        switch sortOption {
+        case .ratingDesc:
+            result.sort { ($0.artist.averageRating ?? 0) > ($1.artist.averageRating ?? 0) }
+        case .priceAsc:
+            result.sort { ($0.mainServicePrice ?? Int.max) < ($1.mainServicePrice ?? Int.max) }
+        case .priceDesc:
+            result.sort { ($0.mainServicePrice ?? 0) > ($1.mainServicePrice ?? 0) }
+        case .newest:
+            break // keep server order
+        case .relevance:
+            break // keep distance/availability sort
+        }
+        return result
     }
 
     // MARK: - Load artists for a date
@@ -477,9 +504,9 @@ struct ArtistSearchByDateView: View {
     private var categoryBarLabel: String {
         var parts: [String] = []
         if let sp = viewModel.selectedSpecialty { parts.append(sp.displayName) }
-        if viewModel.minPrice > 0 { parts.append("Desde \(Int(viewModel.minPrice).piumsFormatted)") }
-        if viewModel.maxPrice < 50000 { parts.append("Hasta \(Int(viewModel.maxPrice).piumsFormatted)") }
-        if !viewModel.showOnlyAvailable { parts.append("Todos") }
+        if let city = viewModel.selectedCity { parts.append(city) }
+        if viewModel.minRating > 0 { parts.append("\(Int(viewModel.minRating))+ ★") }
+        if viewModel.sortOption != .relevance { parts.append(viewModel.sortOption.displayName) }
         return parts.isEmpty ? "Filtrar artistas..." : parts.joined(separator: " · ")
     }
 }
@@ -489,6 +516,8 @@ struct ArtistSearchByDateView: View {
 private struct SearchByDateFiltersSheet: View {
     @Bindable var viewModel: ArtistSearchByDateViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var cityText: String = ""
+    @State private var cityCoordinate: CLLocationCoordinate2D?
 
     var body: some View {
         NavigationStack {
@@ -542,9 +571,72 @@ private struct SearchByDateFiltersSheet: View {
 
                     Divider()
 
-                    Button(role: .destructive) {
-                        viewModel.clearFilters()
-                    } label: {
+                    filterSection(title: "Calificación mínima") {
+                        VStack(spacing: 8) {
+                            HStack(spacing: 12) {
+                                ForEach(1...5, id: \.self) { star in
+                                    Button {
+                                        let val = Double(star)
+                                        viewModel.minRating = viewModel.minRating == val ? 0 : val
+                                    } label: {
+                                        Image(systemName: Double(star) <= viewModel.minRating ? "star.fill" : "star")
+                                            .font(.title2)
+                                            .foregroundStyle(Double(star) <= viewModel.minRating
+                                                             ? Color.piumsOrange : Color(.systemGray3))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            if viewModel.minRating > 0 {
+                                Text("\(Int(viewModel.minRating)) estrella\(viewModel.minRating == 1 ? "" : "s") o más")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Divider()
+
+                    filterSection(title: "Ciudad o zona") {
+                        LocationSearchField(
+                            placeholder: "Buscar ciudad o zona...",
+                            text: $cityText,
+                            coordinate: $cityCoordinate
+                        )
+                        .onChange(of: cityText) { _, newVal in
+                            viewModel.selectedCity = newVal.isEmpty ? nil : newVal
+                        }
+                    }
+
+                    Divider()
+
+                    filterSection(title: "Ordenar por") {
+                        VStack(spacing: 0) {
+                            ForEach(SearchSortOption.allCases, id: \.self) { opt in
+                                Button { viewModel.sortOption = opt } label: {
+                                    HStack {
+                                        Text(opt.displayName).font(.subheadline)
+                                        Spacer()
+                                        if viewModel.sortOption == opt {
+                                            Image(systemName: "checkmark").foregroundStyle(Color.piumsOrange)
+                                        }
+                                    }
+                                    .padding(.vertical, 10)
+                                }
+                                .buttonStyle(.plain)
+                                if opt != SearchSortOption.allCases.last { Divider() }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    filterSection(title: "Solo verificados") {
+                        Toggle("Mostrar solo artistas verificados", isOn: $viewModel.isVerified)
+                            .tint(.piumsOrange)
+                    }
+
+                    Button(role: .destructive) { viewModel.clearFilters(); cityText = "" } label: {
                         Text("Limpiar todos los filtros")
                             .font(.subheadline.weight(.medium))
                             .frame(maxWidth: .infinity).padding(.vertical, 12)
@@ -556,6 +648,7 @@ private struct SearchByDateFiltersSheet: View {
             }
             .navigationTitle("Filtros")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { cityText = viewModel.selectedCity ?? "" }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Aplicar") { dismiss() }
