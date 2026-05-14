@@ -3,7 +3,7 @@ import Foundation
 
 /// Limita intentos de login y forgot-password por email.
 /// Progresión: 3 intentos → bloqueo 30s · 5 intentos → 5 min · 10+ → 15 min.
-/// El estado vive en memoria (se resetea al reiniciar la app, intencional para UX).
+/// El bloqueo persiste en UserDefaults para sobrevivir reinicios de la app.
 final class LoginRateLimiter {
     static let shared = LoginRateLimiter()
     private init() {}
@@ -15,6 +15,8 @@ final class LoginRateLimiter {
 
     private var records: [String: Record] = [:]
     private let lock = NSLock()
+    private let defaults = UserDefaults.standard
+    private func udKey(_ email: String) -> String { "rl.lock.\(email)" }
 
     // MARK: - Public API
 
@@ -22,7 +24,15 @@ final class LoginRateLimiter {
     func shouldBlock(email: String) -> String? {
         lock.withLock {
             let key = email.lowercased()
-            guard var rec = records[key] else { return nil }
+            var rec = records[key] ?? Record()
+
+            // Restaurar bloqueo persistido si no está en memoria
+            if rec.lockedUntil == nil,
+               let ts = defaults.object(forKey: udKey(key)) as? Double {
+                let saved = Date(timeIntervalSince1970: ts)
+                if saved > Date() { rec.lockedUntil = saved }
+                records[key] = rec
+            }
 
             if let until = rec.lockedUntil, until > Date() {
                 let remaining = Int(until.timeIntervalSinceNow.rounded(.up))
@@ -41,8 +51,13 @@ final class LoginRateLimiter {
     func lockedUntil(email: String) -> Date? {
         lock.withLock {
             let key = email.lowercased()
-            guard let until = records[key]?.lockedUntil, until > Date() else { return nil }
-            return until
+            // Primero memoria, luego UserDefaults
+            if let until = records[key]?.lockedUntil, until > Date() { return until }
+            if let ts = defaults.object(forKey: udKey(key)) as? Double {
+                let saved = Date(timeIntervalSince1970: ts)
+                if saved > Date() { return saved }
+            }
+            return nil
         }
     }
 
@@ -71,12 +86,21 @@ final class LoginRateLimiter {
             }
 
             records[key] = rec
+
+            // Persistir fecha de desbloqueo para sobrevivir reinicios
+            if let until = rec.lockedUntil {
+                defaults.set(until.timeIntervalSince1970, forKey: udKey(key))
+            }
         }
     }
 
     /// Limpia el registro tras un login exitoso.
     func reset(email: String) {
-        lock.withLock { records[email.lowercased()] = nil }
+        lock.withLock {
+            let key = email.lowercased()
+            records[key] = nil
+            defaults.removeObject(forKey: udKey(key))
+        }
     }
 
     // MARK: - Private
