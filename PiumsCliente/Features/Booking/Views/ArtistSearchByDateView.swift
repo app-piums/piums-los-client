@@ -38,6 +38,22 @@ struct ArtistWithAvailability: Identifiable {
     var id: String { artist.id }
 }
 
+// MARK: - Category filter model
+
+private struct SearchByDateCategory: Identifiable {
+    let id: String
+    let label: String
+    let icon: String
+    let filterValue: String
+
+    static let all: [SearchByDateCategory] = [
+        SearchByDateCategory(id: "musico",     label: "Música",      icon: "music.note",        filterValue: "musico"),
+        SearchByDateCategory(id: "fotografo",  label: "Fotografía",  icon: "camera.fill",       filterValue: "fotografo"),
+        SearchByDateCategory(id: "videografo", label: "Video",       icon: "film.fill",         filterValue: "videografo"),
+        SearchByDateCategory(id: "animador",   label: "Animador",    icon: "party.popper.fill", filterValue: "animador"),
+    ]
+}
+
 // MARK: - ViewModel
 
 @Observable
@@ -293,59 +309,20 @@ struct ArtistSearchByDateView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                // Barra de búsqueda
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    TextField("Nombre, estilo, especialidad…", text: $viewModel.searchQuery)
-                        .font(.subheadline)
-                    if !viewModel.searchQuery.isEmpty {
-                        Button { viewModel.searchQuery = "" } label: {
-                            Image(systemName: "xmark.circle.fill").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color(.tertiarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(.bar)
-
-                Divider()
-
                 // Results header
                 if !viewModel.isLoading {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("\(viewModel.displayed.count) artista(s) encontrado(s)")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Spacer()
-                            if viewModel.isSmartSearch {
-                                HStack(spacing: 4) {
-                                    if viewModel.isSmartLoading {
-                                        ProgressView().scaleEffect(0.7)
-                                    } else {
-                                        Image(systemName: "sparkles")
-                                    }
-                                    Text("SmartSearch")
-                                }
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.piumsOrange)
-                            } else if userLocation == nil {
-                                Label("Agrega ubicación para ordenar por distancia", systemImage: "info.circle")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
+                    HStack {
+                        Text("\(viewModel.displayed.count) artista(s) encontrado(s)")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        if userLocation == nil {
+                            Label("Agrega ubicación para ordenar por distancia", systemImage: "info.circle")
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
                 }
 
-                // Loading
                 if viewModel.isLoading {
                     LoadingView().frame(maxWidth: .infinity, minHeight: 300)
                 } else if viewModel.displayed.isEmpty {
@@ -353,34 +330,29 @@ struct ArtistSearchByDateView: View {
                         systemImage: "calendar.badge.exclamationmark",
                         title: "Sin artistas disponibles",
                         description: viewModel.showOnlyAvailable
-                            ? "No hay artistas disponibles para esa fecha. Intenta desactivar el filtro."
+                            ? "No hay artistas disponibles para esa fecha. Intenta cambiar la categoría."
                             : "No hay artistas que coincidan."
                     )
-                    .frame(maxWidth: .infinity, minHeight: 300)
-                    .padding(.top, 30)
+                    .frame(maxWidth: .infinity, minHeight: 300).padding(.top, 30)
                 } else {
                     LazyVGrid(
                         columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)],
                         spacing: 14
                     ) {
                         ForEach(viewModel.displayed) { item in
-                            ArtistSearchResultCard(
-                                item: item,
-                                matchedService: viewModel.smartMatchMap[item.id]
-                            )
-                            .onTapGesture {
-                                bookingContext = BookingFlowContext(
-                                    artist: item.artist,
-                                    selectedDate: selectedDate,
-                                    location: locationName,
-                                    locationLat: userLocation?.latitude,
-                                    locationLng: userLocation?.longitude
-                                )
-                            }
+                            ArtistSearchResultCard(item: item, matchedService: nil)
+                                .onTapGesture {
+                                    bookingContext = BookingFlowContext(
+                                        artist: item.artist,
+                                        selectedDate: selectedDate,
+                                        location: locationName,
+                                        locationLat: userLocation?.latitude,
+                                        locationLng: userLocation?.longitude
+                                    )
+                                }
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
+                    .padding(.horizontal, 16).padding(.top, 4)
                 }
 
                 Color.clear.frame(height: 20)
@@ -391,20 +363,16 @@ struct ArtistSearchByDateView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        // ── Strip de fecha + ubicación como header sticky ──────────
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 8) {
                     // Encabezado mes
                     HStack {
                         Text("SELECCIONAR FECHA")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .tracking(1)
+                            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary).tracking(1)
                         Spacer()
                         Text(monthYearLabel)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(Color.piumsOrange)
+                            .font(.subheadline.bold()).foregroundStyle(Color.piumsOrange)
                     }
                     .padding(.horizontal, 16)
 
@@ -412,10 +380,7 @@ struct ArtistSearchByDateView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(nextDays, id: \.self) { date in
-                                DayButton(
-                                    date: date,
-                                    isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate)
-                                ) {
+                                DayButton(date: date, isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate)) {
                                     selectedDate = date
                                 }
                             }
@@ -424,57 +389,67 @@ struct ArtistSearchByDateView: View {
                     }
 
                     // Botón de ubicación
-                    Button {
-                        locationStore.refresh()
-                    } label: {
+                    Button { locationStore.refresh() } label: {
                         HStack(spacing: 12) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.piumsOrange.opacity(0.12))
-                                    .frame(width: 38, height: 38)
+                                    .fill(Color.piumsOrange.opacity(0.12)).frame(width: 38, height: 38)
                                 Image(systemName: userLocation != nil ? "location.fill" : "location")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(Color.piumsOrange)
+                                    .font(.system(size: 16)).foregroundStyle(Color.piumsOrange)
                             }
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("UBICACIÓN DEL EVENTO")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                    .tracking(0.8)
-                                                if locationStore.isLocating && locationName.isEmpty {
+                                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary).tracking(0.8)
+                                if locationStore.isLocating && locationName.isEmpty {
                                     HStack(spacing: 6) {
                                         ProgressView().scaleEffect(0.7)
-                                        Text("Obteniendo ubicación…")
-                                            .font(.subheadline.weight(.medium))
-                                            .foregroundStyle(.secondary)
+                                        Text("Obteniendo ubicación…").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                                     }
                                 } else {
                                     Text(locationName.isEmpty ? "Toca para usar tu ubicación actual" : locationName)
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
+                                        .font(.subheadline.weight(.medium)).foregroundStyle(.primary).lineLimit(1)
                                 }
                             }
                             Spacer()
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.secondary)
                         }
                         .padding(14)
                         .background(Color(.tertiarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
+                    .buttonStyle(.plain).padding(.horizontal, 16)
+
+                    // Filtro de especialidad por categoría (chips horizontales)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(SearchByDateCategory.all) { cat in
+                                let selected = viewModel.categoryFilter == cat.filterValue
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        viewModel.categoryFilter = selected ? nil : cat.filterValue
+                                    }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: cat.icon).font(.caption)
+                                        Text(cat.label).font(.subheadline.weight(.medium))
+                                    }
+                                    .padding(.horizontal, 14).padding(.vertical, 8)
+                                    .background(selected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
+                                    .foregroundStyle(selected ? .white : .primary)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(selected ? Color.clear : Color(.systemGray5), lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
                 }
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                .padding(.top, 12).padding(.bottom, 10)
                 .background(.ultraThinMaterial)
                 Divider()
             }
         }
         .task {
-            // Pre-seed from LocationStore if already available
             if userLocation == nil, let coord = locationStore.coordinate {
                 userLocation = coord
                 locationName = locationStore.cityName
@@ -484,11 +459,7 @@ struct ArtistSearchByDateView: View {
         .onChange(of: selectedDate) { _, newDate in
             Task { await viewModel.load(date: newDate, location: userLocation) }
         }
-        .onChange(of: viewModel.searchQuery) { _, _ in
-            viewModel.searchDebounced()
-        }
         .onChange(of: locationStore.coordinate?.latitude) { _, _ in
-            // LocationStore got a new fix — sync and re-sort
             userLocation = locationStore.coordinate
             locationName = locationStore.cityName
             viewModel.updateLocation(locationStore.coordinate)

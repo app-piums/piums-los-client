@@ -27,7 +27,6 @@ struct SearchView: View {
     @State private var selectedArtist: Artist?
     @State private var showFilters = false
     @Environment(\.locationStore) private var locationStore
-    @FocusState private var searchFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -136,7 +135,6 @@ struct SearchView: View {
             }
         }
         .refreshable { if viewModel.hasSearched { await viewModel.search() } }
-        .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
         .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -164,42 +162,45 @@ struct SearchView: View {
         }
     }
 
-    // MARK: - Search bar
+    // MARK: - Search bar (category chips + filter button)
 
     private var searchBar: some View {
         HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("¿Qué estás buscando?", text: $viewModel.query)
-                    .submitLabel(.search)
-                    .focused($searchFocused)
-                    .onSubmit { Task { await viewModel.search() } }
-                    .onChange(of: viewModel.query) { _, v in
-                        if v.isEmpty {
-                            viewModel.results = []
-                            viewModel.smartResults = []
-                            viewModel.expandedTerms = []
-                            viewModel.hasSearched = false
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(CLIENT_CATEGORIES) { cat in
+                        let selected = viewModel.selectedSpecialty?.rawValue == cat.categoryId
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                if selected {
+                                    viewModel.selectedSpecialty = nil
+                                    viewModel.results = []
+                                    viewModel.smartResults = []
+                                    viewModel.expandedTerms = []
+                                    viewModel.hasSearched = false
+                                } else {
+                                    viewModel.query = ""
+                                    viewModel.selectedSpecialty = SpecialtyOption(rawValue: cat.categoryId)
+                                    Task { await viewModel.search() }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: cat.icon).font(.caption)
+                                Text(cat.label).font(.subheadline.weight(.medium))
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(selected ? Color.piumsOrange : Color(.tertiarySystemGroupedBackground))
+                            .foregroundStyle(selected ? .white : .primary)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(selected ? Color.clear : Color(.systemGray5), lineWidth: 1))
                         }
-                    }
-                if !viewModel.query.isEmpty {
-                    Button {
-                        viewModel.query = ""
-                        viewModel.results = []
-                        viewModel.smartResults = []
-                        viewModel.expandedTerms = []
-                        viewModel.hasSearched = false
-                        searchFocused = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            .padding(12)
-            .background(Color(.tertiarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            Button { searchFocused = false; showFilters = true } label: {
+            Button { showFilters = true } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "slider.horizontal.3")
                         .font(.title3).padding(12)
@@ -365,6 +366,7 @@ struct SearchFiltersSheet: View {
     @Bindable var viewModel: SearchViewModel
     let onApply: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var cityQuery = ""
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -430,20 +432,44 @@ struct SearchFiltersSheet: View {
                     }
                     Divider()
                     filterSection(title: "Ciudad") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 8) {
-                            ForEach(viewModel.cities, id: \.self) { city in
-                                Button {
-                                    viewModel.selectedCity = viewModel.selectedCity == city ? nil : city
-                                } label: {
-                                    Text(city).font(.subheadline).lineLimit(1)
-                                        .frame(maxWidth: .infinity).padding(.vertical, 9)
-                                        .background(viewModel.selectedCity == city
-                                                    ? Color.piumsOrange
-                                                    : Color(.tertiarySystemGroupedBackground))
-                                        .foregroundStyle(viewModel.selectedCity == city ? .white : .primary)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        VStack(spacing: 8) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                                TextField("Buscar ciudad...", text: $cityQuery)
+                                    .autocorrectionDisabled()
+                                if !cityQuery.isEmpty {
+                                    Button { cityQuery = "" } label: {
+                                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                                    }
                                 }
-                                .buttonStyle(.plain)
+                            }
+                            .padding(10)
+                            .background(Color(.tertiarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                            let filtered = cityQuery.isEmpty
+                                ? viewModel.cities
+                                : viewModel.cities.filter { $0.localizedCaseInsensitiveContains(cityQuery) }
+                            if !filtered.isEmpty {
+                                VStack(spacing: 0) {
+                                    ForEach(filtered, id: \.self) { city in
+                                        Button {
+                                            viewModel.selectedCity = viewModel.selectedCity == city ? nil : city
+                                        } label: {
+                                            HStack {
+                                                Text(city).font(.subheadline).foregroundStyle(.primary)
+                                                Spacer()
+                                                if viewModel.selectedCity == city {
+                                                    Image(systemName: "checkmark").foregroundStyle(Color.piumsOrange)
+                                                }
+                                            }
+                                            .padding(.vertical, 10)
+                                        }
+                                        .buttonStyle(.plain)
+                                        if city != filtered.last { Divider() }
+                                    }
+                                }
+                                .padding(.horizontal, 4)
                             }
                         }
                     }

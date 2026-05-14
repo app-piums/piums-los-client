@@ -6,6 +6,7 @@ struct ArtistProfileView: View {
     let artist: Artist
     @State private var viewModel: ArtistProfileViewModel
     @State private var bookingService: ArtistService?
+    @State private var detailService: ArtistService?
     @State private var showWriteReview = false
     @State private var favorites = FavoritesStore.shared
     @State private var showFavError = false
@@ -76,9 +77,11 @@ struct ArtistProfileView: View {
                         .padding(.horizontal)
                     } else {
                         ForEach(viewModel.services) { service in
-                            ServiceRowView(service: service) {
-                                bookingService = service
-                            }
+                            ServiceRowView(
+                                service: service,
+                                onViewDetails: { detailService = service },
+                                onReserve: { bookingService = service }
+                            )
                             .padding(.horizontal)
                         }
                     }
@@ -203,6 +206,15 @@ struct ArtistProfileView: View {
                 ))
             }
         }
+        .sheet(item: $detailService) { service in
+            ServiceDetailSheet(service: service) {
+                detailService = nil
+                bookingService = service
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+        }
         .sheet(isPresented: $showWriteReview) {
             WriteReviewSheet(artistId: artist.id, artistName: artist.artistName) {
                 Task { await viewModel.loadReviews() }
@@ -318,6 +330,7 @@ private struct StatCell: View {
 
 private struct ServiceRowView: View {
     let service: ArtistService
+    let onViewDetails: () -> Void
     let onReserve: () -> Void
 
     private var priceLabel: String {
@@ -371,16 +384,31 @@ private struct ServiceRowView: View {
                     .foregroundStyle(Color.piumsOrange)
             }
 
-            Button(action: onReserve) {
-                Text("Reservar")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(Color.piumsOrange)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            HStack(spacing: 8) {
+                Button(action: onViewDetails) {
+                    Text("Ver detalles")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.piumsOrange)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.piumsOrange.opacity(0.10))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.piumsOrange.opacity(0.25), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+
+                Button(action: onReserve) {
+                    Text("Reservar")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.piumsOrange)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(14)
         .background(Color(.tertiarySystemGroupedBackground))
@@ -598,6 +626,93 @@ private struct WriteReviewSheet: View {
             errorMessage = AppError(from: error).errorDescription
         }
         isSubmitting = false
+    }
+}
+
+// MARK: - ServiceDetailSheet
+
+private struct ServiceDetailSheet: View {
+    let service: ArtistService
+    let onReserve: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var pricingTypeLabel: String? {
+        switch service.pricingType {
+        case "FIXED":   return "Precio fijo"
+        case "HOURLY":  return "Por hora"
+        case "PACKAGE": return "Paquete"
+        default:        return nil
+        }
+    }
+
+    private var durationLabel: String? {
+        let mins = service.duration
+        guard mins > 0 else { return nil }
+        if mins < 60 { return "\(mins) min" }
+        let h = mins / 60; let m = mins % 60
+        return m == 0 ? "\(h) h" : "\(h) h \(m) min"
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Name + price
+                HStack(alignment: .top, spacing: 8) {
+                    Text(service.name)
+                        .font(.title3.bold())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(service.price.piumsFormatted)
+                        .font(.title3.bold())
+                        .foregroundStyle(Color.piumsOrange)
+                }
+
+                // Metadata pills
+                HStack(spacing: 10) {
+                    if let dur = durationLabel {
+                        Label(dur, systemImage: "clock")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if let type = pricingTypeLabel {
+                        if durationLabel != nil {
+                            Text("·").foregroundStyle(.secondary)
+                        }
+                        Text(type).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+
+                // Description
+                if let desc = service.description, !desc.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Descripción")
+                            .font(.headline)
+                        Text(desc)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 20)
+
+                // Reserve button
+                Button {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { onReserve() }
+                } label: {
+                    Text("Reservar este servicio")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.piumsOrange)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(24)
+        }
+        .navigationTitle("Detalle del servicio")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
