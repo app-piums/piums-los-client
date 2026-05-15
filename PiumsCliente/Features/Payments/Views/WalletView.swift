@@ -81,7 +81,6 @@ final class WalletViewModel {
 struct WalletView: View {
     @State private var vm = WalletViewModel()
     @State private var confirmDelete: PaymentMethod?
-    @State private var showAddCard = false
 
     var body: some View {
         Group {
@@ -103,22 +102,8 @@ struct WalletView: View {
         .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Mis Tarjetas")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showAddCard = true
-                } label: {
-                    Image(systemName: "plus")
-                        .fontWeight(.semibold)
-                }
-                .foregroundStyle(Color.piumsOrange)
-            }
-        }
         .task { await vm.load() }
         .refreshable { await vm.load() }
-        .sheet(isPresented: $showAddCard) {
-            AddCardSheet(vm: vm)
-        }
         .alert("Eliminar tarjeta", isPresented: Binding(
             get: { confirmDelete != nil },
             set: { if !$0 { confirmDelete = nil } }
@@ -162,7 +147,6 @@ struct WalletView: View {
                                 Task { await vm.setDefault(method) }
                             }
                         }
-                        AddCardPlaceholder { showAddCard = true }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -233,25 +217,12 @@ struct WalletView: View {
             .padding(.top, 48)
 
             VStack(spacing: 8) {
-                Text("Sin métodos de pago").font(.title3.bold()).padding(.top, 28)
-                Text("Agrega una tarjeta para pagar tus reservas más rápido.")
+                Text("Sin tarjetas guardadas").font(.title3.bold()).padding(.top, 28)
+                Text("Tu tarjeta se guardará automáticamente al completar tu primer pago.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
-
-            Button { showAddCard = true } label: {
-                Label("Agregar tarjeta", systemImage: "plus.circle.fill")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.piumsOrange)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: Color.piumsOrange.opacity(0.3), radius: 10, y: 4)
-            }
-            .padding(.horizontal, 40)
-            .padding(.top, 24)
 
             infoSection
                 .padding(.horizontal, 24)
@@ -267,13 +238,16 @@ struct WalletView: View {
         VStack(spacing: 10) {
             InfoRow(icon: "lock.shield.fill", color: .green,
                     title: "Pagos seguros",
-                    subtitle: "Tus datos de tarjeta son procesados por Stripe y nunca se almacenan en nuestros servidores.")
-            InfoRow(icon: "star.circle.fill", color: Color.piumsOrange,
+                    subtitle: "Tus datos de tarjeta son procesados por Tilopay de forma segura y encriptada.")
+            InfoRow(icon: "bolt.circle.fill", color: Color.piumsOrange,
+                    title: "Pago con un toque",
+                    subtitle: "Al completar tu primer pago tu tarjeta queda guardada para futuros cobros sin tener que ingresarla de nuevo.")
+            InfoRow(icon: "star.circle.fill", color: .blue,
                     title: "Tarjeta principal",
                     subtitle: "Toca cualquier tarjeta en el carrusel o usa «Predeterminar» para cambiar cuál se usa primero.")
             InfoRow(icon: "trash.circle.fill", color: .red,
                     title: "Control total",
-                    subtitle: "Puedes eliminar tarjetas en cualquier momento. Se requiere al menos 1 tarjeta guardada.")
+                    subtitle: "Puedes eliminar tarjetas en cualquier momento.")
         }
         .padding(16)
         .background(Color(.tertiarySystemGroupedBackground))

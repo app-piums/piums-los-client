@@ -411,6 +411,7 @@ struct BookingDetailView: View {
     @State private var showShareSheet = false
     @State private var showReschedule = false
     @State private var showPayCheckout = false
+    @State private var showPayRemaining = false
     @State private var showNoShowAlert = false
     @State private var noShowReason = ""
     @Environment(\.dismiss) private var dismiss
@@ -648,6 +649,16 @@ struct BookingDetailView: View {
                             }
                             Divider()
                         }
+                        if booking.paymentStatus == .anticipoPaid,
+                           let anticipo = booking.anticipoAmount {
+                            let remaining = booking.totalPrice - (booking.paidAmount ?? anticipo)
+                            if remaining > 0 {
+                                actionButton(icon: "creditcard.fill", label: "Pagar saldo restante (\(remaining.piumsFormatted))", color: Color.piumsOrange) {
+                                    showPayRemaining = true
+                                }
+                                Divider()
+                            }
+                        }
                         // Agregar a calendario (iOS nativo)
                         actionButton(icon: "calendar.badge.plus", label: "Agregar al Calendario", color: .blue) {
                             addToCalendar()
@@ -710,6 +721,17 @@ struct BookingDetailView: View {
         .fullScreenCover(isPresented: $showPayCheckout) {
             PaymentCheckoutView(booking: booking, artist: artistForPayment) {
                 showPayCheckout = false
+            }
+        }
+        .fullScreenCover(isPresented: $showPayRemaining) {
+            let anticipo = booking.anticipoAmount ?? 0
+            let remaining = booking.totalPrice - (booking.paidAmount ?? anticipo)
+            PaymentCheckoutView(
+                booking: booking,
+                artist: artistForPayment,
+                overrideAmount: remaining
+            ) {
+                showPayRemaining = false
             }
         }
         .alert("Reportar no presentación", isPresented: $showNoShowAlert) {

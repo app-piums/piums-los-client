@@ -86,9 +86,11 @@ enum APIEndpoint {
 
     // ── Wallet / Payment Methods ──────────────────────────
     case listPaymentMethods
+    case getDefaultPaymentMethod
     case deletePaymentMethod(id: String)
     case setDefaultPaymentMethod(id: String)
     case addPaymentMethod(stripePaymentMethodId: String, setAsDefault: Bool)
+    case chargeWithSavedCard(methodId: String, bookingId: String, amount: Int, currency: String)
 
     // ── Events ────────────────────────────────────────────
     case listEvents
@@ -128,7 +130,7 @@ extension APIEndpoint {
              .logout, .createPaymentIntent, .calculatePrice,
              .createEvent, .sendMessage, .createConversation, .addFavorite,
              .confirmTilopayRedirect, .reportNoShow, .uploadDocument,
-             .validateCoupon, .addPaymentMethod:
+             .validateCoupon, .addPaymentMethod, .chargeWithSavedCard:
             return "POST"
         case .cancelBooking:
             return "POST"
@@ -177,6 +179,8 @@ extension APIEndpoint {
             return encode(["currentPassword": cur, "newPassword": new])
         case .addPaymentMethod(let pmId, let setDefault):
             return encode(["stripePaymentMethodId": pmId, "setAsDefault": setDefault])
+        case .chargeWithSavedCard(_, let bookingId, let amount, let currency):
+            return encode(["bookingId": bookingId, "amount": amount, "currency": currency])
         case .createPaymentIntent(let bId, let amount, let currency, let countryCode, let billingFirst, let billingLast):
             var d: [String: Any] = ["bookingId": bId]
             if let a = amount { d["amount"] = a }
@@ -332,9 +336,11 @@ extension APIEndpoint {
 
         // Wallet
         case .listPaymentMethods:              return "/api/payments/methods"
+        case .getDefaultPaymentMethod:         return "/api/payments/methods/default"
         case .deletePaymentMethod(let id):     return "/api/payments/methods/\(id)"
         case .setDefaultPaymentMethod(let id): return "/api/payments/methods/\(id)/default"
         case .addPaymentMethod:                return "/api/payments/methods"
+        case .chargeWithSavedCard(let id, _, _, _): return "/api/payments/methods/\(id)/charge"
         case .reportNoShow(let id, _):         return "/api/bookings/\(id)/no-show"
         case .listPayments(let pg):            return "/api/payments/payments?page=\(pg)&limit=20"
         case .getPayment(let id):              return "/api/payments/payments/\(id)"

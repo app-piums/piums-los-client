@@ -17,6 +17,9 @@ final class PaymentCheckoutViewModel {
     private(set) var amountToPay: Int = 0
     private(set) var currency: String = "USD"
 
+    var savedCard: PaymentMethod? = nil
+    var useSavedCard: Bool = true
+
     // Helpers para el switch en la vista
     var isBusy: Bool {
         switch phase {
@@ -52,14 +55,53 @@ final class PaymentCheckoutViewModel {
 
     // MARK: - Setup
 
-    func setup(booking: Booking) {
+    func setup(booking: Booking, overrideAmount: Int? = nil) {
         currency    = booking.currency ?? "USD"
-        amountToPay = (booking.anticipoRequired == true)
-            ? (booking.anticipoAmount ?? booking.totalPrice)
-            : booking.totalPrice
+        if let override = overrideAmount {
+            amountToPay = override
+        } else {
+            amountToPay = (booking.anticipoRequired == true)
+                ? (booking.anticipoAmount ?? booking.totalPrice)
+                : booking.totalPrice
+        }
+        Task { await loadDefaultCard() }
     }
 
-    // MARK: - Iniciar pago
+    func loadDefaultCard() async {
+        do {
+            let method: PaymentMethod = try await APIClient.request(.getDefaultPaymentMethod)
+            savedCard = method
+        } catch {
+            savedCard = nil
+        }
+    }
+
+    // MARK: - Pago con tarjeta guardada
+
+    func chargeWithSavedCard(booking: Booking) async {
+        guard let card = savedCard else { return }
+        phase = .processing
+        pollingMessage = "Procesando pago..."
+        do {
+            let result: SavedCardChargeResponse = try await APIClient.request(
+                .chargeWithSavedCard(
+                    methodId:  card.id,
+                    bookingId: booking.id,
+                    amount:    amountToPay,
+                    currency:  currency
+                )
+            )
+            if result.success {
+                await pollUntilPaid(bookingId: booking.id)
+            } else {
+                phase = .declined
+            }
+        } catch {
+            phase = .error(AppError(from: error).errorDescription ?? "Error al procesar el pago.")
+        }
+    }
+
+    // MARK: - Iniciar pago (Tilopay WebView)
 
     func startPayment(booking: Booking, artist: Artist) async {
         phase = .loading
@@ -189,6 +231,7 @@ final class PaymentCheckoutViewModel {
 struct PaymentCheckoutView: View {
     let booking: Booking
     let artist: Artist
+    var overrideAmount: Int? = nil
     let onDone: () -> Void
 
     @State private var vm = PaymentCheckoutViewModel()
@@ -222,7 +265,7 @@ struct PaymentCheckoutView: View {
                 }
             }
         }
-        .onAppear { vm.setup(booking: booking) }
+        .onAppear { vm.setup(booking: booking, overrideAmount: overrideAmount) }
     }
 
     // MARK: - Checkout content
@@ -286,6 +329,61 @@ struct PaymentCheckoutView: View {
             .background(Color(.tertiarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
+            // Tarjeta guardada
+            if let card = vm.savedCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Método de pago").font(.headline)
+                    Divider()
+
+                    // Opción: tarjeta guardada
+                    Button {
+                        vm.useSavedCard = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: vm.useSavedCard ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(vm.useSavedCard ? Color.piumsOrange : .secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(card.brandLabel) ••••\(card.cardLast4 ?? "")")
+                                    .font(.subheadline.bold()).foregroundStyle(.primary)
+                                Text("Vence \(card.expiryLabel)")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "creditcard.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(12)
+                        .background(vm.useSavedCard ? Color.piumsOrange.opacity(0.07) : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10)
+                            .stroke(vm.useSavedCard ? Color.piumsOrange.opacity(0.4) : Color.clear, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+
+                    // Opción: usar otra tarjeta
+                    Button {
+                        vm.useSavedCard = false
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: vm.useSavedCard ? "circle" : "checkmark.circle.fill")
+                                .foregroundStyle(vm.useSavedCard ? .secondary : Color.piumsOrange)
+                            Text("Usar otra tarjeta")
+                                .font(.subheadline).foregroundStyle(.primary)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(vm.useSavedCard ? Color.clear : Color.piumsOrange.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10)
+                            .stroke(vm.useSavedCard ? Color.clear : Color.piumsOrange.opacity(0.4), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(16)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+
             // Badge de seguridad
             HStack(spacing: 8) {
                 Image(systemName: "lock.shield.fill").foregroundStyle(.green)
@@ -317,12 +415,20 @@ struct PaymentCheckoutView: View {
             } else {
                 // Botón de pago
                 Button {
-                    Task { await vm.startPayment(booking: booking, artist: artist) }
+                    if vm.savedCard != nil && vm.useSavedCard {
+                        Task { await vm.chargeWithSavedCard(booking: booking) }
+                    } else {
+                        Task { await vm.startPayment(booking: booking, artist: artist) }
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         if vm.isBusy {
                             ProgressView().tint(.white).scaleEffect(0.85)
-                            Text("Iniciando...").font(.headline)
+                            Text("Procesando...").font(.headline)
+                        } else if let card = vm.savedCard, vm.useSavedCard {
+                            Image(systemName: "bolt.fill")
+                            Text("Pagar \(formatCents(vm.amountToPay)) con \(card.brandLabel) ••••\(card.cardLast4 ?? "")")
+                                .font(.headline)
                         } else {
                             Image(systemName: "creditcard.fill")
                             Text("Pagar \(formatCents(vm.amountToPay))").font(.headline)
@@ -407,7 +513,6 @@ struct PaymentCheckoutView: View {
 
             Button {
                 vm.phase = .ready
-                Task { await vm.startPayment(booking: booking, artist: artist) }
             } label: {
                 Text("Intentar de nuevo").font(.headline).foregroundStyle(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -471,4 +576,10 @@ private struct CKPriceRow: View {
 private struct TilopayConfirmResponse: Decodable {
     let success: Bool?
     let responseCode: String?
+}
+
+private struct SavedCardChargeResponse: Decodable {
+    let success: Bool
+    let orderNumber: String?
+    let provider: String?
 }
