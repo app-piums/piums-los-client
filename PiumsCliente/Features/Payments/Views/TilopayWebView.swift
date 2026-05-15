@@ -12,6 +12,7 @@ struct TilopayCallbackParams {
     let auth: String?
     let currency: String?
     let orderHash: String?
+    let cardHash: String?   // tokenization hash for future one-click charges
 
     // Tilopay uses "1" in the redirect URL for approval; "00" in server-side webhooks
     var isApproved: Bool { responseCode == "00" || responseCode == "1" }
@@ -78,7 +79,8 @@ struct TilopayWebView: UIViewRepresentable {
                 amount:       params["amount"] ?? "",
                 auth:         params["auth"],
                 currency:     params["currency"],
-                orderHash:    params["orderHash"] ?? params["OrderHash"]
+                orderHash:    params["orderHash"] ?? params["OrderHash"],
+                cardHash:     params["hash"] ?? params["cardHash"] ?? params["HashValues"]
             )
 
             decisionHandler(.cancel)

@@ -73,7 +73,8 @@ enum APIEndpoint {
     case createPaymentIntent(bookingId: String, amount: Int?, currency: String?, countryCode: String?,
                              billingFirst: String?, billingLast: String?)
     case confirmTilopayRedirect(bookingId: String, responseCode: String, orderNumber: String,
-                                amount: String, auth: String?, currency: String?, orderHash: String?)
+                                amount: String, auth: String?, currency: String?, orderHash: String?,
+                                cardHash: String?)
     case getMyCredits
     case reportNoShow(bookingId: String, reason: String)
     case listPayments(page: Int)
@@ -189,11 +190,12 @@ extension APIEndpoint {
             if let bf = billingFirst { d["billingFirst"] = bf }
             if let bl = billingLast  { d["billingLast"]  = bl }
             return try? JSONSerialization.data(withJSONObject: d)
-        case .confirmTilopayRedirect(let bId, let code, let order, let amount, let auth, let curr, let hash):
+        case .confirmTilopayRedirect(let bId, let code, let order, let amount, let auth, let curr, let hash, let cardHash):
             var d: [String: Any] = ["bookingId": bId, "responseCode": code, "orderNumber": order, "amount": amount]
             if let auth { d["auth"] = auth }
             if let curr { d["currency"] = curr }
             if let hash { d["orderHash"] = hash }
+            if let cardHash { d["cardHash"] = cardHash }
             return try? JSONSerialization.data(withJSONObject: d)
         case .reportNoShow(_, let reason):
             return encode(["reason": reason])

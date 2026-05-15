@@ -81,6 +81,7 @@ final class WalletViewModel {
 struct WalletView: View {
     @State private var vm = WalletViewModel()
     @State private var confirmDelete: PaymentMethod?
+    @State private var showAddCard = false
 
     var body: some View {
         Group {
@@ -104,6 +105,16 @@ struct WalletView: View {
         .navigationBarTitleDisplayMode(.large)
         .task { await vm.load() }
         .refreshable { await vm.load() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showAddCard = true } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showAddCard) {
+            AddCardSheet(vm: vm) { showAddCard = false }
+        }
         .alert("Eliminar tarjeta", isPresented: Binding(
             get: { confirmDelete != nil },
             set: { if !$0 { confirmDelete = nil } }
@@ -147,6 +158,7 @@ struct WalletView: View {
                                 Task { await vm.setDefault(method) }
                             }
                         }
+                        AddCardPlaceholder { showAddCard = true }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -238,7 +250,7 @@ struct WalletView: View {
         VStack(spacing: 10) {
             InfoRow(icon: "lock.shield.fill", color: .green,
                     title: "Pagos seguros",
-                    subtitle: "Tus datos de tarjeta son procesados por Tilopay de forma segura y encriptada.")
+                    subtitle: "Aceptamos Visa y Mastercard. Tus datos son procesados por Tilopay de forma segura y encriptada.")
             InfoRow(icon: "bolt.circle.fill", color: Color.piumsOrange,
                     title: "Pago con un toque",
                     subtitle: "Al completar tu primer pago tu tarjeta queda guardada para futuros cobros sin tener que ingresarla de nuevo.")
@@ -259,6 +271,7 @@ struct WalletView: View {
 
 private struct AddCardSheet: View {
     let vm: WalletViewModel
+    var onDismissed: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var cardNumber = ""
@@ -278,10 +291,15 @@ private struct AddCardSheet: View {
         return result
     }
 
+    private var isValidBrand: Bool {
+        detectedBrand == "visa" || detectedBrand == "mastercard"
+    }
+
     private var isValid: Bool {
         let digits = cardNumber.filter(\.isNumber)
         let expParts = expiry.split(separator: "/")
-        return digits.count >= 15 && expParts.count == 2
+        return isValidBrand
+            && digits.count >= 16 && expParts.count == 2
             && (expParts[0].count == 2) && (expParts[1].count == 2 || expParts[1].count == 4)
             && cvc.count >= 3 && !cardholderName.trimmingCharacters(in: .whitespaces).isEmpty
     }
@@ -316,14 +334,23 @@ private struct AddCardSheet: View {
                             .padding(.vertical, 14)
                             .frame(maxWidth: .infinity)
 
-                            // Brand hint
+                            // Brand hint or unsupported warning
                             if !cardNumber.isEmpty {
-                                Image(systemName: brandIcon)
-                                    .font(.title3)
-                                    .foregroundStyle(brandColor)
-                                    .padding(.trailing, 16)
-                                    .transition(.scale.combined(with: .opacity))
-                                    .animation(.spring(duration: 0.25), value: detectedBrand)
+                                if detectedBrand == "unknown" || (!isValidBrand && !cardNumber.filter(\.isNumber).isEmpty) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(.orange)
+                                        .padding(.trailing, 16)
+                                        .transition(.scale.combined(with: .opacity))
+                                        .animation(.spring(duration: 0.25), value: detectedBrand)
+                                } else {
+                                    Image(systemName: brandIcon)
+                                        .font(.title3)
+                                        .foregroundStyle(brandColor)
+                                        .padding(.trailing, 16)
+                                        .transition(.scale.combined(with: .opacity))
+                                        .animation(.spring(duration: 0.25), value: detectedBrand)
+                                }
                             }
                         }
 
@@ -390,9 +417,19 @@ private struct AddCardSheet: View {
                     }
                     .disabled(!isValid || isLoading)
 
+                    // Brand error
+                    let digits = cardNumber.filter(\.isNumber)
+                    if !digits.isEmpty && !isValidBrand {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
+                            Text("Solo se aceptan tarjetas Visa y Mastercard")
+                                .font(.caption).foregroundStyle(.orange)
+                        }
+                    }
+
                     HStack(spacing: 6) {
                         Image(systemName: "lock.shield.fill").foregroundStyle(.green).font(.caption)
-                        Text("Datos procesados de forma segura por Stripe")
+                        Text("Solo Visa y Mastercard · Procesado de forma segura")
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                     .padding(.bottom, 8)
@@ -470,7 +507,6 @@ private struct AddCardSheet: View {
         let digits = cardNumber.filter(\.isNumber)
         if digits.hasPrefix("4") { return "visa" }
         if digits.hasPrefix("5") || digits.hasPrefix("2") { return "mastercard" }
-        if digits.hasPrefix("34") || digits.hasPrefix("37") { return "amex" }
         return "unknown"
     }
 
@@ -478,7 +514,6 @@ private struct AddCardSheet: View {
         switch detectedBrand {
         case "visa":       return "v.circle.fill"
         case "mastercard": return "m.circle.fill"
-        case "amex":       return "a.circle.fill"
         default:           return "creditcard.fill"
         }
     }
@@ -487,7 +522,6 @@ private struct AddCardSheet: View {
         switch detectedBrand {
         case "visa":       return Color(hex: "#1A1F71")
         case "mastercard": return Color(hex: "#EB001B")
-        case "amex":       return Color(hex: "#006FCF")
         default:           return .secondary
         }
     }
@@ -496,7 +530,6 @@ private struct AddCardSheet: View {
         switch detectedBrand {
         case "visa":       return LinearGradient(colors: [Color(hex: "#1A1F71"), Color(hex: "#2B35AF")], startPoint: .topLeading, endPoint: .bottomTrailing)
         case "mastercard": return LinearGradient(colors: [Color(hex: "#1D2434"), Color(hex: "#3D1C1C")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case "amex":       return LinearGradient(colors: [Color(hex: "#006FCF"), Color(hex: "#004A8F")], startPoint: .topLeading, endPoint: .bottomTrailing)
         default:           return LinearGradient(colors: [Color(hex: "#1C1C1E"), Color(hex: "#2C2C2E")], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
@@ -521,6 +554,7 @@ private struct AddCardSheet: View {
             let pmId = try await createStripePaymentMethod()
             try await vm.saveMethod(stripePaymentMethodId: pmId, setAsDefault: setAsDefault)
             dismiss()
+            onDismissed?()
         } catch {
             errorMsg = AppError(from: error).errorDescription ?? "No se pudo guardar la tarjeta"
         }

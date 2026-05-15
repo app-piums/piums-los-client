@@ -191,7 +191,8 @@ final class PaymentCheckoutViewModel {
                     amount:       amountStr,
                     auth:         params.auth,
                     currency:     params.currency,
-                    orderHash:    params.orderHash
+                    orderHash:    params.orderHash,
+                    cardHash:     params.cardHash
                 )
             )
         } catch {}
