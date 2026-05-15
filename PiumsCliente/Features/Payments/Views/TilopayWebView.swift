@@ -13,7 +13,8 @@ struct TilopayCallbackParams {
     let currency: String?
     let orderHash: String?
 
-    var isApproved: Bool { responseCode == "00" }
+    // Tilopay uses "1" in the redirect URL for approval; "00" in server-side webhooks
+    var isApproved: Bool { responseCode == "00" || responseCode == "1" }
 }
 
 // MARK: - WKWebView wrapper
@@ -60,6 +61,10 @@ struct TilopayWebView: UIViewRepresentable {
             let params = comps.queryItems?.reduce(into: [String: String]()) { acc, item in
                 if let v = item.value { acc[item.name] = v }
             } ?? [:]
+            #if DEBUG
+            print("[Tilopay] redirect interceptado: \(url.absoluteString)")
+            print("[Tilopay] params: \(params)")
+            #endif
 
             // bookingId: último segmento no vacío del path
             let bookingId = comps.path
@@ -67,13 +72,13 @@ struct TilopayWebView: UIViewRepresentable {
                 .last(where: { !$0.isEmpty }) ?? ""
 
             let result = TilopayCallbackParams(
-                bookingId: bookingId,
+                bookingId:    bookingId,
                 responseCode: params["responseCode"] ?? params["code"] ?? "",
-                orderNumber:  params["orderNumber"]  ?? params["tpt"]  ?? "",
-                amount:       params["amount"]        ?? "",
+                orderNumber:  params["orderNumber"]  ?? params["tpt"] ?? params["tilopay-transaction"] ?? "",
+                amount:       params["amount"] ?? "",
                 auth:         params["auth"],
                 currency:     params["currency"],
-                orderHash:    params["orderHash"]
+                orderHash:    params["orderHash"] ?? params["OrderHash"]
             )
 
             decisionHandler(.cancel)

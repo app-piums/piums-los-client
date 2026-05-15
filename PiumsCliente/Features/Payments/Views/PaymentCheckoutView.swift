@@ -99,23 +99,54 @@ final class PaymentCheckoutViewModel {
 
     func handleCallback(_ params: TilopayCallbackParams) {
         showWebView = false
+        #if DEBUG
+        print("[Tilopay] callback: responseCode='\(params.responseCode)' orderNumber='\(params.orderNumber)' amount='\(params.amount)'")
+        #endif
         if params.isApproved {
             phase = .processing
             Task { await confirmAndPoll(params: params) }
         } else {
-            phase = .declined
+            // responseCode no es "00" (o está vacío).
+            // Tilopay puede haber enviado el webhook server-side antes de redirigir
+            // al cliente → verificar el estado real en backend antes de declinar.
+            phase = .processing
+            Task { await checkThenDecline(bookingId: params.bookingId, params: params) }
         }
+    }
+
+    // Verifica brevemente si el pago fue confirmado por webhook antes de declinar.
+    private func checkThenDecline(bookingId: String, params: TilopayCallbackParams) async {
+        pollingMessage = "Verificando tu pago..."
+        // Breve espera para que el webhook de Tilopay alcance al backend
+        try? await Task.sleep(for: .seconds(3))
+        do {
+            let booking: Booking = try await APIClient.request(.getBooking(id: bookingId))
+            let paid = booking.paymentStatus == .anticipoPaid
+                    || booking.paymentStatus == .fullyPaid
+                    || booking.paymentStatus == .completed
+            if paid {
+                confirmedBooking = booking
+                phase = .confirmed
+                return
+            }
+        } catch {}
+        // Pago genuinamente no procesado
+        phase = .declined
     }
 
     private func confirmAndPoll(params: TilopayCallbackParams) async {
         // Confirmar en el backend (no bloquea aunque falle)
+        // Tilopay no incluye amount en el redirect URL; usamos amountToPay como fallback
+        let amountStr = params.amount.isEmpty
+            ? String(format: "%.2f", Double(amountToPay) / 100.0)
+            : params.amount
         do {
             let _: TilopayConfirmResponse = try await APIClient.request(
                 .confirmTilopayRedirect(
                     bookingId:    params.bookingId,
                     responseCode: params.responseCode,
                     orderNumber:  params.orderNumber,
-                    amount:       params.amount,
+                    amount:       amountStr,
                     auth:         params.auth,
                     currency:     params.currency,
                     orderHash:    params.orderHash
