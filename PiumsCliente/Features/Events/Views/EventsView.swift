@@ -875,7 +875,7 @@ final class ExistingBookingsViewModel {
         
         do {
             // Cargar todas las reservas del usuario
-            let res: BookingsResponse = try await APIClient.request(.listMyBookings(status: nil, page: 1))
+            let res: BookingsResponse = try await APIClient.request(.listMyBookings(status: nil, paymentStatus: nil, page: 1))
             
             // Filtrar solo las que no están vinculadas a eventos
             availableBookings = res.allBookings.filter { booking in

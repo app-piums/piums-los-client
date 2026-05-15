@@ -109,8 +109,19 @@ final class MyBookingsViewModel {
         errorMessage = nil
         defer { isLoading = false }
         do {
+            // .paymentPending filtra por paymentStatus=PENDING para capturar
+            // reservas en cualquier BookingStatus que aún no han pagado.
+            let statusParam: String?
+            let paymentStatusParam: String?
+            if selectedStatus == .paymentPending {
+                statusParam = nil
+                paymentStatusParam = "PENDING"
+            } else {
+                statusParam = selectedStatus?.rawValue
+                paymentStatusParam = nil
+            }
             let res: BookingsResponse = try await APIClient.request(
-                .listMyBookings(status: selectedStatus?.rawValue, page: currentPage)
+                .listMyBookings(status: statusParam, paymentStatus: paymentStatusParam, page: currentPage)
             )
             print("📋 Bookings cargadas: \(res.allBookings.count) — bookings:\(res.bookings?.count ?? -1) data:\(res.data?.count ?? -1) items:\(res.items?.count ?? -1)")
             let newBookings = res.allBookings

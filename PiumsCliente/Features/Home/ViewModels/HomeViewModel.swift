@@ -74,7 +74,7 @@ final class HomeViewModel {
     private func loadUpcomingBookings() async {
         do {
             let res: BookingsResponse = try await APIClient.request(
-                .listMyBookings(status: BookingStatus.confirmed.rawValue, page: 1)
+                .listMyBookings(status: BookingStatus.confirmed.rawValue, paymentStatus: nil, page: 1)
             )
             upcomingBookingDates = Set(res.allBookings.map { $0.scheduledDate })
             // Próxima reserva = la más cercana en el futuro

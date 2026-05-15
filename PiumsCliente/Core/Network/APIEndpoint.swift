@@ -31,7 +31,7 @@ enum APIEndpoint {
 
     // ── Bookings ──────────────────────────────────────────
     case createBooking(payload: [String: Any])
-    case listMyBookings(status: String?, page: Int)
+    case listMyBookings(status: String?, paymentStatus: String?, page: Int)
     case getBooking(id: String)
     case cancelBooking(id: String)
     case rescheduleBooking(id: String, payload: [String: Any])
@@ -282,9 +282,10 @@ extension APIEndpoint {
 
         // Bookings
         case .createBooking:                   return "/api/bookings"
-        case .listMyBookings(let s, let pg):
+        case .listMyBookings(let s, let ps, let pg):
             var p = "/api/bookings?page=\(pg)&limit=20"
-            if let s = s { p += "&status=\(s)" }
+            if let s  = s  { p += "&status=\(s)" }
+            if let ps = ps { p += "&paymentStatus=\(ps)" }
             return p
         case .getBooking(let id):              return "/api/bookings/\(id)"
         case .cancelBooking(let id):            return "/api/bookings/\(id)/cancel"

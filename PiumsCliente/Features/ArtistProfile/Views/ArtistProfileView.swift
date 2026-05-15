@@ -600,7 +600,7 @@ private struct WriteReviewSheet: View {
     private func loadCompletedBookings() async {
         isLoadingBookings = true
         do {
-            let res: BookingsResponse = try await APIClient.request(.listMyBookings(status: "COMPLETED", page: 1))
+            let res: BookingsResponse = try await APIClient.request(.listMyBookings(status: "COMPLETED", paymentStatus: nil, page: 1))
             completedBookings = res.allBookings.filter { $0.artistId == artistId }
             selectedBookingId = completedBookings.first?.id
         } catch {
