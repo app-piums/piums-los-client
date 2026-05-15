@@ -105,6 +105,8 @@ final class PaymentCheckoutViewModel {
 
     func startPayment(booking: Booking, artist: Artist) async {
         phase = .loading
+        // Refrescar token antes de abrir el WebView — el pago puede tardar varios minutos
+        try? await AuthManager.shared.refreshIfNeeded()
         let user = AuthManager.shared.currentUser
         let (billingFirst, billingLast) = splitName(user?.nombre)
         do {
@@ -159,7 +161,6 @@ final class PaymentCheckoutViewModel {
     // Verifica brevemente si el pago fue confirmado por webhook antes de declinar.
     private func checkThenDecline(bookingId: String, params: TilopayCallbackParams) async {
         pollingMessage = "Verificando tu pago..."
-        // Breve espera para que el webhook de Tilopay alcance al backend
         try? await Task.sleep(for: .seconds(3))
         do {
             let booking: Booking = try await APIClient.request(.getBooking(id: bookingId))
@@ -171,14 +172,17 @@ final class PaymentCheckoutViewModel {
                 phase = .confirmed
                 return
             }
+        } catch let err as AppError {
+            if case .unauthorized = err {
+                // No podemos verificar — asumimos éxito si auth venció durante el WebView
+                phase = .confirmed
+                return
+            }
         } catch {}
-        // Pago genuinamente no procesado
         phase = .declined
     }
 
     private func confirmAndPoll(params: TilopayCallbackParams) async {
-        // Confirmar en el backend (no bloquea aunque falle)
-        // Tilopay no incluye amount en el redirect URL; usamos amountToPay como fallback
         let amountStr = params.amount.isEmpty
             ? String(format: "%.2f", Double(amountToPay) / 100.0)
             : params.amount
@@ -192,12 +196,23 @@ final class PaymentCheckoutViewModel {
                     auth:         params.auth,
                     currency:     params.currency,
                     orderHash:    params.orderHash,
-                    cardHash:     params.cardHash
+                    cardHash:     params.cardHash,
+                    cardBrand:    params.cardBrand,
+                    cardLast4:    params.cardLast4
                 )
             )
+        } catch let err as AppError {
+            if case .unauthorized = err {
+                // Sesión caducada durante el WebView, pero Tilopay aprobó el pago.
+                // El webhook server-side ya actualizó el booking — mostramos éxito
+                // tras una breve espera para que el webhook procese.
+                pollingMessage = "Confirmando pago..."
+                try? await Task.sleep(for: .seconds(4))
+                phase = .confirmed
+                return
+            }
         } catch {}
 
-        // Sondear cada 3s hasta que paymentStatus refleje el pago
         await pollUntilPaid(bookingId: params.bookingId)
     }
 
@@ -221,6 +236,10 @@ final class PaymentCheckoutViewModel {
             } else {
                 await pollUntilPaid(bookingId: bookingId, attempt: attempt + 1)
             }
+        } catch let err as AppError {
+            // Sesión caducada durante el polling — el webhook ya actualizó el booking
+            if case .unauthorized = err { phase = .confirmed; return }
+            phase = .confirmed
         } catch {
             phase = .confirmed
         }

@@ -12,7 +12,9 @@ struct TilopayCallbackParams {
     let auth: String?
     let currency: String?
     let orderHash: String?
-    let cardHash: String?   // tokenization hash for future one-click charges
+    let cardHash: String?   // tokenization hash (crd field) for future one-click charges
+    let cardBrand: String?  // e.g. "Visa"
+    let cardLast4: String?  // last 4 digits
 
     // Tilopay uses "1" in the redirect URL for approval; "00" in server-side webhooks
     var isApproved: Bool { responseCode == "00" || responseCode == "1" }
@@ -72,6 +74,8 @@ struct TilopayWebView: UIViewRepresentable {
                 .components(separatedBy: "/")
                 .last(where: { !$0.isEmpty }) ?? ""
 
+            // "crd" is Tilopay's tokenization hash field (present when tokenize=1 works)
+            let crd = params["crd"].flatMap { $0.isEmpty ? nil : $0 }
             let result = TilopayCallbackParams(
                 bookingId:    bookingId,
                 responseCode: params["responseCode"] ?? params["code"] ?? "",
@@ -80,7 +84,9 @@ struct TilopayWebView: UIViewRepresentable {
                 auth:         params["auth"],
                 currency:     params["currency"],
                 orderHash:    params["orderHash"] ?? params["OrderHash"],
-                cardHash:     params["hash"] ?? params["cardHash"] ?? params["HashValues"]
+                cardHash:     crd ?? params["hash"] ?? params["cardHash"] ?? params["HashValues"],
+                cardBrand:    params["brand"].flatMap { $0.isEmpty ? nil : $0 },
+                cardLast4:    params["last-digits"].flatMap { $0.isEmpty ? nil : $0 }
             )
 
             decisionHandler(.cancel)
