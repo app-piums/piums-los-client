@@ -230,7 +230,7 @@ struct WalletView: View {
 
             VStack(spacing: 8) {
                 Text("Sin tarjetas guardadas").font(.title3.bold()).padding(.top, 28)
-                Text("Tu tarjeta se guardará automáticamente al completar tu primer pago.")
+                Text("Aquí verás tus tarjetas guardadas para realizar pagos rápidos.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -252,8 +252,8 @@ struct WalletView: View {
                     title: "Pagos seguros",
                     subtitle: "Aceptamos Visa y Mastercard. Tus datos son procesados por Tilopay de forma segura y encriptada.")
             InfoRow(icon: "bolt.circle.fill", color: Color.piumsOrange,
-                    title: "Pago con un toque",
-                    subtitle: "Al completar tu primer pago tu tarjeta queda guardada para futuros cobros sin tener que ingresarla de nuevo.")
+                    title: "Pagos rápidos",
+                    subtitle: "Administra tus métodos de pago para realizar reservas de forma segura con Tilopay.")
             InfoRow(icon: "star.circle.fill", color: .blue,
                     title: "Tarjeta principal",
                     subtitle: "Toca cualquier tarjeta en el carrusel o usa «Predeterminar» para cambiar cuál se usa primero.")
@@ -288,10 +288,10 @@ private struct HowToAddCardSheet: View {
                     .padding(.top, 32)
 
                     VStack(spacing: 8) {
-                        Text("¿Cómo agregar una tarjeta?")
+                        Text("¿Cómo pagar con tarjeta?")
                             .font(.title3.bold())
                             .multilineTextAlignment(.center)
-                        Text("Las tarjetas se guardan automáticamente al completar tu primer pago.")
+                        Text("Paga de forma segura a través de Tilopay con tu tarjeta Visa o Mastercard.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -308,8 +308,8 @@ private struct HowToAddCardSheet: View {
                                 subtitle: "Ingresa los datos de tu tarjeta Visa o Mastercard en el formulario seguro de Tilopay.")
                         Divider().padding(.leading, 56)
                         StepRow(number: "3", icon: "checkmark.seal.fill",
-                                title: "Tarjeta guardada",
-                                subtitle: "Tu tarjeta queda guardada para futuros pagos con un solo toque.")
+                                title: "Pago confirmado",
+                                subtitle: "Recibirás confirmación de tu reserva una vez procesado el pago.")
                     }
                     .background(Color(.tertiarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 16))
