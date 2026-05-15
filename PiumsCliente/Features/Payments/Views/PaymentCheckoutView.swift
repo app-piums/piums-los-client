@@ -56,7 +56,7 @@ final class PaymentCheckoutViewModel {
     // MARK: - Setup
 
     func setup(booking: Booking, overrideAmount: Int? = nil) {
-        currency    = booking.currency ?? "USD"
+        currency    = "USD"
         if let override = overrideAmount {
             amountToPay = override
         } else {

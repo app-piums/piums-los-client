@@ -113,7 +113,7 @@ struct WalletView: View {
             }
         }
         .sheet(isPresented: $showAddCard) {
-            AddCardSheet(vm: vm) { showAddCard = false }
+            HowToAddCardSheet()
         }
         .alert("Eliminar tarjeta", isPresented: Binding(
             get: { confirmDelete != nil },
@@ -267,350 +267,103 @@ struct WalletView: View {
     }
 }
 
-// MARK: - Add Card Sheet
+// MARK: - How To Add Card Sheet
 
-private struct AddCardSheet: View {
-    let vm: WalletViewModel
-    var onDismissed: (() -> Void)? = nil
+private struct HowToAddCardSheet: View {
     @Environment(\.dismiss) private var dismiss
-
-    @State private var cardNumber = ""
-    @State private var expiry = ""
-    @State private var cvc = ""
-    @State private var cardholderName = ""
-    @State private var setAsDefault = true
-    @State private var isLoading = false
-    @State private var errorMsg: String?
-
-    private var formattedNumber: String {
-        var result = ""
-        for (i, ch) in cardNumber.filter(\.isNumber).prefix(16).enumerated() {
-            if i > 0 && i % 4 == 0 { result += " " }
-            result.append(ch)
-        }
-        return result
-    }
-
-    private var isValidBrand: Bool {
-        detectedBrand == "visa" || detectedBrand == "mastercard"
-    }
-
-    private var isValid: Bool {
-        let digits = cardNumber.filter(\.isNumber)
-        let expParts = expiry.split(separator: "/")
-        return isValidBrand
-            && digits.count >= 16 && expParts.count == 2
-            && (expParts[0].count == 2) && (expParts[1].count == 2 || expParts[1].count == 4)
-            && cvc.count >= 3 && !cardholderName.trimmingCharacters(in: .whitespaces).isEmpty
-    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Live card preview
-                    cardPreview
-                        .padding(.top, 8)
-
-                    // Form
-                    VStack(spacing: 0) {
-                        TextField("Nombre en la tarjeta", text: $cardholderName,
-                                  prompt: Text("JUAN PÉREZ").foregroundStyle(Color(.placeholderText)))
-                            .textInputAutocapitalization(.characters)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                        Divider().padding(.leading, 16)
-
-                        HStack(spacing: 0) {
-                            TextField("Número de tarjeta", text: Binding(
-                                get: { formattedNumber },
-                                set: { raw in
-                                    let digits = raw.filter(\.isNumber)
-                                    cardNumber = String(digits.prefix(16))
-                                }
-                            ))
-                            .keyboardType(.numberPad)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .frame(maxWidth: .infinity)
-
-                            // Brand hint or unsupported warning
-                            if !cardNumber.isEmpty {
-                                if detectedBrand == "unknown" || (!isValidBrand && !cardNumber.filter(\.isNumber).isEmpty) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.title3)
-                                        .foregroundStyle(.orange)
-                                        .padding(.trailing, 16)
-                                        .transition(.scale.combined(with: .opacity))
-                                        .animation(.spring(duration: 0.25), value: detectedBrand)
-                                } else {
-                                    Image(systemName: brandIcon)
-                                        .font(.title3)
-                                        .foregroundStyle(brandColor)
-                                        .padding(.trailing, 16)
-                                        .transition(.scale.combined(with: .opacity))
-                                        .animation(.spring(duration: 0.25), value: detectedBrand)
-                                }
-                            }
-                        }
-
-                        Divider().padding(.leading, 16)
-
-                        HStack(spacing: 0) {
-                            TextField("MM/AA", text: $expiry)
-                                .keyboardType(.numberPad)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .frame(maxWidth: .infinity)
-                                .onChange(of: expiry) { _, new in expiry = formatExpiry(new) }
-
-                            Rectangle().fill(Color(.separator)).frame(width: 1, height: 44)
-
-                            TextField("CVC", text: $cvc)
-                                .keyboardType(.numberPad)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .frame(maxWidth: .infinity)
-                                .onChange(of: cvc) { _, new in cvc = String(new.filter(\.isNumber).prefix(4)) }
-                        }
+                VStack(spacing: 24) {
+                    // Ilustración
+                    ZStack {
+                        Circle()
+                            .fill(Color.piumsOrange.opacity(0.10))
+                            .frame(width: 100, height: 100)
+                        Image(systemName: "creditcard.and.123")
+                            .font(.system(size: 44))
+                            .foregroundStyle(Color.piumsOrange)
                     }
-                    .background(Color(.tertiarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.top, 32)
 
-                    // Default toggle
-                    Toggle(isOn: $setAsDefault) {
-                        Label("Establecer como tarjeta principal", systemImage: "star.fill")
-                            .font(.subheadline)
-                    }
-                    .tint(Color.piumsOrange)
-                    .padding(16)
-                    .background(Color(.tertiarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-
-                    // Error
-                    if let err = errorMsg {
-                        Text(err)
-                            .font(.caption).foregroundStyle(.red)
+                    VStack(spacing: 8) {
+                        Text("¿Cómo agregar una tarjeta?")
+                            .font(.title3.bold())
                             .multilineTextAlignment(.center)
-                            .padding(.horizontal, 16)
+                        Text("Las tarjetas se guardan automáticamente al completar tu primer pago.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
                     }
 
-                    // Submit
-                    Button {
-                        Task { await submit() }
-                    } label: {
+                    VStack(spacing: 0) {
+                        StepRow(number: "1", icon: "calendar.badge.plus",
+                                title: "Reserva un servicio",
+                                subtitle: "Encuentra un artista y crea tu reserva.")
+                        Divider().padding(.leading, 56)
+                        StepRow(number: "2", icon: "lock.shield.fill",
+                                title: "Paga con Tilopay",
+                                subtitle: "Ingresa los datos de tu tarjeta Visa o Mastercard en el formulario seguro de Tilopay.")
+                        Divider().padding(.leading, 56)
+                        StepRow(number: "3", icon: "checkmark.seal.fill",
+                                title: "Tarjeta guardada",
+                                subtitle: "Tu tarjeta queda guardada para futuros pagos con un solo toque.")
+                    }
+                    .background(Color(.tertiarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 20)
+
+                    VStack(spacing: 10) {
                         HStack(spacing: 8) {
-                            if isLoading {
-                                ProgressView().tint(.white).scaleEffect(0.85)
-                                Text("Guardando...").font(.headline)
-                            } else {
-                                Image(systemName: "lock.fill")
-                                Text("Guardar tarjeta").font(.headline)
-                            }
+                            Image(systemName: "lock.shield.fill").foregroundStyle(.green)
+                            Text("Datos procesados de forma segura por Tilopay")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(isValid && !isLoading ? Color.piumsOrange : Color(.systemGray3))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: (isValid ? Color.piumsOrange : .clear).opacity(0.3), radius: 10, y: 4)
+                        Text("Solo se aceptan Visa y Mastercard")
+                            .font(.caption2).foregroundStyle(.tertiary)
                     }
-                    .disabled(!isValid || isLoading)
-
-                    // Brand error
-                    let digits = cardNumber.filter(\.isNumber)
-                    if !digits.isEmpty && !isValidBrand {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
-                            Text("Solo se aceptan tarjetas Visa y Mastercard")
-                                .font(.caption).foregroundStyle(.orange)
-                        }
-                    }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.shield.fill").foregroundStyle(.green).font(.caption)
-                        Text("Solo Visa y Mastercard · Procesado de forma segura")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
             }
             .scrollIndicators(.hidden)
             .background(Color(.secondarySystemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("Nueva tarjeta")
+            .navigationTitle("Agregar tarjeta")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancelar") { dismiss() }.foregroundStyle(.secondary)
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cerrar") { dismiss() }.foregroundStyle(.secondary)
                 }
             }
-        }
-    }
-
-    // MARK: - Card Preview
-
-    private var cardPreview: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(previewGradient)
-                .frame(height: 170)
-                .shadow(color: .black.opacity(0.2), radius: 14, y: 8)
-
-            Circle().fill(.white.opacity(0.06)).frame(width: 160).offset(x: 80, y: -60)
-            Circle().fill(.white.opacity(0.04)).frame(width: 120).offset(x: -60, y: 70)
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Image(systemName: brandIcon).font(.title2).foregroundStyle(.white.opacity(0.85))
-                    Spacer()
-                    if setAsDefault {
-                        Text("Principal")
-                            .font(.caption2.bold()).foregroundStyle(.white)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(.white.opacity(0.2)).clipShape(Capsule())
-                    }
-                }
-                Spacer()
-                let digits = cardNumber.filter(\.isNumber)
-                let display = digits.isEmpty ? "•••• •••• •••• ••••" :
-                    (formattedNumber + String(repeating: " ••••", count: max(0, 4 - formattedNumber.split(separator: " ").count)))
-                Text(display)
-                    .font(.system(.subheadline, design: .monospaced).bold())
-                    .foregroundStyle(.white)
-                    .padding(.bottom, 8)
-                    .animation(.none, value: display)
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("TITULAR").font(.system(size: 9).bold()).foregroundStyle(.white.opacity(0.6)).tracking(1)
-                        Text(cardholderName.isEmpty ? "NOMBRE APELLIDO" : cardholderName.uppercased())
-                            .font(.system(.caption, design: .monospaced).bold()).foregroundStyle(.white)
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("VENCE").font(.system(size: 9).bold()).foregroundStyle(.white.opacity(0.6)).tracking(1)
-                        Text(expiry.isEmpty ? "MM/AA" : expiry)
-                            .font(.system(.caption, design: .monospaced).bold()).foregroundStyle(.white)
-                    }
-                }
-            }
-            .padding(20)
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var detectedBrand: String {
-        let digits = cardNumber.filter(\.isNumber)
-        if digits.hasPrefix("4") { return "visa" }
-        if digits.hasPrefix("5") || digits.hasPrefix("2") { return "mastercard" }
-        return "unknown"
-    }
-
-    private var brandIcon: String {
-        switch detectedBrand {
-        case "visa":       return "v.circle.fill"
-        case "mastercard": return "m.circle.fill"
-        default:           return "creditcard.fill"
-        }
-    }
-
-    private var brandColor: Color {
-        switch detectedBrand {
-        case "visa":       return Color(hex: "#1A1F71")
-        case "mastercard": return Color(hex: "#EB001B")
-        default:           return .secondary
-        }
-    }
-
-    private var previewGradient: LinearGradient {
-        switch detectedBrand {
-        case "visa":       return LinearGradient(colors: [Color(hex: "#1A1F71"), Color(hex: "#2B35AF")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case "mastercard": return LinearGradient(colors: [Color(hex: "#1D2434"), Color(hex: "#3D1C1C")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        default:           return LinearGradient(colors: [Color(hex: "#1C1C1E"), Color(hex: "#2C2C2E")], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-    }
-
-    private func formatExpiry(_ raw: String) -> String {
-        var digits = raw.filter(\.isNumber)
-        if digits.count > 4 { digits = String(digits.prefix(4)) }
-        if digits.count > 2 {
-            return String(digits.prefix(2)) + "/" + String(digits.dropFirst(2))
-        }
-        return digits
-    }
-
-    // MARK: - Submit
-
-    private func submit() async {
-        errorMsg = nil
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            let pmId = try await createStripePaymentMethod()
-            try await vm.saveMethod(stripePaymentMethodId: pmId, setAsDefault: setAsDefault)
-            dismiss()
-            onDismissed?()
-        } catch {
-            errorMsg = AppError(from: error).errorDescription ?? "No se pudo guardar la tarjeta"
-        }
-    }
-
-    private func createStripePaymentMethod() async throws -> String {
-        guard let key = Bundle.main.infoDictionary?["STRIPE_PUBLISHABLE_KEY"] as? String,
-              !key.isEmpty, !key.contains("REPLACE_ME") else {
-            throw AppError.http(statusCode: 0, message: "Configuración de pagos no disponible")
-        }
-
-        let expiryParts = expiry.split(separator: "/")
-        guard expiryParts.count == 2,
-              let expMonth = Int(expiryParts[0]),
-              let expYearRaw = Int(expiryParts[1]) else {
-            throw AppError.http(statusCode: 0, message: "Fecha de expiración inválida")
-        }
-        let expYear = expYearRaw < 100 ? 2000 + expYearRaw : expYearRaw
-        let digits = cardNumber.filter(\.isNumber)
-
-        var components = URLComponents()
-        components.queryItems = [
-            URLQueryItem(name: "type", value: "card"),
-            URLQueryItem(name: "card[number]", value: String(digits)),
-            URLQueryItem(name: "card[exp_month]", value: "\(expMonth)"),
-            URLQueryItem(name: "card[exp_year]", value: "\(expYear)"),
-            URLQueryItem(name: "card[cvc]", value: cvc),
-            URLQueryItem(name: "billing_details[name]", value: cardholderName),
-        ]
-        let body = components.percentEncodedQuery?.data(using: .utf8)
-
-        var req = URLRequest(url: URL(string: "https://api.stripe.com/v1/payment_methods")!)
-        req.httpMethod = "POST"
-        req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        req.httpBody = body
-
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw AppError.network(URLError(.badServerResponse))
-        }
-
-        struct StripeError: Decodable {
-            struct Err: Decodable { let message: String }
-            let error: Err
-        }
-        struct StripePM: Decodable { let id: String }
-
-        if http.statusCode == 200 {
-            return try JSONDecoder().decode(StripePM.self, from: data).id
-        } else {
-            let msg = (try? JSONDecoder().decode(StripeError.self, from: data))?.error.message ?? "Tarjeta rechazada"
-            throw AppError.http(statusCode: http.statusCode, message: msg)
         }
     }
 }
+
+private struct StepRow: View {
+    let number: String
+    let icon: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            ZStack {
+                Circle().fill(Color.piumsOrange.opacity(0.12)).frame(width: 36, height: 36)
+                Image(systemName: icon).font(.subheadline).foregroundStyle(Color.piumsOrange)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.bold())
+                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineSpacing(2)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+}
+
+
 
 // MARK: - CardTile
 
