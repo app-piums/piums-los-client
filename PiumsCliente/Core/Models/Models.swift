@@ -580,14 +580,16 @@ private struct AnyCodingKey: CodingKey {
 struct BookingParticipant: Codable {
     let id: String?
     let name: String?
-    let nombre: String?     // el backend usa "nombre" en endpoints de usuario
+    let artistName: String?  // algunos endpoints usan "artistName"
+    let nombre: String?
     let email: String?
     let avatar: String?
     let phone: String?
     let specialties: [String]?
     let isVerified: Bool?
 
-    var resolvedName: String? { name ?? nombre }
+    // artistName > name > nombre — evita que "nombre" autogenerado gane sobre el nombre real
+    var resolvedName: String? { artistName ?? name ?? nombre }
 }
 
 // MARK: - Booking  (shape: GET /api/bookings)

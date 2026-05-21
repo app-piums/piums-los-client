@@ -19,23 +19,28 @@ struct BookingServiceInfo {
 // DTO privado para decodificar /api/artists/:id
 private struct ArtistSummaryDTO: Decodable {
     let name: String?
-    let nombre: String?     // backend puede usar "nombre" en vez de "name"
+    let artistName: String?  // algunos endpoints usan "artistName"
+    let nombre: String?
     let avatar: String?
     let specialties: [String]?
     let isVerified: Bool?
     struct Nested: Decodable {
         let name: String?
+        let artistName: String?
         let nombre: String?
         let avatar: String?
         let specialties: [String]?
         let isVerified: Bool?
-        var resolvedName: String? { name ?? nombre }
+        var resolvedName: String? { artistName ?? name ?? nombre }
     }
     // maneja: { "artist": {} }, { "data": {} }, { "user": {} }, o campos en raíz
+    // IMPORTANTE: top-level name/artistName van ANTES que los anidados para evitar
+    // que user.nombre (nombre autogenerado tipo "Cliente ···abc123") gane sobre el
+    // nombre real del artista que viene en el campo raíz.
     let artist: Nested?
     let data: Nested?
     let user: Nested?
-    var resolvedName: String?      { artist?.resolvedName ?? data?.resolvedName ?? user?.resolvedName ?? name ?? nombre }
+    var resolvedName: String?      { artistName ?? name ?? artist?.resolvedName ?? data?.resolvedName ?? user?.resolvedName ?? nombre }
     var resolvedAvatar: String?    { artist?.avatar ?? data?.avatar ?? user?.avatar ?? avatar }
     var resolvedSpecialty: String? { (artist?.specialties ?? data?.specialties ?? user?.specialties ?? specialties)?.first }
     var resolvedVerified: Bool     { artist?.isVerified ?? data?.isVerified ?? user?.isVerified ?? isVerified ?? false }
