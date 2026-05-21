@@ -1,6 +1,6 @@
 # ANDROID_CONTEXT.md — Piums Cliente Android
 > Referencia completa para replicar la app iOS en Android con Jetpack Compose.
-> Última actualización: 14 mayo 2026 (tarde)
+> Última actualización: 21 mayo 2026
 
 ---
 
@@ -756,7 +756,7 @@ POST /api/catalog/pricing/calculate
 → { totalCents, breakdown: { baseCents, travelCents } }
 ```
 
-### 5.6 Mi Espacio (3 tabs internos)
+### 5.6 Mi Espacio (5 tabs internos)
 
 **Tab Reservas**:
 - Filtro horizontal: Todas | Pendiente | Confirmada | Completada | Cancelada
@@ -780,11 +780,19 @@ POST /api/catalog/pricing/calculate
 - Cards: Información, Resumen de pago, Notas, Acciones
 - Acciones: Agregar al calendario, Compartir, Dejar reseña (si completed), Abrir queja
 
+**Tab Boletos**:
+- `GET /api/ticket-purchases/my` → lista separada en "Próximos" y "Pasados/Cancelados"
+- Al tocar un boleto → sheet con código QR generado del campo `code` (usar `ZXing` o `ML Kit Barcode`)
+- Flujo de compra: grid de eventos → detalle → selección de tier → sheet con datos del comprador → WebView Tilopay → polling de estado
+
 **Tab Eventos**:
 - CRUD: `GET/POST/PATCH/DELETE /api/events`
 - Vincular reservas existentes: `POST /api/events/{eventId}/bookings/{bookingId}`
 - Mostrar total del evento = suma de reservas
 - Campo ubicación en EventForm abre sheet con LocationSearchField (ver §5.9)
+
+**Tab Cupones**:
+- Sección de cupones del cliente (si aplica — deep link desde push COUPON_SENT / COUPON_EXPIRING)
 
 **Tab Favoritos**:
 - `GET /api/users/me/favorites?entityType=ARTIST`
@@ -1538,6 +1546,128 @@ enum class SpecialtyOption(val raw: String, val displayName: String, val icon: S
     PAYASO("PAYASO", "Payaso", "party.popper"),
     MAESTRO_CEREMONIA("MAESTRO_CEREMONIA", "Maestro de Ceremonia", "mic")
 }
+
+// ── NUEVAS FEATURES MAYO 2026 ─────────────────────────────────────────────────
+
+// data/models/Ticket.kt
+data class TicketEvent(
+    val id: String,
+    val code: String,
+    val artistId: String,
+    val name: String,
+    val description: String?,
+    val venue: String,
+    val address: String,
+    val locationLat: Double?,
+    val locationLng: Double?,
+    val eventDate: String,        // ISO 8601
+    val doorsOpen: String?,
+    val imageUrl: String?,
+    val maxCapacity: Int,
+    val status: String,           // "BORRADOR"|"PUBLICADO"|"AGOTADO"|"CANCELADO"|"FINALIZADO"
+    val tiers: List<TicketTier>,
+    val createdAt: String
+) {
+    val isPublished: Boolean get() = status == "PUBLICADO"
+    val isSoldOut: Boolean  get() = status == "AGOTADO"
+    val minPriceCents: Int  get() = tiers.minOfOrNull { it.priceCents } ?: 0
+}
+
+data class TicketTier(
+    val id: String,
+    val ticketEventId: String,
+    val name: String,
+    val description: String?,
+    val priceCents: Int,
+    val currency: String,
+    val totalQty: Int,
+    val soldQty: Int
+) {
+    val available: Int  get() = totalQty - soldQty
+    val isSoldOut: Boolean get() = available <= 0
+    val formattedPrice: String get() = priceCents.piumsFormatted()
+}
+
+data class TicketPurchase(
+    val id: String,
+    val code: String,             // código QR
+    val ticketEventId: String,
+    val tierId: String,
+    val buyerId: String,
+    val buyerEmail: String,
+    val buyerName: String,
+    val quantity: Int,
+    val subtotalCents: Int,
+    val discountCents: Int,
+    val totalCents: Int,
+    val currency: String,
+    val couponCode: String?,
+    val status: String,           // "PENDIENTE"|"PAGADO"|"USADO"|"REEMBOLSADO"|"EXPIRADO"
+    val paidAt: String?,
+    val checkedInAt: String?,
+    val ticketEvent: TicketEvent?,
+    val tier: TicketTier?,
+    val createdAt: String
+) {
+    val isPaid: Boolean get() = status == "PAGADO"
+    val isUpcoming: Boolean get() {
+        val d = ticketEvent?.eventDate ?: return false
+        return runCatching {
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).parse(d)
+        }.getOrNull()?.after(java.util.Date()) == true
+    }
+}
+
+// Respuestas wrapper — el backend puede devolver eventos/compras en "events"/"data" o "purchases"/"data"
+data class TicketEventsResponse(val events: List<TicketEvent>?, val data: List<TicketEvent>?, val pagination: SearchPagination?) {
+    val all: List<TicketEvent> get() = events ?: data ?: emptyList()
+}
+data class TicketPurchasesResponse(val purchases: List<TicketPurchase>?, val data: List<TicketPurchase>?) {
+    val all: List<TicketPurchase> get() = purchases ?: data ?: emptyList()
+}
+data class TicketPurchaseCheckoutResponse(
+    val purchase: TicketPurchase?,
+    val purchaseId: String?,
+    val redirectUrl: String?         // URL de Tilopay para abrir en WebView
+)
+
+// data/models/ServiceDayOffer.kt
+data class ServiceDayOffer(
+    val id: String,
+    val serviceId: String,
+    val artistId: String,
+    val discountPercent: Int?,
+    val discountAmount: Int?,        // en centavos
+    val note: String?,
+    val isActive: Boolean,
+    val validFrom: String?,
+    val validUntil: String?,
+    val createdAt: String
+)
+data class ServiceDayOffersResponse(val offers: List<ServiceDayOffer>?, val data: List<ServiceDayOffer>?) {
+    val all: List<ServiceDayOffer> get() = offers ?: data ?: emptyList()
+}
+
+// data/models/BookingCollaborator.kt
+data class BookingCollaborator(
+    val id: String,
+    val bookingId: String,
+    val artistId: String,
+    val invitedBy: String,
+    val role: String?,
+    val status: String,             // "INVITED"|"ACCEPTED"|"REJECTED"|"CANCELLED"
+    val notes: String?,
+    val invitedAt: String,
+    val respondedAt: String?,
+    // Enriched
+    val artistName: String?,
+    val artistAvatar: String?
+) {
+    val isAccepted: Boolean get() = status == "ACCEPTED"
+}
+data class CollaboratorsResponse(val collaborators: List<BookingCollaborator>?, val data: List<BookingCollaborator>?) {
+    val all: List<BookingCollaborator> get() = collaborators ?: data ?: emptyList()
+}
 ```
 
 ---
@@ -1677,10 +1807,123 @@ POST /api/notifications/read   [auth] body: {notificationIds: ["id1", "id2"]}
 POST /api/notifications/push-token  [auth] body: {token, platform: "android"}
 ```
 
-**Payload FCM data para NEW_MESSAGE** (llega en `remoteMessage.data`):
+### Tickets y Eventos de Conciertos (NUEVO Mayo 2026)
 ```
-type          = "NEW_MESSAGE"
-conversationId = "uuid-de-la-conversacion"   // usar para deep link directo al chat
+GET  /api/ticket-events?page=1&limit=12               → TicketEventsResponse (filtrar status PUBLICADO|AGOTADO)
+GET  /api/ticket-events/{id}                          → TicketEventWrapper { event | data }
+POST /api/ticket-events/{eventId}/purchase  [auth]
+     body: { tierId, quantity, buyerName, buyerEmail, couponCode?, returnUrl: "piums://tickets/confirmacion" }
+     → TicketPurchaseCheckoutResponse { purchase?, purchaseId?, redirectUrl? }
+GET  /api/ticket-purchases/my               [auth]    → TicketPurchasesResponse
+GET  /api/ticket-purchases/{id}             [auth]    → { purchase | data }
+```
+
+Flujo de pago ticket (equivalente Android):
+1. `POST purchase` → obtienes `redirectUrl` de Tilopay y `purchaseId`
+2. Abrir `redirectUrl` en `WebView` interceptando URLs que contengan `"piums://tickets"` o `"confirmacion"`
+3. Al interceptar → polling `GET /api/ticket-purchases/{id}` cada 3s (máx 10 intentos) hasta `status == "PAGADO"`
+
+Generar QR del campo `code` con `ZXing`:
+```kotlin
+implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
+fun generateQR(content: String, size: Int = 512): Bitmap {
+    val hints = mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M)
+    val matrix = MultiFormatWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
+    return BarcodeEncoder().createBitmap(matrix)
+}
+```
+
+### Ofertas del Día (Day Offers) (NUEVO Mayo 2026)
+```
+GET /api/catalog/services/{serviceId}/day-offers/public
+    → ServiceDayOffersResponse { offers | data }
+```
+Cargar en paralelo para todos los servicios del artista al abrir ArtistProfileScreen.
+Mostrar badge de descuento en la tarjeta del servicio si hay oferta activa hoy (`isActive == true`).
+
+### Solicitud de Cambio de Fecha (Reschedule) (NUEVO Mayo 2026)
+```
+POST /api/bookings/{id}/reschedule-request  [auth]
+     body: { proposedDate: "2026-06-15T20:00:00.000Z", reason?: "..." }
+```
+Validaciones en UI:
+- Solo reservas en estado PENDING, CONFIRMED, PAYMENT_PENDING, PAYMENT_COMPLETED
+- La fecha de la reserva debe ser futura con ≥24h de anticipación
+- DatePicker con mínimo = ahora + 24h
+
+### Colaboradores en Reserva (NUEVO Mayo 2026)
+```
+GET /api/bookings/{bookingId}/collaborators  [auth]
+    → CollaboratorsResponse { collaborators | data }
+```
+Mostrar sección "Equipo adicional" en BookingDetailScreen solo si hay colaboradores con `status == "ACCEPTED"`.
+
+### Google Calendar (NUEVO Mayo 2026)
+```
+GET  /api/auth/google-calendar/status       [auth]
+     → { connected: Boolean, email?: String, calendarEmail?: String }
+POST /api/auth/google-calendar/disconnect   [auth]
+Conectar: abrir en CustomTab/WebView:
+     https://backend.piums.io/api/auth/google/calendar-connect?token={JWT}
+     Callback: piums://profile/personal?calendarConnected=true
+```
+
+Implementación Android (Custom Tab + intercept del deep link):
+```kotlin
+// En ProfileScreen — fila Google Calendar
+fun connectGoogleCalendar(context: Context, token: String) {
+    val url = "https://backend.piums.io/api/auth/google/calendar-connect?token=$token"
+    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+    // El callback piums://profile/personal?calendarConnected=true
+    // se intercepta en MainActivity.onNewIntent (mismo mecanismo que social auth)
+}
+
+// MainActivity.kt — agregar al intent-filter existente de piums://
+// host: "profile", pathPrefix: "/personal"
+// Al recibir calendarConnected=true → refrescar estado del calendario
+```
+
+**Tipos de notificaciones y deep links** (llegan en `remoteMessage.data`):
+
+| `type` | Payload adicional | Acción |
+|--------|-------------------|--------|
+| `NEW_MESSAGE` | `conversationId` | Navegar al chat |
+| `BOOKING_CONFIRMED` | `bookingId` | Navegar a BookingDetail |
+| `PAYMENT_COMPLETED` | `bookingId` | Navegar a BookingDetail |
+| `RESCHEDULE_REQUEST` | `bookingId` | Navegar a BookingDetail |
+| `DISPUTE_OPENED` | `disputeId` (+ `bookingId`) | Navegar a DisputeDetail **priorizar `disputeId`** |
+| `DISPUTE_RESOLVED` | `disputeId` | Navegar a DisputeDetail |
+| `DISPUTE_MESSAGE` | `disputeId` | Navegar a DisputeDetail |
+| `COUPON_SENT` | — | Navegar a tab Cupones (Mi Espacio) |
+| `COUPON_EXPIRING` | — | Navegar a tab Cupones (Mi Espacio) |
+| `DISCOUNT` | — | Navegar a tab Cupones (Mi Espacio) |
+| `DELIVERY_PROBLEM_REPORTED` | `bookingId` | Navegar a BookingDetail |
+
+**CRÍTICO — Orden de dispatch al tocar push**:
+```kotlin
+// FirebaseMessagingService o en el intent handler
+fun handleNotificationTap(data: Map<String, String>) {
+    val type = data["type"]?.uppercase() ?: ""
+    val conversationId = data["conversationId"] ?: data["chatId"]
+    val disputeId = data["disputeId"]
+    val bookingId = data["bookingId"]
+
+    when {
+        conversationId != null ->
+            navigateTo(Screen.ChatDetail(conversationId))
+        type in listOf("COUPON_SENT", "COUPON_EXPIRING", "DISCOUNT") ->
+            navigateTo(Screen.MySpace(tab = "coupons"))
+        // IMPORTANTE: disputas ANTES que bookings (las disputas tienen ambos IDs)
+        (type == "DISPUTE_OPENED" || type == "DISPUTE_RESOLVED" || type == "DISPUTE_MESSAGE")
+            && disputeId != null ->
+            navigateTo(Screen.DisputeDetail(disputeId))
+        bookingId != null ->
+            navigateTo(Screen.BookingDetail(bookingId))
+        disputeId != null ->
+            navigateTo(Screen.Profile)  // fallback: abrir Perfil → Quejas
+    }
+}
 ```
 
 ---
@@ -1857,7 +2100,8 @@ app/src/main/java/com/piums/cliente/
 │       ├── search/
 │       ├── artist_profile/
 │       ├── booking/
-│       ├── my_space/               ← tabs: Reservas, Eventos, Favoritos
+│       ├── my_space/               ← tabs: Reservas, Boletos, Eventos, Cupones, Favoritos
+│       ├── tickets/                ← TicketsScreen, TicketDetailScreen, MyTicketsScreen
 │       ├── inbox/                  ← tabs: Mensajes, Quejas
 │       ├── profile/
 │       └── notifications/
@@ -2980,3 +3224,336 @@ implementation("com.google.android.gms:play-services-auth:21.1.0")
 // Custom Tabs (para Facebook/TikTok)
 implementation("androidx.browser:browser:1.8.0")
 ```
+
+---
+
+## 16. NUEVAS FEATURES MAYO 2026
+
+### 16.1 Tickets y Eventos de Conciertos
+
+**TicketsScreen** — Grid 2 columnas de `TicketEventCard`:
+```kotlin
+@Composable
+fun TicketsScreen(viewModel: TicketsViewModel = hiltViewModel()) {
+    val events by viewModel.events.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+
+    LaunchedEffect(Unit) { viewModel.loadInitial() }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(events, key = { it.id }) { event ->
+            TicketEventCard(event = event, onClick = { /* navegar a detalle */ })
+            // Cargar siguiente página al llegar al último
+            if (event == events.lastOrNull()) {
+                LaunchedEffect(Unit) { viewModel.loadNextPage() }
+            }
+        }
+        if (isLoading) item(span = { GridItemSpan(2) }) {
+            Box(Modifier.fillMaxWidth().padding(20.dp), Alignment.Center) {
+                CircularProgressIndicator(color = PiumsOrange)
+            }
+        }
+    }
+}
+```
+
+**TicketEventCard** — card con imagen hero + badge AGOTADO + precio mínimo:
+```kotlin
+@Composable
+fun TicketEventCard(event: TicketEvent, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick)
+            .alpha(if (event.isSoldOut) 0.7f else 1f)
+    ) {
+        Box(Modifier.fillMaxWidth().height(120.dp)) {
+            if (event.imageUrl != null) {
+                AsyncImage(model = event.imageUrl, contentDescription = null,
+                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            } else {
+                // Gradiente placeholder naranja → rosa
+                Box(Modifier.fillMaxSize()
+                    .background(Brush.linearGradient(listOf(PiumsOrange.copy(0.7f), Color(0xFFE91E8C).copy(0.5f)))))
+            }
+            if (event.isSoldOut) {
+                Text("AGOTADO",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                        .background(Color.Red, CircleShape).padding(horizontal = 6.dp, vertical = 3.dp))
+            }
+        }
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(event.name, style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold, maxLines = 2)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.LocationOn, null, tint = PiumsOrange, modifier = Modifier.size(12.dp))
+                Text(event.venue, style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(0.6f), maxLines = 1)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Desde", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(0.6f))
+                Text(event.minPriceCents.piumsFormatted(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold, color = PiumsOrange)
+            }
+        }
+    }
+}
+```
+
+**TicketsViewModel**:
+```kotlin
+@HiltViewModel
+class TicketsViewModel @Inject constructor(private val api: PiumsApiService) : ViewModel() {
+    private val _events = MutableStateFlow<List<TicketEvent>>(emptyList())
+    val events = _events.asStateFlow()
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading = _isLoading.asStateFlow()
+    private val _myPurchases = MutableStateFlow<List<TicketPurchase>>(emptyList())
+    val myPurchases = _myPurchases.asStateFlow()
+
+    // Estado de compra
+    private val _redirectUrl = MutableStateFlow<String?>(null)
+    val redirectUrl = _redirectUrl.asStateFlow()
+    private val _pendingPurchaseId = MutableStateFlow<String?>(null)
+    private val _purchaseCompleted = MutableStateFlow(false)
+    val purchaseCompleted = _purchaseCompleted.asStateFlow()
+    private val _purchaseError = MutableStateFlow<String?>(null)
+    val purchaseError = _purchaseError.asStateFlow()
+
+    private var currentPage = 1
+    private val pageLimit = 12
+    private var hasMore = true
+
+    fun loadInitial() { viewModelScope.launch {
+        currentPage = 1; _events.value = emptyList(); hasMore = true
+        loadNextPage()
+    }}
+
+    fun loadNextPage() { if (_isLoading.value || !hasMore) return
+        viewModelScope.launch {
+            _isLoading.value = true
+            runCatching { api.listTicketEvents(page = currentPage, limit = pageLimit) }
+                .onSuccess { res ->
+                    val new = res.all.filter { it.isPublished || it.isSoldOut }
+                    _events.value = if (currentPage == 1) new else _events.value + new
+                    hasMore = new.size == pageLimit
+                    currentPage++
+                }
+            _isLoading.value = false
+        }
+    }
+
+    fun loadMyPurchases() { viewModelScope.launch {
+        runCatching { api.myTicketPurchases() }
+            .onSuccess { _myPurchases.value = it.all.sortedByDescending { p -> p.createdAt } }
+    }}
+
+    fun purchase(event: TicketEvent, tier: TicketTier, qty: Int,
+                 buyerName: String, buyerEmail: String, couponCode: String?) {
+        viewModelScope.launch {
+            _purchaseError.value = null
+            _purchaseCompleted.value = false
+            val body = buildMap {
+                put("tierId", tier.id); put("quantity", qty)
+                put("buyerName", buyerName); put("buyerEmail", buyerEmail)
+                put("returnUrl", "piums://tickets/confirmacion")
+                couponCode?.takeIf { it.isNotBlank() }?.let { put("couponCode", it) }
+            }
+            runCatching { api.purchaseTicket(event.id, body) }
+                .onSuccess { res ->
+                    _pendingPurchaseId.value = res.purchase?.id ?: res.purchaseId
+                    _redirectUrl.value = res.redirectUrl
+                }
+                .onFailure { _purchaseError.value = it.toUserMessage() }
+        }
+    }
+
+    fun pollPurchaseStatus() { viewModelScope.launch {
+        val pid = _pendingPurchaseId.value ?: return@launch
+        repeat(10) {
+            delay(3_000)
+            runCatching { api.getTicketPurchase(pid) }.getOrNull()?.let { res ->
+                if (res.all.firstOrNull()?.isPaid == true) {
+                    _purchaseCompleted.value = true
+                    loadMyPurchases()
+                    return@launch
+                }
+            }
+        }
+    }}
+}
+```
+
+### 16.2 Ofertas del Día — Badge en tarjeta de servicio
+
+```kotlin
+// En ArtistProfileViewModel
+private val _dayOffers = MutableStateFlow<Map<String, ServiceDayOffer>>(emptyMap())
+val dayOffers = _dayOffers.asStateFlow()
+
+private suspend fun loadDayOffers(serviceIds: List<String>) {
+    val results = serviceIds.map { id ->
+        async {
+            runCatching { api.getDayOffers(id) }.getOrNull()
+                ?.all?.firstOrNull { it.isActive }
+                ?.let { id to it }
+        }
+    }.awaitAll().filterNotNull().toMap()
+    _dayOffers.value = results
+}
+
+// En ServiceCard
+val offer = dayOffers[service.id]
+if (offer != null) {
+    val label = offer.discountPercent?.let { "-${it}%" }
+        ?: offer.discountAmount?.let { "-${it.piumsFormatted()}" }
+    if (label != null) {
+        PiumsStatusBadge(text = label, color = Color(0xFF4CAF50))
+    }
+}
+```
+
+### 16.3 Solicitud de Cambio de Fecha
+
+En `BookingDetailScreen`, mostrar botón "Solicitar cambio de fecha" si la reserva es futura con >24h:
+
+```kotlin
+@Composable
+fun ModifyDateSection(booking: Booking, onSubmit: (String, String?) -> Unit) {
+    var showSheet by remember { mutableStateOf(false) }
+    val canReschedule = booking.status in listOf(
+        BookingStatus.PENDING, BookingStatus.CONFIRMED,
+        BookingStatus.PAYMENT_PENDING, BookingStatus.PAYMENT_COMPLETED
+    ) // y fecha futura con >24h
+
+    if (canReschedule) {
+        OutlinedButton(onClick = { showSheet = true }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.CalendarMonth, null)
+            Spacer(Modifier.width(8.dp))
+            Text("Solicitar cambio de fecha")
+        }
+    }
+
+    if (showSheet) ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+        RescheduleDatePicker(
+            currentDate = booking.scheduledDate,
+            onConfirm = { newDate, reason ->
+                onSubmit(newDate, reason)
+                showSheet = false
+            }
+        )
+    }
+}
+```
+
+Body del POST: `{ proposedDate: "ISO8601", reason: "..." }`
+
+### 16.4 Disputas — Sección "Equipo adicional" en BookingDetail
+
+```kotlin
+// Cargar colaboradores junto con el detalle de la reserva
+val collaborators by viewModel.collaborators.collectAsState()
+val accepted = collaborators.filter { it.isAccepted }
+
+if (accepted.isNotEmpty()) {
+    Text("Equipo adicional", style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold)
+    accepted.forEach { collab ->
+        ListItem(
+            leadingContent = {
+                AsyncImage(model = collab.artistAvatar, contentDescription = null,
+                    modifier = Modifier.size(40.dp).clip(CircleShape))
+            },
+            headlineContent = {
+                Text(collab.artistName ?: "Colaborador", fontWeight = FontWeight.SemiBold)
+            },
+            supportingContent = collab.role?.let { { Text(it) } }
+        )
+    }
+}
+```
+
+### 16.5 Google Calendar — Perfil
+
+```kotlin
+// En ProfileViewModel
+data class GoogleCalendarState(
+    val isConnected: Boolean = false,
+    val email: String? = null
+)
+private val _calendarState = MutableStateFlow(GoogleCalendarState())
+val calendarState = _calendarState.asStateFlow()
+
+fun loadCalendarStatus() { viewModelScope.launch {
+    runCatching { api.googleCalendarStatus() }
+        .onSuccess { res ->
+            _calendarState.value = GoogleCalendarState(
+                isConnected = res.connected,
+                email = res.email ?: res.calendarEmail
+            )
+        }
+}}
+
+fun disconnectCalendar() { viewModelScope.launch {
+    runCatching { api.googleCalendarDisconnect() }
+        .onSuccess { _calendarState.value = GoogleCalendarState() }
+}}
+```
+
+```kotlin
+// En ProfileScreen — fila Google Calendar
+val calState by viewModel.calendarState.collectAsState()
+
+ListItem(
+    leadingContent = { Icon(Icons.Default.CalendarToday, null, tint = PiumsOrange) },
+    headlineContent = { Text("Google Calendar") },
+    supportingContent = {
+        Text(if (calState.isConnected) calState.email ?: "Conectado" else "No conectado")
+    },
+    trailingContent = {
+        if (calState.isConnected) {
+            TextButton(onClick = { viewModel.disconnectCalendar() }) { Text("Desconectar") }
+        } else {
+            TextButton(onClick = { connectGoogleCalendar(context, token) }) { Text("Conectar") }
+        }
+    }
+)
+```
+
+### 16.6 Dependencias adicionales (nuevas features)
+
+```kotlin
+// build.gradle.kts
+// QR Code para boletos
+implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+```
+
+### 16.7 Checklist de nuevas features
+
+- [ ] `TicketEvent`, `TicketTier`, `TicketPurchase` en modelos
+- [ ] `ServiceDayOffer`, `BookingCollaborator` en modelos
+- [ ] Endpoints de tickets en `PiumsApiService`
+- [ ] `TicketsViewModel` con paginación, compra y polling
+- [ ] `TicketsScreen` (grid de eventos)
+- [ ] `TicketDetailScreen` (hero + tiers + selector de cantidad + sheet de compra)
+- [ ] `MyTicketsScreen` (Próximos / Pasados + sheet QR)
+- [ ] Tab "Boletos" en MySpaceScreen
+- [ ] Badge de day offer en `ServiceCard` de ArtistProfileScreen
+- [ ] Botón "Solicitar cambio de fecha" en BookingDetailScreen
+- [ ] Sección "Equipo adicional" (colaboradores) en BookingDetailScreen
+- [ ] Fila Google Calendar en ProfileScreen
+- [ ] Endpoint `GET /api/auth/google-calendar/status` y `POST disconnect`
+- [ ] Intent filter `piums://profile/personal` para callback de Google Calendar
+- [ ] Dispatch de push notifications con disputeId ANTES de bookingId
+- [ ] Deep link a DisputeDetailScreen desde push de disputa
+- [ ] Tipos de notificación COUPON_SENT/EXPIRING/DISCOUNT → tab Cupones
