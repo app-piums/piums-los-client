@@ -2,6 +2,7 @@
 import SwiftUI
 import CoreLocation
 import AVKit
+import SafariServices
 
 struct ArtistProfileView: View {
     let artist: Artist
@@ -775,6 +776,7 @@ private struct ServiceDetailSheet: View {
 private struct PortfolioSectionView: View {
     let items: [PortfolioItem]
     @State private var selectedImage: PortfolioItem?
+    @State private var videoUrl: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -794,29 +796,46 @@ private struct PortfolioSectionView: View {
                     ForEach(items) { item in
                         PortfolioThumbnail(item: item)
                             .onTapGesture {
-                                if item.isVideo { openYouTube(item) }
-                                else { selectedImage = item }
+                                if item.isVideo {
+                                    guard let vid = item.youtubeId else { return }
+                                    videoUrl = URL(string: "https://www.youtube.com/watch?v=\(vid)")
+                                } else {
+                                    selectedImage = item
+                                }
                             }
                     }
                 }
                 .padding(.horizontal)
             }
         }
+        .sheet(isPresented: Binding(get: { videoUrl != nil }, set: { if !$0 { videoUrl = nil } })) {
+            if let url = videoUrl {
+                SafariVideoView(url: url)
+                    .ignoresSafeArea()
+            }
+        }
         .fullScreenCover(item: $selectedImage) { item in
             ImageGalleryView(item: item, items: items.filter { !$0.isVideo })
         }
     }
+}
 
-    private func openYouTube(_ item: PortfolioItem) {
-        guard let vid = item.youtubeId else { return }
-        let appURL = URL(string: "youtube://watch?v=\(vid)")!
-        let webURL = URL(string: "https://youtu.be/\(vid)")!
-        if UIApplication.shared.canOpenURL(appURL) {
-            UIApplication.shared.open(appURL)
-        } else {
-            UIApplication.shared.open(webURL)
-        }
+// SFSafariViewController dentro de la app — sin restricciones de embedding
+private struct SafariVideoView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let cfg = SFSafariViewController.Configuration()
+        cfg.entersReaderIfAvailable = false
+        cfg.barCollapsingEnabled = true
+        let vc = SFSafariViewController(url: url, configuration: cfg)
+        vc.preferredBarTintColor = UIColor.black
+        vc.preferredControlTintColor = UIColor(named: "piumsOrange") ?? .systemOrange
+        vc.dismissButtonStyle = .close
+        return vc
     }
+
+    func updateUIViewController(_ vc: SFSafariViewController, context: Context) {}
 }
 
 // Miniatura individual — imagen o video
