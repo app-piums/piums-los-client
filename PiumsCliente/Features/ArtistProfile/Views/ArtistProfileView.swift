@@ -1,6 +1,7 @@
 // ArtistProfileView.swift
 import SwiftUI
 import CoreLocation
+import AVKit
 
 struct ArtistProfileView: View {
     let artist: Artist
@@ -89,43 +90,11 @@ struct ArtistProfileView: View {
                 }
                 .padding(.vertical)
 
-                // Galería / Portfolio
+                // Portafolio
                 if !viewModel.portfolio.isEmpty {
                     Divider().padding(.horizontal)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Galería")
-                            .font(.headline)
-                            .padding(.horizontal)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(viewModel.portfolio) { item in
-                                    AsyncImage(url: URL(string: item.url)) { phase in
-                                        switch phase {
-                                        case .success(let image):
-                                            image.resizable()
-                                                .scaledToFill()
-                                                .frame(width: 140, height: 140)
-                                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        case .failure, .empty:
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(Color(.tertiarySystemGroupedBackground))
-                                                .frame(width: 140, height: 140)
-                                                .overlay(
-                                                    Image(systemName: "photo")
-                                                        .foregroundStyle(.secondary)
-                                                        .font(.title)
-                                                )
-                                        @unknown default:
-                                            EmptyView()
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    .padding(.vertical)
+                    PortfolioSectionView(items: viewModel.portfolio)
+                        .padding(.vertical)
                 }
 
                 Divider().padding(.horizontal)
@@ -797,6 +766,224 @@ private struct ServiceDetailSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+        }
+    }
+}
+
+// MARK: - Portafolio section
+
+private struct PortfolioSectionView: View {
+    let items: [PortfolioItem]
+    @State private var selected: PortfolioItem?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Portafolio")
+                    .font(.headline)
+                Text("\(items.count)")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Capsule().fill(Color.piumsOrange))
+            }
+            .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(items) { item in
+                        PortfolioThumbnail(item: item)
+                            .onTapGesture { selected = item }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .fullScreenCover(item: $selected) { item in
+            PortfolioFullscreenView(item: item, items: items)
+        }
+    }
+}
+
+// Miniatura individual — imagen o video
+private struct PortfolioThumbnail: View {
+    let item: PortfolioItem
+    private var isVideo: Bool { item.type?.lowercased() == "video" }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if isVideo {
+                VideoThumbnailView(url: URL(string: item.url))
+            } else {
+                AsyncImage(url: URL(string: item.url)) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                    default:
+                        Color(.tertiarySystemGroupedBackground)
+                            .overlay(Image(systemName: "photo").foregroundStyle(.secondary).font(.title))
+                    }
+                }
+            }
+
+            // Badge tipo
+            Image(systemName: isVideo ? "play.circle.fill" : "photo")
+                .font(.system(size: isVideo ? 18 : 12))
+                .foregroundStyle(.white)
+                .shadow(radius: 2)
+                .padding(6)
+        }
+        .frame(width: 140, height: 140)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.1)))
+    }
+}
+
+// Genera thumbnail del primer frame de un video remoto
+private struct VideoThumbnailView: View {
+    let url: URL?
+    @State private var thumbnail: UIImage?
+
+    var body: some View {
+        Group {
+            if let img = thumbnail {
+                Image(uiImage: img).resizable().scaledToFill()
+            } else {
+                Color.black.overlay(
+                    Image(systemName: "play.rectangle.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(Color.piumsOrange)
+                )
+            }
+        }
+        .task(id: url?.absoluteString) {
+            guard let url, thumbnail == nil else { return }
+            thumbnail = await generateThumbnail(url: url)
+        }
+    }
+
+    private func generateThumbnail(url: URL) async -> UIImage? {
+        let asset = AVURLAsset(url: url)
+        let gen = AVAssetImageGenerator(asset: asset)
+        gen.appliesPreferredTrackTransform = true
+        gen.maximumSize = CGSize(width: 280, height: 280)
+        return try? await withCheckedThrowingContinuation { cont in
+            gen.generateCGImageAsynchronously(for: .zero) { cgImg, _, err in
+                if let cgImg { cont.resume(returning: UIImage(cgImage: cgImg)) }
+                else { cont.resume(throwing: err ?? NSError()) }
+            }
+        }
+    }
+}
+
+// MARK: - Visor fullscreen
+
+private struct PortfolioFullscreenView: View {
+    let item: PortfolioItem
+    let items: [PortfolioItem]
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentIndex: Int
+
+    init(item: PortfolioItem, items: [PortfolioItem]) {
+        self.item = item
+        self.items = items
+        self._currentIndex = State(initialValue: items.firstIndex(where: { $0.id == item.id }) ?? 0)
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            TabView(selection: $currentIndex) {
+                ForEach(Array(items.enumerated()), id: \.1.id) { idx, it in
+                    Group {
+                        if it.type?.lowercased() == "video" {
+                            FullscreenVideoPlayer(url: URL(string: it.url))
+                        } else {
+                            FullscreenImageView(url: URL(string: it.url))
+                        }
+                    }
+                    .tag(idx)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: items.count > 1 ? .always : .never))
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+
+            // Botón cerrar
+            Button { dismiss() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(.white)
+                    .shadow(radius: 4)
+            }
+            .padding(.top, 56)
+            .padding(.trailing, 20)
+
+            // Contador
+            if items.count > 1 {
+                Text("\(currentIndex + 1) / \(items.count)")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Capsule().fill(Color.black.opacity(0.5)))
+                    .padding(.top, 60)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .statusBarHidden()
+    }
+}
+
+private struct FullscreenImageView: View {
+    let url: URL?
+    @State private var scale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let img):
+                img.resizable()
+                    .scaledToFit()
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { scale = max(1, $0) }
+                            .onEnded { _ in withAnimation { if scale < 1.2 { scale = 1; offset = .zero } } }
+                            .simultaneously(with:
+                                DragGesture()
+                                    .onChanged { offset = scale > 1 ? $0.translation : .zero }
+                                    .onEnded { _ in withAnimation { if scale <= 1 { offset = .zero } } }
+                            )
+                    )
+            default:
+                ProgressView().tint(.white)
+            }
+        }
+    }
+}
+
+private struct FullscreenVideoPlayer: View {
+    let url: URL?
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        Group {
+            if let player {
+                VideoPlayer(player: player)
+            } else {
+                ProgressView().tint(.white)
+            }
+        }
+        .onAppear {
+            guard let url else { return }
+            player = AVPlayer(url: url)
+            player?.play()
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
         }
     }
 }
