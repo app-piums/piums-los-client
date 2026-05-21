@@ -2,7 +2,7 @@
 import SwiftUI
 import CoreLocation
 import AVKit
-import WebKit
+import SafariServices
 
 struct ArtistProfileView: View {
     let artist: Artist
@@ -809,10 +809,9 @@ private struct PortfolioSectionView: View {
             }
         }
         .sheet(isPresented: Binding(get: { videoUrl != nil }, set: { if !$0 { videoUrl = nil } })) {
-            if let vid = videoUrl?.absoluteString
-                .components(separatedBy: "v=").last?
-                .components(separatedBy: "&").first {
-                YouTubeModalView(videoId: vid, onClose: { videoUrl = nil })
+            if let url = videoUrl {
+                SafariVideoView(url: url)
+                    .ignoresSafeArea()
             }
         }
         .fullScreenCover(item: $selectedImage) { item in
@@ -821,135 +820,23 @@ private struct PortfolioSectionView: View {
     }
 }
 
-// Modal limpio con WKWebView cargando m.youtube.com — sin chrome de browser,
-// sin Error 153 (carga el sitio móvil real, no el iframe embed).
-private struct YouTubeModalView: View {
-    let videoId: String
-    let onClose: () -> Void
-    @State private var isLoading = true
+// SFSafariViewController en sheet — motor completo de Safari, sin Error 153,
+// el usuario permanece dentro de la app.
+private struct SafariVideoView: UIViewControllerRepresentable {
+    let url: URL
 
-    var body: some View {
-        ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
-
-            YouTubeMobileWebView(videoId: videoId, isLoading: $isLoading)
-                .ignoresSafeArea()
-
-            // Barra superior minimalista
-            HStack {
-                Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.5), radius: 4)
-                }
-                .padding(.trailing, 16)
-                .padding(.top, 16)
-            }
-
-            if isLoading {
-                ProgressView()
-                    .tint(Color.piumsOrange)
-                    .scaleEffect(1.4)
-            }
-        }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-    }
-}
-
-private struct YouTubeMobileWebView: UIViewRepresentable {
-    let videoId: String
-    @Binding var isLoading: Bool
-
-    func makeCoordinator() -> Coordinator { Coordinator(isLoading: $isLoading) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
-        config.allowsPictureInPictureMediaPlayback = true
-
-        let wv = WKWebView(frame: .zero, configuration: config)
-        wv.navigationDelegate = context.coordinator
-        wv.backgroundColor = .black
-        wv.isOpaque = false
-        wv.scrollView.backgroundColor = .black
-        wv.scrollView.isScrollEnabled = false
-
-        // Mismo enfoque que YouTubeiOSPlayerHelper: HTML local con IFrame API JS
-        // La API de JS tiene políticas más permisivas que un embed directo
-        let html = Self.playerHTML(for: videoId)
-        // baseURL nil → YouTube trata el iframe como "mismo origen" a través de postMessage
-        wv.loadHTMLString(html, baseURL: nil)
-        return wv
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let cfg = SFSafariViewController.Configuration()
+        cfg.entersReaderIfAvailable = false
+        cfg.barCollapsingEnabled = true
+        let vc = SFSafariViewController(url: url, configuration: cfg)
+        vc.preferredBarTintColor = .black
+        vc.preferredControlTintColor = UIColor(named: "piumsOrange") ?? .systemOrange
+        vc.dismissButtonStyle = .close
+        return vc
     }
 
-    func updateUIView(_ wv: WKWebView, context: Context) {}
-
-    private static func playerHTML(for videoId: String) -> String {
-        """
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-          <style>
-            * { margin:0; padding:0; box-sizing:border-box; }
-            html, body { width:100%; height:100%; background:#000; overflow:hidden; }
-            #player { width:100%; height:100%; }
-          </style>
-        </head>
-        <body>
-          <div id="player"></div>
-          <script>
-            var tag = document.createElement('script');
-            tag.src = 'https://www.youtube.com/iframe_api';
-            document.head.appendChild(tag);
-
-            var player;
-            function onYouTubeIframeAPIReady() {
-              player = new YT.Player('player', {
-                videoId: '\(videoId)',
-                playerVars: {
-                  autoplay: 1,
-                  playsinline: 1,
-                  controls: 1,
-                  rel: 0,
-                  modestbranding: 1,
-                  fs: 1
-                },
-                events: {
-                  onReady: function(e) { e.target.playVideo(); }
-                }
-              });
-            }
-          </script>
-        </body>
-        </html>
-        """
-    }
-
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        @Binding var isLoading: Bool
-        init(isLoading: Binding<Bool>) { _isLoading = isLoading }
-
-        func webView(_ wv: WKWebView, didFinish navigation: WKNavigation!) {
-            isLoading = false
-        }
-
-        func webView(_ wv: WKWebView,
-                     decidePolicyFor action: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            guard let scheme = action.request.url?.scheme else { decisionHandler(.allow); return }
-            // Bloquea salida a app de YouTube — el player ya se maneja internamente
-            if ["youtube", "vnd.youtube"].contains(scheme) {
-                decisionHandler(.cancel)
-            } else {
-                decisionHandler(.allow)
-            }
-        }
-    }
+    func updateUIViewController(_ vc: SFSafariViewController, context: Context) {}
 }
 
 // Miniatura individual — imagen o video
