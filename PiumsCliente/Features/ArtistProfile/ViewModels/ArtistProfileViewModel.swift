@@ -71,6 +71,7 @@ private struct ArtistAvatarResponse: Decodable {
         let coverPhoto: String?
         let instagram: String?
         let website: String?
+        let certifications: [Certification]?
         var resolvedAvatar: String? { avatar ?? avatarUrl }
         var resolvedName: String?  { name ?? nombre }
         var resolvedCoverInner: String? { coverUrl ?? coverPhoto }
@@ -79,12 +80,14 @@ private struct ArtistAvatarResponse: Decodable {
     let artist: Inner?
     let data: Inner?
     let user: Inner?
+    let certifications: [Certification]?
 
     var resolved: String?     { artist?.resolvedAvatar ?? data?.resolvedAvatar ?? user?.resolvedAvatar ?? avatar ?? avatarUrl }
     var resolvedName: String? { artist?.resolvedName   ?? data?.resolvedName   ?? user?.resolvedName   ?? name ?? nombre }
     var resolvedCover: String?     { artist?.resolvedCoverInner ?? data?.resolvedCoverInner ?? user?.resolvedCoverInner ?? coverUrl ?? coverPhoto }
     var resolvedInstagram: String? { artist?.instagram  ?? data?.instagram  ?? user?.instagram  ?? instagram }
     var resolvedWebsite: String?   { artist?.website    ?? data?.website    ?? user?.website    ?? website }
+    var resolvedCertifications: [Certification] { artist?.certifications ?? data?.certifications ?? user?.certifications ?? certifications ?? [] }
 }
 
 // MARK: - ViewModel
@@ -100,6 +103,7 @@ final class ArtistProfileViewModel {
     var services: [ArtistService] = []
     var reviews: [Review] = []
     var portfolio: [PortfolioItem] = []
+    var certifications: [Certification] = []
     var dayOffers: [String: ServiceDayOffer] = [:]  // serviceId → oferta activa hoy
     var isLoadingServices = false
     var isLoadingReviews = false
@@ -131,6 +135,8 @@ final class ArtistProfileViewModel {
             if let url = dto.resolvedCover     { coverURL = url }
             if let ig  = dto.resolvedInstagram { instagram = ig }
             if let wb  = dto.resolvedWebsite   { website = wb }
+            let certs = dto.resolvedCertifications
+            if !certs.isEmpty { certifications = certs }
         } catch {}
     }
 

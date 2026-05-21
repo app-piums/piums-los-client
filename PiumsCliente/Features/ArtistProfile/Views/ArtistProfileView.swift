@@ -54,6 +54,12 @@ struct ArtistProfileView: View {
                     .padding()
                 }
 
+                // Certificaciones
+                if !viewModel.certifications.isEmpty {
+                    Divider().padding(.horizontal)
+                    CertificationsSectionView(certifications: viewModel.certifications)
+                }
+
                 Divider().padding(.horizontal)
 
                 // Servicios
@@ -194,6 +200,51 @@ struct ArtistProfileView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
         }
+    }
+}
+
+// MARK: - Certificaciones
+
+private struct CertificationsSectionView: View {
+    let certifications: [Certification]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Certificaciones")
+                .font(.headline)
+                .padding(.horizontal)
+
+            ForEach(certifications) { cert in
+                HStack(spacing: 12) {
+                    Image(systemName: "rosette")
+                        .font(.title3)
+                        .foregroundStyle(Color.piumsOrange)
+                        .frame(width: 32)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(cert.name)
+                            .font(.subheadline.bold())
+                        if let issuer = cert.issuer {
+                            HStack(spacing: 4) {
+                                Text(issuer).font(.caption).foregroundStyle(.secondary)
+                                if let year = cert.issueYear {
+                                    Text("· \(year)").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    Spacer()
+                    if let urlStr = cert.certificateUrl, let url = URL(string: urlStr) {
+                        Link(destination: url) {
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundStyle(Color.piumsOrange)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.vertical)
     }
 }
 

@@ -70,6 +70,23 @@ struct AvatarUploadUserWrapperDTO: Decodable {
     var resolvedURL: String? { user?.resolvedURL }
 }
 
+// MARK: - Certification  (shape: artist.certifications[])
+
+struct Certification: Codable, Identifiable {
+    let id: String
+    let artistId: String?
+    let name: String
+    let issuer: String?
+    let issueDate: String?
+    let expiresAt: String?
+    let certificateUrl: String?
+
+    var issueYear: String? {
+        guard let d = issueDate else { return nil }
+        return String(d.prefix(4))
+    }
+}
+
 // MARK: - Artist  (shape: GET /api/search/artists)
 
 struct Artist: Codable, Identifiable, Hashable {
@@ -100,6 +117,7 @@ struct Artist: Codable, Identifiable, Hashable {
     let coverUrl: String?
     let instagram: String?
     let website: String?
+    let certifications: [Certification]?
 
     // Computed helpers para la UI
     var artistName: String { name }
@@ -222,7 +240,7 @@ struct SmartArtist: Codable, Identifiable {
                servicesCount: servicesCount, serviceIds: serviceIds, serviceTitles: serviceTitles,
                specialties: specialties, createdAt: createdAt,
                baseLocationLat: baseLocationLat, baseLocationLng: baseLocationLng, avatar: avatar,
-               coverUrl: coverPhoto, instagram: nil, website: nil)
+               coverUrl: coverPhoto, instagram: nil, website: nil, certifications: nil)
     }
 }
 
@@ -312,7 +330,8 @@ extension Artist {
                    ?? c.decodeIfPresent(String.self, forKey: .coverImage)
                    ?? c.decodeIfPresent(String.self, forKey: .coverPhoto),
             instagram: try c.decodeIfPresent(String.self, forKey: .instagram),
-            website: try c.decodeIfPresent(String.self, forKey: .website)
+            website: try c.decodeIfPresent(String.self, forKey: .website),
+            certifications: nil
         )
     }
 }
@@ -1100,14 +1119,14 @@ extension Artist {
                mainServiceName: "Show 1 hora", isVerified: true, isActive: true, isAvailable: true,
                servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra", "Eventos"],
                createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil,
-               coverUrl: nil, instagram: nil, website: nil)
+               coverUrl: nil, instagram: nil, website: nil, certifications: nil)
     }
 
     static var mockList: [Artist] {
         [
-            Artist(id: "1", name: "Carlos Méndez", bio: nil, city: "Ciudad de Guatemala", state: nil, country: "GT", averageRating: 4.8, totalReviews: 32, totalBookings: 5, hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil, coverUrl: nil, instagram: nil, website: nil),
-            Artist(id: "2", name: "Sofía Ramírez", bio: nil, city: "Antigua", state: nil, country: "GT", averageRating: 4.5, totalReviews: 18, totalBookings: 10, hourlyRateMin: 20000, hourlyRateMax: 40000, mainServicePrice: 20000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 3, serviceIds: nil, serviceTitles: nil, specialties: ["Baile"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil, coverUrl: nil, instagram: nil, website: nil),
-            Artist(id: "3", name: "Javier Torres", bio: nil, city: "Quetzaltenango", state: nil, country: "GT", averageRating: 4.9, totalReviews: 55, totalBookings: 20, hourlyRateMin: 25000, hourlyRateMax: 50000, mainServicePrice: 25000, mainServiceName: "Sesión foto", isVerified: false, isActive: true, isAvailable: true, servicesCount: 4, serviceIds: nil, serviceTitles: nil, specialties: ["Fotografía"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil, coverUrl: nil, instagram: nil, website: nil),
+            Artist(id: "1", name: "Carlos Méndez", bio: nil, city: "Ciudad de Guatemala", state: nil, country: "GT", averageRating: 4.8, totalReviews: 32, totalBookings: 5, hourlyRateMin: 15000, hourlyRateMax: 30000, mainServicePrice: 15000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 2, serviceIds: nil, serviceTitles: nil, specialties: ["Guitarra"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil, coverUrl: nil, instagram: nil, website: nil, certifications: nil),
+            Artist(id: "2", name: "Sofía Ramírez", bio: nil, city: "Antigua", state: nil, country: "GT", averageRating: 4.5, totalReviews: 18, totalBookings: 10, hourlyRateMin: 20000, hourlyRateMax: 40000, mainServicePrice: 20000, mainServiceName: "Show 1h", isVerified: true, isActive: true, isAvailable: true, servicesCount: 3, serviceIds: nil, serviceTitles: nil, specialties: ["Baile"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil, coverUrl: nil, instagram: nil, website: nil, certifications: nil),
+            Artist(id: "3", name: "Javier Torres", bio: nil, city: "Quetzaltenango", state: nil, country: "GT", averageRating: 4.9, totalReviews: 55, totalBookings: 20, hourlyRateMin: 25000, hourlyRateMax: 50000, mainServicePrice: 25000, mainServiceName: "Sesión foto", isVerified: false, isActive: true, isAvailable: true, servicesCount: 4, serviceIds: nil, serviceTitles: nil, specialties: ["Fotografía"], createdAt: nil, baseLocationLat: nil, baseLocationLng: nil, avatar: nil, coverUrl: nil, instagram: nil, website: nil, certifications: nil),
         ]
     }
 }
