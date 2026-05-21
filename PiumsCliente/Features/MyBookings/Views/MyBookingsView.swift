@@ -1171,15 +1171,6 @@ struct PiumsSegmentedPicker<T: Hashable & CaseIterable>: View {
     }
 }
 
-struct EventsContentView: View {
-    var body: some View {
-        EmptyStateView(
-            systemImage: "ticket.fill",
-            title: "Eventos",
-            description: "Próximamente podrás crear eventos y agrupar múltiples artistas para una misma ocasión."
-        )
-    }
-}
 
 struct FavoritesContentView: View {
     var body: some View {

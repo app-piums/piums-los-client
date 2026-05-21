@@ -366,12 +366,3 @@ struct InboxView: View {
     }
 }
 
-private struct MessagesPlaceholderView: View {
-    var body: some View {
-        EmptyStateView(
-            systemImage: "message.fill",
-            title: "Mensajes",
-            description: "El chat en tiempo real con artistas estará disponible próximamente."
-        )
-    }
-}
