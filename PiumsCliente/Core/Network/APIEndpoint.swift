@@ -28,6 +28,7 @@ enum APIEndpoint {
     // ── Catalog ───────────────────────────────────────────
     case listServices(artistId: String)
     case getService(id: String)
+    case getServiceDayOffers(serviceId: String)
 
     // ── Bookings ──────────────────────────────────────────
     case createBooking(payload: [String: Any])
@@ -35,6 +36,7 @@ enum APIEndpoint {
     case getBooking(id: String)
     case cancelBooking(id: String)
     case rescheduleBooking(id: String, payload: [String: Any])
+    case getBookingCollaborators(bookingId: String)
     case getAvailableSlots(artistId: String, date: String)
     case getArtistCalendar(artistId: String, year: Int, month: Int)
     case calculatePrice(payload: [String: Any])
@@ -110,6 +112,17 @@ enum APIEndpoint {
     case sendMessage(conversationId: String, content: String)
     case unreadCount
 
+    // ── Ticket Events ─────────────────────────────────────
+    case listTicketEvents(page: Int, limit: Int)
+    case getTicketEvent(id: String)
+    case purchaseTicket(eventId: String, payload: [String: Any])
+    case myTicketPurchases
+    case getTicketPurchase(id: String)
+
+    // ── Google Calendar ───────────────────────────────────
+    case googleCalendarStatus
+    case googleCalendarDisconnect
+
     // ── Onboarding ────────────────────────────────────────
     case completeOnboarding
 }
@@ -133,10 +146,8 @@ extension APIEndpoint {
              .confirmTilopayRedirect, .reportNoShow, .uploadDocument,
              .validateCoupon, .addPaymentMethod, .chargeWithSavedCard:
             return "POST"
-        case .cancelBooking:
+        case .cancelBooking, .rescheduleBooking, .purchaseTicket, .googleCalendarDisconnect:
             return "POST"
-        case .rescheduleBooking:
-            return "PATCH"
         case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead,
              .setDefaultPaymentMethod:
             return "PATCH"
@@ -205,7 +216,7 @@ extension APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: p)
         case .calculatePrice(let p):
             return try? JSONSerialization.data(withJSONObject: p)
-        case .createEvent(let p), .updateEvent(_, let p):
+        case .createEvent(let p), .updateEvent(_, let p), .purchaseTicket(_, let p):
             return try? JSONSerialization.data(withJSONObject: p)
         case .createConversation(let artistId):
             return try? JSONSerialization.data(withJSONObject: ["artistId": artistId])
@@ -227,7 +238,8 @@ extension APIEndpoint {
     var requiresAuth: Bool {
         switch self {
         case .login, .registerClient, .firebaseAuth, .refreshToken, .forgotPassword,
-             .searchArtists, .smartSearch, .getArtist, .listReviews, .getArtistPortfolio:
+             .searchArtists, .smartSearch, .getArtist, .listReviews, .getArtistPortfolio,
+             .getServiceDayOffers, .listTicketEvents, .getTicketEvent:
             return false
         default:
             return true
@@ -283,6 +295,7 @@ extension APIEndpoint {
         // Catalog
         case .listServices(let artistId):      return "/api/catalog/services?artistId=\(artistId)"
         case .getService(let id):              return "/api/catalog/services/\(id)"
+        case .getServiceDayOffers(let id):     return "/api/catalog/services/\(id)/day-offers/public"
 
         // Bookings
         case .createBooking:                   return "/api/bookings"
@@ -293,7 +306,8 @@ extension APIEndpoint {
             return p
         case .getBooking(let id):              return "/api/bookings/\(id)"
         case .cancelBooking(let id):            return "/api/bookings/\(id)/cancel"
-        case .rescheduleBooking(let id, _):    return "/api/bookings/\(id)/reschedule"
+        case .rescheduleBooking(let id, _):    return "/api/bookings/\(id)/reschedule-request"
+        case .getBookingCollaborators(let id): return "/api/bookings/\(id)/collaborators"
         case .getAvailableSlots(let a, let d): return "/api/availability/time-slots?artistId=\(a)&date=\(d)"
         case .getArtistCalendar(let a, let yr, let mo): return "/api/availability/calendar?artistId=\(a)&year=\(yr)&month=\(mo)"
         case .calculatePrice:                  return "/api/catalog/pricing/calculate"
@@ -368,6 +382,17 @@ extension APIEndpoint {
         case .listMessages(let cid, let pg):   return "/api/chat/messages/\(cid)?page=\(pg)&limit=50"
         case .sendMessage:                     return "/api/chat/messages"
         case .unreadCount:                     return "/api/chat/messages/unread-count"
+
+        // Ticket Events
+        case .listTicketEvents(let pg, let lm): return "/api/ticket-events?page=\(pg)&limit=\(lm)"
+        case .getTicketEvent(let id):           return "/api/ticket-events/\(id)"
+        case .purchaseTicket(let eventId, _):   return "/api/ticket-events/\(eventId)/purchase"
+        case .myTicketPurchases:               return "/api/ticket-purchases/my"
+        case .getTicketPurchase(let id):        return "/api/ticket-purchases/\(id)"
+
+        // Google Calendar
+        case .googleCalendarStatus:            return "/api/auth/google-calendar/status"
+        case .googleCalendarDisconnect:        return "/api/auth/google-calendar/disconnect"
 
         // Onboarding
         case .completeOnboarding:              return "/api/auth/complete-onboarding"

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @Binding var deepLinkBookingId: String?
+    @Binding var deepLinkDisputeId: String?
     @State private var selectedTab = 0
     @State private var bookingsPath = NavigationPath()
     @State private var chatStore = ChatRealtimeStore.shared
@@ -40,6 +41,9 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToMySpace)) { _ in
             selectedTab = 2
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToCoupons)) { _ in
+            selectedTab = 2
+        }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToConversation)) { _ in
             selectedTab = 3
         }
@@ -53,6 +57,11 @@ struct MainTabView: View {
                 bookingsPath.append(bookingId)
                 deepLinkBookingId = nil
             }
+        }
+        .onChange(of: deepLinkDisputeId) { _, disputeId in
+            guard disputeId != nil else { return }
+            selectedTab = 4
+            deepLinkDisputeId = nil
         }
         .onChange(of: scenePhase) { _, newPhase in
             chatStore.setActive(newPhase == .active)
@@ -109,5 +118,5 @@ struct MainTabView: View {
 
 
 #Preview {
-    MainTabView(deepLinkBookingId: .constant(nil))
+    MainTabView(deepLinkBookingId: .constant(nil), deepLinkDisputeId: .constant(nil))
 }

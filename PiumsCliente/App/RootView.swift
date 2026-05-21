@@ -5,6 +5,7 @@ struct RootView: View {
     @State private var auth = AuthManager.shared
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var deepLinkBookingId: String?
+    @State private var deepLinkDisputeId: String?
     @State private var showSplash = true
 
     private var isUITestingAuth: Bool { CommandLine.arguments.contains("UI_TESTING_AUTH") }
@@ -18,7 +19,7 @@ struct RootView: View {
             if isUITestingAuth {
                 AuthFlowView()
             } else if isUITestingLoggedIn {
-                MainTabView(deepLinkBookingId: .constant(nil))
+                MainTabView(deepLinkBookingId: .constant(nil), deepLinkDisputeId: .constant(nil))
             } else if showSplash {
                 SplashVideoView {
                     withAnimation(.easeInOut(duration: 0.5)) { showSplash = false }
@@ -35,7 +36,7 @@ struct RootView: View {
                     withAnimation { hasSeenOnboarding = true }
                 }
             } else if auth.isAuthenticated {
-                MainTabView(deepLinkBookingId: $deepLinkBookingId)
+                MainTabView(deepLinkBookingId: $deepLinkBookingId, deepLinkDisputeId: $deepLinkDisputeId)
             } else {
                 AuthFlowView()
             }
@@ -45,6 +46,11 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToBooking)) { notif in
             if let bookingId = notif.userInfo?["bookingId"] as? String {
                 deepLinkBookingId = bookingId
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToDispute)) { notif in
+            if let disputeId = notif.userInfo?["disputeId"] as? String {
+                deepLinkDisputeId = disputeId
             }
         }
     }

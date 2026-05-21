@@ -7,6 +7,7 @@ private enum NotifDestination: Identifiable, Hashable {
     case artist(id: String)
     case dispute(id: String)
     case inbox
+    case coupons
 
     var id: String {
         switch self {
@@ -14,19 +15,27 @@ private enum NotifDestination: Identifiable, Hashable {
         case .artist(let id):   return "artist-\(id)"
         case .dispute(let id):  return "dispute-\(id)"
         case .inbox:            return "inbox"
+        case .coupons:          return "coupons"
         }
     }
 }
 
 private extension PiumsNotification {
     var destination: NotifDestination? {
+        let t = type.uppercased()
+        // Cupones/descuentos → pestaña Cupones en Mi Espacio
+        if t == "COUPON_SENT" || t == "COUPON_EXPIRING" || t == "DISCOUNT" { return .coupons }
+        // Disputas (acepta mayúsculas y minúsculas del backend)
         if let did = data?.disputeId, !did.isEmpty,
-           type == "DISPUTE_OPENED" || type == "DISPUTE_RESOLVED" || type == "DISPUTE_MESSAGE" {
+           t == "DISPUTE_OPENED" || t == "DISPUTE_RESOLVED" || t == "DISPUTE_MESSAGE" {
             return .dispute(id: did)
         }
+        // Reserva directa o mediante bookingId
         if let bid = data?.bookingId, !bid.isEmpty { return .booking(id: bid) }
-        if type == "NEW_MESSAGE" || type == "SUPPORT_REPLY" { return .inbox }
-        if let aid = data?.artistId, !aid.isEmpty  { return .artist(id: aid) }
+        // Mensajes
+        if t == "NEW_MESSAGE" || t == "SUPPORT_REPLY" { return .inbox }
+        // Artista
+        if let aid = data?.artistId, !aid.isEmpty { return .artist(id: aid) }
         return nil
     }
 }
@@ -101,6 +110,8 @@ struct NotificationsView: View {
                 DeepLinkDisputeView(disputeId: id)
             case .inbox:
                 InboxView()
+            case .coupons:
+                CouponsView()
             }
         }
         .task { await viewModel.loadInitial() }
@@ -160,59 +171,59 @@ struct NotificationRowView: View {
     }
 
     private var iconName: String {
-        switch notification.type {
+        switch notification.type.uppercased() {
         // Reserva
-        case "BOOKING_CONFIRMED":           return "checkmark.circle.fill"
-        case "BOOKING_CANCELLED":           return "xmark.circle.fill"
-        case "BOOKING_IN_PROGRESS":         return "play.circle.fill"
-        case "BOOKING_DELIVERED":           return "shippingbox.fill"
-        case "BOOKING_COMPLETED",
-             "AUTO_COMPLETE":               return "checkmark.seal.fill"
-        case "BOOKING_NO_SHOW":             return "person.slash.fill"
+        case "BOOKING_CONFIRMED":                    return "checkmark.circle.fill"
+        case "BOOKING_CANCELLED":                    return "xmark.circle.fill"
+        case "BOOKING_IN_PROGRESS":                  return "play.circle.fill"
+        case "BOOKING_DELIVERED":                    return "shippingbox.fill"
+        case "BOOKING_COMPLETED", "AUTO_COMPLETE":   return "checkmark.seal.fill"
+        case "BOOKING_NO_SHOW":                      return "person.slash.fill"
+        case "DELIVERY_PROBLEM_REPORTED":            return "exclamationmark.triangle.fill"
         // Reagendamiento
-        case "RESCHEDULE_REQUESTED":        return "calendar.badge.clock"
-        case "RESCHEDULE_APPROVED":         return "calendar.badge.checkmark"
-        case "RESCHEDULE_REJECTED":         return "calendar.badge.minus"
+        case "RESCHEDULE_REQUESTED",
+             "RESCHEDULE_REQUEST":                   return "calendar.badge.clock"
+        case "RESCHEDULE_APPROVED":                  return "calendar.badge.checkmark"
+        case "RESCHEDULE_REJECTED":                  return "calendar.badge.minus"
         // Pagos
-        case "PAYMENT_COMPLETED",
-             "ANTICIPO_PAID":               return "creditcard.fill"
-        case "BALANCE_CHARGED",
-             "COMMISSION":                  return "banknote"
-        case "PAYMENT_FAILED":              return "creditcard.trianglebadge.exclamationmark"
-        case "REFUND_ISSUED":               return "arrow.uturn.left.circle.fill"
+        case "PAYMENT_COMPLETED", "ANTICIPO_PAID":   return "creditcard.fill"
+        case "BALANCE_CHARGED", "COMMISSION":        return "banknote"
+        case "PAYMENT_FAILED":                       return "creditcard.trianglebadge.exclamationmark"
+        case "REFUND_ISSUED":                        return "arrow.uturn.left.circle.fill"
         // Disputas
-        case "DISPUTE_OPENED":              return "exclamationmark.triangle.fill"
-        case "DISPUTE_RESOLVED":            return "shield.checkered"
+        case "DISPUTE_OPENED":                       return "exclamationmark.triangle.fill"
+        case "DISPUTE_RESOLVED":                     return "shield.checkered"
+        // Cupones / descuentos
+        case "COUPON_SENT":                          return "tag.fill"
+        case "COUPON_EXPIRING":                      return "tag.badge.minus"
+        case "DISCOUNT":                             return "percent"
         // Social
-        case "NEW_REVIEW":                  return "star.fill"
-        case "NEW_MESSAGE":                 return "message.fill"
-        default:                            return "bell.fill"
+        case "NEW_REVIEW":                           return "star.fill"
+        case "NEW_MESSAGE", "SUPPORT_REPLY":         return "message.fill"
+        default:                                     return "bell.fill"
         }
     }
 
     private var iconColor: Color {
-        switch notification.type {
-        case "BOOKING_CONFIRMED",
-             "BOOKING_COMPLETED",
-             "AUTO_COMPLETE",
-             "BOOKING_DELIVERED":           return .green
-        case "BOOKING_CANCELLED",
-             "BOOKING_NO_SHOW",
-             "RESCHEDULE_REJECTED",
-             "PAYMENT_FAILED",
-             "DISPUTE_OPENED":              return .red
-        case "BOOKING_IN_PROGRESS":         return Color.piumsOrange
-        case "RESCHEDULE_REQUESTED",
-             "RESCHEDULE_APPROVED":         return .purple
-        case "PAYMENT_COMPLETED",
-             "ANTICIPO_PAID",
-             "BALANCE_CHARGED",
-             "COMMISSION":                  return .blue
-        case "REFUND_ISSUED":               return .teal
-        case "DISPUTE_RESOLVED":            return .teal
-        case "NEW_REVIEW":                  return .yellow
-        case "NEW_MESSAGE":                 return Color.piumsOrange
-        default:                            return .secondary
+        switch notification.type.uppercased() {
+        case "BOOKING_CONFIRMED", "BOOKING_COMPLETED",
+             "AUTO_COMPLETE", "BOOKING_DELIVERED":   return .green
+        case "BOOKING_CANCELLED", "BOOKING_NO_SHOW",
+             "RESCHEDULE_REJECTED", "PAYMENT_FAILED",
+             "DISPUTE_OPENED",
+             "DELIVERY_PROBLEM_REPORTED":            return .red
+        case "BOOKING_IN_PROGRESS":                  return Color.piumsOrange
+        case "RESCHEDULE_REQUESTED", "RESCHEDULE_REQUEST",
+             "RESCHEDULE_APPROVED":                  return .purple
+        case "PAYMENT_COMPLETED", "ANTICIPO_PAID",
+             "BALANCE_CHARGED", "COMMISSION":        return .blue
+        case "REFUND_ISSUED":                        return .teal
+        case "DISPUTE_RESOLVED":                     return .teal
+        case "COUPON_SENT", "DISCOUNT":              return .green
+        case "COUPON_EXPIRING":                      return .orange
+        case "NEW_REVIEW":                           return .yellow
+        case "NEW_MESSAGE", "SUPPORT_REPLY":         return Color.piumsOrange
+        default:                                     return .secondary
         }
     }
 }

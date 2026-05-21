@@ -79,6 +79,7 @@ struct ArtistProfileView: View {
                         ForEach(viewModel.services) { service in
                             ServiceRowView(
                                 service: service,
+                                dayOffer: viewModel.dayOffers[service.id],
                                 onViewDetails: { detailService = service },
                                 onReserve: { bookingService = service }
                             )
@@ -330,6 +331,7 @@ private struct StatCell: View {
 
 private struct ServiceRowView: View {
     let service: ArtistService
+    var dayOffer: ServiceDayOffer? = nil
     let onViewDetails: () -> Void
     let onReserve: () -> Void
 
@@ -379,9 +381,19 @@ private struct ServiceRowView: View {
                     }
                 }
                 Spacer()
-                Text(priceLabel)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(Color.piumsOrange)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(priceLabel)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(Color.piumsOrange)
+                    if let offer = dayOffer {
+                        Text(offer.badgeLabel)
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(Color.green)
+                            .clipShape(Capsule())
+                    }
+                }
             }
 
             HStack(spacing: 8) {

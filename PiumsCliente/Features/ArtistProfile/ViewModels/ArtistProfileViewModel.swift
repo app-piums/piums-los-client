@@ -78,6 +78,7 @@ final class ArtistProfileViewModel {
     var services: [ArtistService] = []
     var reviews: [Review] = []
     var portfolio: [PortfolioItem] = []
+    var dayOffers: [String: ServiceDayOffer] = [:]  // serviceId → oferta activa hoy
     var isLoadingServices = false
     var isLoadingReviews = false
     var isLoadingPortfolio = false
@@ -97,6 +98,8 @@ final class ArtistProfileViewModel {
         async let p: () = loadPortfolio()
         async let d: () = loadArtistDetail()
         _ = await (s, r, p, d)
+        // cargar ofertas del día después de tener servicios
+        await loadDayOffersForServices()
     }
 
     func loadArtistDetail() async {
@@ -109,6 +112,31 @@ final class ArtistProfileViewModel {
         } catch {}
     }
 
+
+    func loadDayOffersForServices() async {
+        let today = Date()
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let isoDay = df.string(from: today)
+        await withTaskGroup(of: (String, ServiceDayOffer?).self) { group in
+            for svc in services {
+                group.addTask {
+                    let res: ServiceDayOffersResponse? = try? await APIClient.request(.getServiceDayOffers(serviceId: svc.id))
+                    let active = res?.all.first { offer in
+                        guard offer.isActive else { return false }
+                        if let from = offer.validFrom, from > isoDay { return false }
+                        if let until = offer.validUntil, until < isoDay { return false }
+                        return true
+                    }
+                    return (svc.id, active)
+                }
+            }
+            var result: [String: ServiceDayOffer] = [:]
+            for await (id, offer) in group {
+                if let o = offer { result[id] = o }
+            }
+            dayOffers = result
+        }
+    }
 
     func loadServices() async {
         isLoadingServices = true

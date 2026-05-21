@@ -82,19 +82,36 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         handlePushUserInfo(userInfo)
 
         // Backend envía "chatId"; cuando cambies la clave a "conversationId" ambas funcionan
+        let type = (userInfo["type"] as? String ?? "").uppercased()
         let conversationId = (userInfo["conversationId"] as? String)
                           ?? (userInfo["chatId"] as? String)
+
         if let conversationId {
             NotificationCenter.default.post(
                 name: .navigateToConversation,
                 object: nil,
                 userInfo: ["conversationId": conversationId]
             )
+        } else if type == "COUPON_SENT" || type == "COUPON_EXPIRING" || type == "DISCOUNT" {
+            NotificationCenter.default.post(name: .navigateToCoupons, object: nil)
+        } else if (type == "DISPUTE_OPENED" || type == "DISPUTE_RESOLVED" || type == "DISPUTE_MESSAGE"),
+                  let disputeId = userInfo["disputeId"] as? String {
+            NotificationCenter.default.post(
+                name: .navigateToDispute,
+                object: nil,
+                userInfo: ["disputeId": disputeId]
+            )
         } else if let bookingId = userInfo["bookingId"] as? String {
             NotificationCenter.default.post(
                 name: .navigateToBooking,
                 object: nil,
                 userInfo: ["bookingId": bookingId]
+            )
+        } else if let disputeId = userInfo["disputeId"] as? String {
+            NotificationCenter.default.post(
+                name: .navigateToDispute,
+                object: nil,
+                userInfo: ["disputeId": disputeId]
             )
         }
         completionHandler()
@@ -133,11 +150,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 // MARK: - Notification names
 
 extension Notification.Name {
-    static let navigateToBooking      = Notification.Name("navigateToBooking")
-    static let navigateToMySpace      = Notification.Name("navigateToMySpace")
-    static let navigateToProfile      = Notification.Name("navigateToProfile")
-    // Deep link push → conversación específica del chat
-    static let navigateToConversation = Notification.Name("navigateToConversation")
-    // Push no-chat recibido → refrescar contador de campana
+    static let navigateToBooking        = Notification.Name("navigateToBooking")
+    static let navigateToMySpace        = Notification.Name("navigateToMySpace")
+    static let navigateToProfile        = Notification.Name("navigateToProfile")
+    static let navigateToConversation   = Notification.Name("navigateToConversation")
+    static let navigateToCoupons        = Notification.Name("navigateToCoupons")
+    static let navigateToDispute        = Notification.Name("navigateToDispute")
     static let notificationsNeedRefresh = Notification.Name("notifications.needs.refresh")
 }

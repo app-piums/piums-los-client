@@ -421,6 +421,7 @@ struct BookingDetailView: View {
     @State private var loadedArtistSpecialty: String?
     @State private var loadedArtistCountry: String?
     @State private var loadedArtistVerified: Bool = false
+    @State private var collaborators: [BookingCollaborator] = []
 
     init(booking: Booking, preloadedArtist: BookingArtistInfo? = nil) {
         self.booking = booking
@@ -640,6 +641,43 @@ struct BookingDetailView: View {
                     }
                 }
 
+                // ── Equipo adicional (colaboradores) ─────────
+                let accepted = collaborators.filter { $0.status == "ACCEPTED" }
+                if !accepted.isEmpty {
+                    DetailCard(title: "Equipo adicional") {
+                        VStack(spacing: 12) {
+                            ForEach(accepted) { collab in
+                                HStack(spacing: 12) {
+                                    Group {
+                                        if let url = collab.artistAvatar, let imgURL = URL(string: url) {
+                                            AsyncImage(url: imgURL) { img in img.resizable().scaledToFill() }
+                                                placeholder: { Color(.systemGray5) }
+                                        } else {
+                                            ZStack {
+                                                Circle().fill(Color.piumsOrange.opacity(0.15))
+                                                Text(String(collab.artistName?.prefix(1) ?? "?"))
+                                                    .font(.subheadline.bold()).foregroundStyle(Color.piumsOrange)
+                                            }
+                                        }
+                                    }
+                                    .frame(width: 38, height: 38).clipShape(Circle())
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(collab.artistName ?? "Colaborador").font(.subheadline.bold())
+                                        if let role = collab.role, !role.isEmpty {
+                                            Text(role).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.caption).foregroundStyle(.green)
+                                }
+                                if collab.id != accepted.last?.id { Divider() }
+                            }
+                        }
+                    }
+                }
+
                 // ── Acciones ────────────────────────────────
                 DetailCard(title: "Acciones") {
                     VStack(spacing: 10) {
@@ -704,7 +742,11 @@ struct BookingDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .task { await loadArtist() }
+        .task {
+            async let a: () = loadArtist()
+            async let c: () = loadCollaborators()
+            _ = await (a, c)
+        }
         .sheet(isPresented: $showReview) { ReviewView(booking: booking) }
         .sheet(isPresented: $showQueja)  { CreateQuejaView(booking: booking) }
         .sheet(isPresented: $showReschedule) {
@@ -746,6 +788,17 @@ struct BookingDetailView: View {
     }
 
     // MARK: - Helpers
+
+    private func loadCollaborators() async {
+        struct CollaboratorsResponse: Decodable {
+            let collaborators: [BookingCollaborator]?
+            let data: [BookingCollaborator]?
+            var all: [BookingCollaborator] { collaborators ?? data ?? [] }
+        }
+        if let res: CollaboratorsResponse = try? await APIClient.request(.getBookingCollaborators(bookingId: booking.id)) {
+            collaborators = res.all
+        }
+    }
 
     private func loadArtist() async {
         guard loadedArtistName == nil else { return }
@@ -1017,6 +1070,7 @@ private struct DetailRow: View {
 
 enum MySpaceTab: String, CaseIterable {
     case bookings  = "Reservas"
+    case tickets   = "Boletos"
     case events    = "Eventos"
     case coupons   = "Cupones"
     case favorites = "Favoritos"
@@ -1024,7 +1078,8 @@ enum MySpaceTab: String, CaseIterable {
     var systemImage: String {
         switch self {
         case .bookings:  return "calendar"
-        case .events:    return "ticket.fill"
+        case .tickets:   return "ticket.fill"
+        case .events:    return "calendar.badge.plus"
         case .coupons:   return "tag.fill"
         case .favorites: return "heart.fill"
         }
@@ -1045,9 +1100,11 @@ struct MySpaceView: View {
                 .background(.bar)
             Divider()
 
+
             Group {
                 switch selected {
                 case .bookings:  MyBookingsView()
+                case .tickets:   TicketsView()
                 case .events:    EventsView()
                 case .coupons:   CouponsView()
                 case .favorites: FavoritesView()
@@ -1061,6 +1118,9 @@ struct MySpaceView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(.secondarySystemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToCoupons)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) { selected = .coupons }
+        }
     }
 }
 

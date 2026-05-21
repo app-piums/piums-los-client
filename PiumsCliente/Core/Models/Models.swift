@@ -1469,3 +1469,200 @@ struct PaymentMethodsResponse: Codable {
     var all: [PaymentMethod] { methods ?? data ?? [] }
 }
 
+// MARK: - BookingCollaborator
+
+struct BookingCollaborator: Codable, Identifiable {
+    let id: String
+    let bookingId: String
+    let artistId: String
+    let invitedBy: String
+    let role: String?
+    let status: String
+    let notes: String?
+    let invitedAt: String
+    let respondedAt: String?
+    let artistName: String?
+    let artistAvatar: String?
+}
+
+// MARK: - ServiceDayOffer
+
+struct ServiceDayOffer: Codable, Identifiable {
+    let id: String
+    let serviceId: String
+    let artistId: String
+    let discountPercent: Int?
+    let discountAmount: Int?
+    let note: String?
+    let isActive: Bool
+    let validFrom: String?
+    let validUntil: String?
+    let createdAt: String
+
+    var badgeLabel: String {
+        if let pct = discountPercent, pct > 0 { return "\(pct)% OFF" }
+        if let amt = discountAmount,  amt > 0  {
+            return String(format: "$%.2f OFF", Double(amt) / 100.0)
+        }
+        return "Oferta"
+    }
+}
+
+struct ServiceDayOffersResponse: Codable {
+    let offers: [ServiceDayOffer]?
+    let data: [ServiceDayOffer]?
+    var all: [ServiceDayOffer] { offers ?? data ?? [] }
+}
+
+// MARK: - Ticket Events
+
+struct TicketEvent: Codable, Identifiable, Hashable {
+    let id: String
+    let code: String
+    let artistId: String
+    let name: String
+    let description: String?
+    let venue: String
+    let address: String
+    let locationLat: Double?
+    let locationLng: Double?
+    let eventDate: String
+    let doorsOpen: String?
+    let imageUrl: String?
+    let maxCapacity: Int
+    let status: String       // BORRADOR | PUBLICADO | AGOTADO | CANCELADO | FINALIZADO
+    let tiers: [TicketTier]
+    let createdAt: String
+
+    var isPublished: Bool { status == "PUBLICADO" }
+    var isSoldOut: Bool    { status == "AGOTADO" }
+    var minPriceCents: Int { tiers.map(\.priceCents).min() ?? 0 }
+
+    static func == (lhs: TicketEvent, rhs: TicketEvent) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct TicketTier: Codable, Identifiable {
+    let id: String
+    let ticketEventId: String
+    let name: String
+    let description: String?
+    let priceCents: Int
+    let currency: String
+    let totalQty: Int
+    let soldQty: Int
+
+    var available: Int { max(0, totalQty - soldQty) }
+    var isSoldOut: Bool { available == 0 }
+    var formattedPrice: String {
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .currency; fmt.currencyCode = currency; fmt.locale = Locale(identifier: "en_US")
+        return fmt.string(from: NSNumber(value: Double(priceCents) / 100.0)) ?? "$\(Double(priceCents)/100.0)"
+    }
+}
+
+extension TicketTier {
+    private enum CK: String, CodingKey {
+        case id, name, description, currency, totalQty, soldQty
+        case ticketEventId, priceCents
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CK.self)
+        id             = try c.decode(String.self, forKey: .id)
+        ticketEventId  = (try? c.decode(String.self, forKey: .ticketEventId)) ?? ""
+        name           = try c.decode(String.self, forKey: .name)
+        description    = try c.decodeIfPresent(String.self, forKey: .description)
+        priceCents     = (try? c.decodeFlexibleInt(forKey: .priceCents)) ?? 0
+        currency       = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
+        totalQty       = (try? c.decode(Int.self, forKey: .totalQty)) ?? 0
+        soldQty        = (try? c.decode(Int.self, forKey: .soldQty)) ?? 0
+    }
+}
+
+struct TicketPurchase: Codable, Identifiable {
+    let id: String
+    let code: String
+    let ticketEventId: String
+    let tierId: String
+    let buyerId: String
+    let buyerEmail: String
+    let buyerName: String
+    let quantity: Int
+    let subtotalCents: Int
+    let discountCents: Int
+    let totalCents: Int
+    let currency: String
+    let couponCode: String?
+    let status: String       // PENDIENTE | PAGADO | USADO | REEMBOLSADO | EXPIRADO
+    let paidAt: String?
+    let checkedInAt: String?
+    let ticketEvent: TicketEvent?
+    let tier: TicketTier?
+    let createdAt: String
+
+    var isPaid: Bool      { status == "PAGADO" }
+    var isUsed: Bool      { status == "USADO" }
+    var isUpcoming: Bool  {
+        guard let event = ticketEvent else { return false }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let iso2 = ISO8601DateFormatter()
+        guard let date = iso.date(from: event.eventDate) ?? iso2.date(from: event.eventDate) else { return false }
+        return date > Date()
+    }
+}
+
+extension TicketPurchase {
+    private enum CK: String, CodingKey {
+        case id, code, tierId, buyerId, buyerEmail, buyerName, quantity, currency, couponCode, status, paidAt, checkedInAt, ticketEvent, tier, createdAt
+        case ticketEventId, subtotalCents, discountCents, totalCents
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CK.self)
+        id             = try c.decode(String.self, forKey: .id)
+        code           = (try? c.decode(String.self, forKey: .code)) ?? ""
+        ticketEventId  = (try? c.decode(String.self, forKey: .ticketEventId)) ?? ""
+        tierId         = (try? c.decode(String.self, forKey: .tierId)) ?? ""
+        buyerId        = (try? c.decode(String.self, forKey: .buyerId)) ?? ""
+        buyerEmail     = (try? c.decode(String.self, forKey: .buyerEmail)) ?? ""
+        buyerName      = (try? c.decode(String.self, forKey: .buyerName)) ?? ""
+        quantity       = (try? c.decode(Int.self, forKey: .quantity)) ?? 1
+        subtotalCents  = (try? c.decodeFlexibleInt(forKey: .subtotalCents)) ?? 0
+        discountCents  = (try? c.decodeFlexibleInt(forKey: .discountCents)) ?? 0
+        totalCents     = (try? c.decodeFlexibleInt(forKey: .totalCents)) ?? 0
+        currency       = (try? c.decode(String.self, forKey: .currency)) ?? "USD"
+        couponCode     = try c.decodeIfPresent(String.self, forKey: .couponCode)
+        status         = (try? c.decode(String.self, forKey: .status)) ?? "PENDIENTE"
+        paidAt         = try c.decodeIfPresent(String.self, forKey: .paidAt)
+        checkedInAt    = try c.decodeIfPresent(String.self, forKey: .checkedInAt)
+        ticketEvent    = try c.decodeIfPresent(TicketEvent.self, forKey: .ticketEvent)
+        tier           = try c.decodeIfPresent(TicketTier.self, forKey: .tier)
+        createdAt      = (try? c.decode(String.self, forKey: .createdAt)) ?? ""
+    }
+}
+
+struct TicketEventsResponse: Codable {
+    let events: [TicketEvent]?
+    let data: [TicketEvent]?
+    let pagination: SearchPagination?
+    var all: [TicketEvent] { events ?? data ?? [] }
+}
+
+struct TicketEventWrapper: Codable {
+    let event: TicketEvent?
+    let data: TicketEvent?
+    var resolved: TicketEvent? { event ?? data }
+}
+
+struct TicketPurchasesResponse: Codable {
+    let purchases: [TicketPurchase]?
+    let data: [TicketPurchase]?
+    var all: [TicketPurchase] { purchases ?? data ?? [] }
+}
+
+struct TicketPurchaseWrapper: Codable {
+    let purchase: TicketPurchase?
+    let data: TicketPurchase?
+    var resolved: TicketPurchase? { purchase ?? data }
+}
+

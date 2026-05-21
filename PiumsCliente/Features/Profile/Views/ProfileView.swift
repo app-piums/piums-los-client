@@ -2,6 +2,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import AuthenticationServices
 
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
@@ -114,6 +115,11 @@ struct ProfileView: View {
                 identityRow
             }
 
+            // Integraciones
+            Section("Integraciones") {
+                GoogleCalendarRow(viewModel: viewModel)
+            }
+
             // Apariencia
             Section("Apariencia") {
                 Toggle(isOn: Binding(
@@ -192,8 +198,16 @@ struct ProfileView: View {
         .sheet(isPresented: $viewModel.showDeleteSheet) {
             DeleteAccountSheet(viewModel: viewModel)
         }
-        .refreshable { await viewModel.refreshProfile() }
-        .task { await viewModel.refreshProfile() }
+        .refreshable {
+            async let p: () = viewModel.refreshProfile()
+            async let c: () = viewModel.loadGoogleCalendarStatus()
+            _ = await (p, c)
+        }
+        .task {
+            async let p: () = viewModel.refreshProfile()
+            async let c: () = viewModel.loadGoogleCalendarStatus()
+            _ = await (p, c)
+        }
         .alert("¿Cerrar sesión?", isPresented: $showLogoutConfirm) {
             Button("Cancelar", role: .cancel) {}
             Button("Cerrar sesión", role: .destructive) {
@@ -830,6 +844,116 @@ private struct DeleteAccountSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - GoogleCalendarRow
+
+private struct GoogleCalendarRow: View {
+    @Bindable var viewModel: ProfileViewModel
+    @State private var isConnecting = false
+    @State private var showDisconnectAlert = false
+
+    var body: some View {
+        if viewModel.isLoadingCalendarStatus {
+            HStack {
+                Label("Google Calendar", systemImage: "calendar")
+                Spacer()
+                ProgressView().scaleEffect(0.8)
+            }
+            .listRowBackground(Color(.tertiarySystemGroupedBackground))
+        } else if viewModel.googleCalendarConnected {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Google Calendar").font(.subheadline.bold())
+                            if let email = viewModel.googleCalendarEmail {
+                                Text(email).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    } icon: {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    }
+                    Spacer()
+                    Button {
+                        showDisconnectAlert = true
+                    } label: {
+                        Text("Desconectar")
+                            .font(.caption.bold())
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listRowBackground(Color(.tertiarySystemGroupedBackground))
+            .alert("Desconectar Google Calendar", isPresented: $showDisconnectAlert) {
+                Button("Cancelar", role: .cancel) {}
+                Button("Desconectar", role: .destructive) {
+                    Task { await viewModel.disconnectGoogleCalendar() }
+                }
+            } message: {
+                Text("Las reservas confirmadas ya no se agregarán automáticamente a tu Google Calendar.")
+            }
+        } else {
+            Button {
+                connectGoogleCalendar()
+            } label: {
+                HStack {
+                    Label("Conectar Google Calendar", systemImage: "calendar.badge.plus")
+                    Spacer()
+                    if isConnecting {
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Text("Conectar").font(.caption.bold()).foregroundStyle(Color.piumsOrange)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(isConnecting)
+            .listRowBackground(Color(.tertiarySystemGroupedBackground))
+        }
+    }
+
+    private func connectGoogleCalendar() {
+        guard let token = TokenStorage.shared.accessToken else { return }
+        let base = "https://backend.piums.io/api/auth/google/calendar-connect"
+        let returnUrl = "piums://calendar-connected"
+        guard
+            let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+            let encodedReturn = returnUrl.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+            let url = URL(string: "\(base)?token=\(encodedToken)&return_url=\(encodedReturn)")
+        else { return }
+
+        isConnecting = true
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: "piums"
+        ) { callbackURL, error in
+            Task { @MainActor in
+                isConnecting = false
+                guard let callback = callbackURL else { return }
+                let components = URLComponents(url: callback, resolvingAgainstBaseURL: false)
+                if components?.queryItems?.first(where: { $0.name == "calendarConnected" })?.value == "true" {
+                    await viewModel.loadGoogleCalendarStatus()
+                }
+            }
+        }
+        session.prefersEphemeralWebBrowserSession = true
+        session.presentationContextProvider = WindowSceneProvider.shared
+        session.start()
+    }
+}
+
+// Adaptador para proveer el UIWindowScene a ASWebAuthenticationSession
+private final class WindowSceneProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = WindowSceneProvider()
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
+            ?? ASPresentationAnchor()
     }
 }
 

@@ -1,6 +1,15 @@
 // ProfileViewModel.swift
 import Foundation
 
+private struct GoogleCalendarStatusResponse: Decodable {
+    let enabled: Bool?          // campo real del backend
+    let connected: Bool?        // alias alternativo por compatibilidad
+    let email: String?
+    let calendarEmail: String?
+    var isConnected: Bool { enabled ?? connected ?? false }
+    var resolvedEmail: String? { email ?? calendarEmail }
+}
+
 @Observable
 @MainActor
 final class ProfileViewModel {
@@ -80,6 +89,28 @@ final class ProfileViewModel {
             if res.user.identityApproved {
                 UserDefaults.standard.set(true, forKey: "identityVerificationApproved")
             }
+        } catch {}
+    }
+
+    // Google Calendar
+    var googleCalendarConnected  = false
+    var googleCalendarEmail: String?
+    var isLoadingCalendarStatus  = false
+
+    func loadGoogleCalendarStatus() async {
+        isLoadingCalendarStatus = true
+        defer { isLoadingCalendarStatus = false }
+        if let res: GoogleCalendarStatusResponse = try? await APIClient.request(.googleCalendarStatus) {
+            googleCalendarConnected = res.isConnected
+            googleCalendarEmail = res.resolvedEmail
+        }
+    }
+
+    func disconnectGoogleCalendar() async {
+        do {
+            let _: VoidResponse = try await APIClient.request(.googleCalendarDisconnect)
+            googleCalendarConnected = false
+            googleCalendarEmail = nil
         } catch {}
     }
 

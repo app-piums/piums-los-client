@@ -63,8 +63,8 @@ final class SearchViewModel {
     // MARK: - Filtros
     var query          = ""
     var selectedSpecialty: SpecialtyOption? = nil
-    var minPrice: Double = 0        // en quetzales (se convierte a centavos para API)
-    var maxPrice: Double = 50000    // Q500.00 max (en centavos)
+    var minPrice: Double = 0        // en centavos USD (se envía directo a API)
+    var maxPrice: Double = 50000    // $500.00 max (en centavos)
     var minRating: Double = 0
     var selectedCity: String?
     var isVerified: Bool = false
