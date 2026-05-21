@@ -917,7 +917,8 @@ private struct GoogleCalendarRow: View {
 
     private func connectGoogleCalendar() {
         guard let token = TokenStorage.shared.accessToken else { return }
-        let base = "https://backend.piums.io/api/auth/google/calendar-connect"
+        let apiBase = Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://client.piums.io"
+        let base = "\(apiBase)/api/auth/google/calendar-connect"
         let returnUrl = "piums://calendar-connected"
         guard
             let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
@@ -939,7 +940,9 @@ private struct GoogleCalendarRow: View {
                 }
             }
         }
-        session.prefersEphemeralWebBrowserSession = true
+        // false: reutiliza la sesión del browser para que el usuario no tenga que
+        // hacer login en Google si ya está autenticado en el dispositivo
+        session.prefersEphemeralWebBrowserSession = false
         session.presentationContextProvider = WindowSceneProvider.shared
         session.start()
     }
