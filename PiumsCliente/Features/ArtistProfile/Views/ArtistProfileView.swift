@@ -2,7 +2,7 @@
 import SwiftUI
 import CoreLocation
 import AVKit
-import SafariServices
+import WebKit
 
 struct ArtistProfileView: View {
     let artist: Artist
@@ -798,7 +798,7 @@ private struct PortfolioSectionView: View {
                             .onTapGesture {
                                 if item.isVideo {
                                     guard let vid = item.youtubeId else { return }
-                                    videoUrl = URL(string: "https://www.youtube.com/watch?v=\(vid)")
+                                    videoUrl = URL(string: "https://m.youtube.com/watch?v=\(vid)")
                                 } else {
                                     selectedImage = item
                                 }
@@ -810,8 +810,7 @@ private struct PortfolioSectionView: View {
         }
         .sheet(isPresented: Binding(get: { videoUrl != nil }, set: { if !$0 { videoUrl = nil } })) {
             if let url = videoUrl {
-                SafariVideoView(url: url)
-                    .ignoresSafeArea()
+                YouTubeModalView(url: url, onClose: { videoUrl = nil })
             }
         }
         .fullScreenCover(item: $selectedImage) { item in
@@ -820,22 +819,99 @@ private struct PortfolioSectionView: View {
     }
 }
 
-// SFSafariViewController dentro de la app — sin restricciones de embedding
-private struct SafariVideoView: UIViewControllerRepresentable {
+// Modal limpio con WKWebView cargando m.youtube.com — sin chrome de browser,
+// sin Error 153 (carga el sitio móvil real, no el iframe embed).
+private struct YouTubeModalView: View {
     let url: URL
+    let onClose: () -> Void
+    @State private var isLoading = true
 
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        let cfg = SFSafariViewController.Configuration()
-        cfg.entersReaderIfAvailable = false
-        cfg.barCollapsingEnabled = true
-        let vc = SFSafariViewController(url: url, configuration: cfg)
-        vc.preferredBarTintColor = UIColor.black
-        vc.preferredControlTintColor = UIColor(named: "piumsOrange") ?? .systemOrange
-        vc.dismissButtonStyle = .close
-        return vc
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
+
+            YouTubeMobileWebView(url: url, isLoading: $isLoading)
+                .ignoresSafeArea()
+
+            // Barra superior minimalista
+            HStack {
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 4)
+                }
+                .padding(.trailing, 16)
+                .padding(.top, 16)
+            }
+
+            if isLoading {
+                ProgressView()
+                    .tint(Color.piumsOrange)
+                    .scaleEffect(1.4)
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+private struct YouTubeMobileWebView: UIViewRepresentable {
+    let url: URL
+    @Binding var isLoading: Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(isLoading: $isLoading) }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        config.allowsPictureInPictureMediaPlayback = true
+
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.navigationDelegate = context.coordinator
+        wv.backgroundColor = .black
+        wv.isOpaque = false
+        wv.scrollView.backgroundColor = .black
+        // User-agent de Safari móvil para que YouTube sirva la versión móvil completa
+        wv.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+
+        var req = URLRequest(url: url)
+        req.setValue("https://www.youtube.com", forHTTPHeaderField: "Referer")
+        wv.load(req)
+        return wv
     }
 
-    func updateUIViewController(_ vc: SFSafariViewController, context: Context) {}
+    func updateUIView(_ wv: WKWebView, context: Context) {}
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        @Binding var isLoading: Bool
+        init(isLoading: Binding<Bool>) { _isLoading = isLoading }
+
+        func webView(_ wv: WKWebView, didFinish navigation: WKNavigation!) {
+            isLoading = false
+        }
+
+        // Intercepta intentos de abrir la app de YouTube y los mantiene en el WebView
+        func webView(_ wv: WKWebView,
+                     decidePolicyFor action: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if let scheme = action.request.url?.scheme,
+               ["youtube", "vnd.youtube"].contains(scheme) {
+                // Redirigir a la URL web equivalente en vez de salir de la app
+                if let videoUrl = action.request.url,
+                   let components = URLComponents(url: videoUrl, resolvingAgainstBaseURL: false),
+                   let vid = components.queryItems?.first(where: { $0.name == "v" })?.value {
+                    let webUrl = URL(string: "https://m.youtube.com/watch?v=\(vid)")!
+                    wv.load(URLRequest(url: webUrl))
+                }
+                decisionHandler(.cancel)
+                return
+            }
+            decisionHandler(.allow)
+        }
+    }
 }
 
 // Miniatura individual — imagen o video
