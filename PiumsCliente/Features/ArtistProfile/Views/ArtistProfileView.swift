@@ -2,7 +2,6 @@
 import SwiftUI
 import CoreLocation
 import AVKit
-import WebKit
 
 struct ArtistProfileView: View {
     let artist: Artist
@@ -775,7 +774,6 @@ private struct ServiceDetailSheet: View {
 
 private struct PortfolioSectionView: View {
     let items: [PortfolioItem]
-    @State private var selectedVideo: PortfolioItem?
     @State private var selectedImage: PortfolioItem?
 
     var body: some View {
@@ -796,7 +794,7 @@ private struct PortfolioSectionView: View {
                     ForEach(items) { item in
                         PortfolioThumbnail(item: item)
                             .onTapGesture {
-                                if item.isVideo { selectedVideo = item }
+                                if item.isVideo { openYouTube(item) }
                                 else { selectedImage = item }
                             }
                     }
@@ -804,11 +802,19 @@ private struct PortfolioSectionView: View {
                 .padding(.horizontal)
             }
         }
-        .sheet(item: $selectedVideo) { item in
-            YoutubePlayerSheet(item: item)
-        }
         .fullScreenCover(item: $selectedImage) { item in
             ImageGalleryView(item: item, items: items.filter { !$0.isVideo })
+        }
+    }
+
+    private func openYouTube(_ item: PortfolioItem) {
+        guard let vid = item.youtubeId else { return }
+        let appURL = URL(string: "youtube://watch?v=\(vid)")!
+        let webURL = URL(string: "https://youtu.be/\(vid)")!
+        if UIApplication.shared.canOpenURL(appURL) {
+            UIApplication.shared.open(appURL)
+        } else {
+            UIApplication.shared.open(webURL)
         }
     }
 }
@@ -856,80 +862,6 @@ private struct PortfolioThumbnail: View {
     }
 }
 
-// MARK: - YouTube player sheet
-
-private struct YoutubePlayerSheet: View {
-    let item: PortfolioItem
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Group {
-                if let vid = item.youtubeId {
-                    YouTubeWebView(videoId: vid)
-                        .ignoresSafeArea(edges: .bottom)
-                } else {
-                    ContentUnavailableView(
-                        "Video no disponible",
-                        systemImage: "play.slash",
-                        description: Text("No se pudo cargar el video.")
-                    )
-                }
-            }
-            .navigationTitle(item.title ?? "Video")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Cerrar") { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-}
-
-private struct YouTubeWebView: UIViewRepresentable {
-    let videoId: String
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
-        let wv = WKWebView(frame: .zero, configuration: config)
-        wv.scrollView.isScrollEnabled = false
-        wv.backgroundColor = .black
-        wv.isOpaque = false
-        // User-agent de Chrome móvil para evitar restricciones de embed
-        wv.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.0.0 Mobile/15E148 Safari/604.1"
-        return wv
-    }
-
-    func updateUIView(_ wv: WKWebView, context: Context) {
-        // Cargar HTML completo con baseURL de YouTube evita Error 153
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-        <style>
-          * { margin:0; padding:0; box-sizing:border-box; }
-          body { background:#000; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
-          iframe { width:100%; height:100%; border:none; }
-        </style>
-        </head>
-        <body>
-        <iframe
-          src="https://www.youtube.com/embed/\(videoId)?autoplay=1&playsinline=1&rel=0&modestbranding=1"
-          allow="autoplay; fullscreen; encrypted-media"
-          allowfullscreen>
-        </iframe>
-        </body>
-        </html>
-        """
-        wv.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
-    }
-}
 
 // MARK: - Fullscreen image gallery
 

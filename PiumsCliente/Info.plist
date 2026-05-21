@@ -24,6 +24,12 @@
 		<string>remote-notifications</string>
 	</array>
 
+	<!-- Permite canOpenURL para deep link a la app de YouTube -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>youtube</string>
+	</array>
+
 	<key>CFBundleURLTypes</key>
 	<array>
 		<!-- Esquema propio de Piums: deep links de pago, calendario y notificaciones push -->
