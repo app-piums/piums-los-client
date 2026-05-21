@@ -865,8 +865,8 @@ private struct YoutubePlayerSheet: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let embedUrl = item.youtubeEmbedUrl {
-                    YouTubeWebView(url: embedUrl)
+                if let vid = item.youtubeId {
+                    YouTubeWebView(videoId: vid)
                         .ignoresSafeArea(edges: .bottom)
                 } else {
                     ContentUnavailableView(
@@ -890,7 +890,7 @@ private struct YoutubePlayerSheet: View {
 }
 
 private struct YouTubeWebView: UIViewRepresentable {
-    let url: URL
+    let videoId: String
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -900,11 +900,34 @@ private struct YouTubeWebView: UIViewRepresentable {
         wv.scrollView.isScrollEnabled = false
         wv.backgroundColor = .black
         wv.isOpaque = false
+        // User-agent de Chrome móvil para evitar restricciones de embed
+        wv.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.0.0 Mobile/15E148 Safari/604.1"
         return wv
     }
 
     func updateUIView(_ wv: WKWebView, context: Context) {
-        wv.load(URLRequest(url: url))
+        // Cargar HTML completo con baseURL de YouTube evita Error 153
+        let html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+        <style>
+          * { margin:0; padding:0; box-sizing:border-box; }
+          body { background:#000; width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
+          iframe { width:100%; height:100%; border:none; }
+        </style>
+        </head>
+        <body>
+        <iframe
+          src="https://www.youtube.com/embed/\(videoId)?autoplay=1&playsinline=1&rel=0&modestbranding=1"
+          allow="autoplay; fullscreen; encrypted-media"
+          allowfullscreen>
+        </iframe>
+        </body>
+        </html>
+        """
+        wv.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
     }
 }
 
