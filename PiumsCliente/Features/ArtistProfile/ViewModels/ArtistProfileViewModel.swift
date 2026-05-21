@@ -7,10 +7,32 @@ struct PortfolioItem: Codable, Identifiable {
     let id: String
     let artistId: String
     let url: String
-    let type: String?        // "image" | "video"
+    let thumbnailUrl: String?   // provisto por backend para items de video
+    let imageUrl: String?       // alias alternativo que usan algunos endpoints
+    let type: String?           // "image" | "video" | "audio"
     let title: String?
     let description: String?
     let createdAt: String?
+
+    var resolvedImageUrl: String { imageUrl ?? url }
+    var isVideo: Bool { type?.lowercased() == "video" }
+    var youtubeId: String? {
+        guard isVideo else { return nil }
+        let pattern = #"(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: url, range: NSRange(url.startIndex..., in: url)),
+              let range = Range(match.range(at: 1), in: url)
+        else { return nil }
+        return String(url[range])
+    }
+    var youtubeEmbedUrl: URL? {
+        guard let vid = youtubeId else { return nil }
+        return URL(string: "https://www.youtube.com/embed/\(vid)?autoplay=1&playsinline=1")
+    }
+    var youtubeThumbnailUrl: URL? {
+        guard let vid = youtubeId else { return nil }
+        return URL(string: "https://img.youtube.com/vi/\(vid)/hqdefault.jpg")
+    }
 }
 
 struct PortfolioResponse: Decodable {

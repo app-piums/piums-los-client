@@ -2,6 +2,7 @@
 import SwiftUI
 import CoreLocation
 import AVKit
+import WebKit
 
 struct ArtistProfileView: View {
     let artist: Artist
@@ -774,7 +775,8 @@ private struct ServiceDetailSheet: View {
 
 private struct PortfolioSectionView: View {
     let items: [PortfolioItem]
-    @State private var selected: PortfolioItem?
+    @State private var selectedVideo: PortfolioItem?
+    @State private var selectedImage: PortfolioItem?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -793,14 +795,20 @@ private struct PortfolioSectionView: View {
                 HStack(spacing: 10) {
                     ForEach(items) { item in
                         PortfolioThumbnail(item: item)
-                            .onTapGesture { selected = item }
+                            .onTapGesture {
+                                if item.isVideo { selectedVideo = item }
+                                else { selectedImage = item }
+                            }
                     }
                 }
                 .padding(.horizontal)
             }
         }
-        .fullScreenCover(item: $selected) { item in
-            PortfolioFullscreenView(item: item, items: items)
+        .sheet(item: $selectedVideo) { item in
+            YoutubePlayerSheet(item: item)
+        }
+        .fullScreenCover(item: $selectedImage) { item in
+            ImageGalleryView(item: item, items: items.filter { !$0.isVideo })
         }
     }
 }
@@ -808,81 +816,107 @@ private struct PortfolioSectionView: View {
 // Miniatura individual — imagen o video
 private struct PortfolioThumbnail: View {
     let item: PortfolioItem
-    private var isVideo: Bool { item.type?.lowercased() == "video" }
+
+    private var thumbnailUrl: URL? {
+        if item.isVideo {
+            // Prioridad: thumbnailUrl del backend → thumbnail de YouTube por ID
+            if let t = item.thumbnailUrl, let url = URL(string: t) { return url }
+            return item.youtubeThumbnailUrl
+        }
+        return URL(string: item.resolvedImageUrl)
+    }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            if isVideo {
-                VideoThumbnailView(url: URL(string: item.url))
-            } else {
-                AsyncImage(url: URL(string: item.url)) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                    default:
-                        Color(.tertiarySystemGroupedBackground)
-                            .overlay(Image(systemName: "photo").foregroundStyle(.secondary).font(.title))
-                    }
+        ZStack {
+            AsyncImage(url: thumbnailUrl) { phase in
+                switch phase {
+                case .success(let img):
+                    img.resizable().scaledToFill()
+                default:
+                    Color(.tertiarySystemGroupedBackground)
+                        .overlay(Image(systemName: item.isVideo ? "play.rectangle.fill" : "photo")
+                            .foregroundStyle(.secondary).font(.title2))
                 }
             }
 
-            // Badge tipo
-            Image(systemName: isVideo ? "play.circle.fill" : "photo")
-                .font(.system(size: isVideo ? 18 : 12))
-                .foregroundStyle(.white)
-                .shadow(radius: 2)
-                .padding(6)
+            if item.isVideo {
+                Color.black.opacity(0.25)
+                ZStack {
+                    Circle().fill(Color.black.opacity(0.55)).frame(width: 40, height: 40)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white)
+                        .offset(x: 2)
+                }
+            }
         }
         .frame(width: 140, height: 140)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.1)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08)))
     }
 }
 
-// Genera thumbnail del primer frame de un video remoto
-private struct VideoThumbnailView: View {
-    let url: URL?
-    @State private var thumbnail: UIImage?
+// MARK: - YouTube player sheet
+
+private struct YoutubePlayerSheet: View {
+    let item: PortfolioItem
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Group {
-            if let img = thumbnail {
-                Image(uiImage: img).resizable().scaledToFill()
-            } else {
-                Color.black.overlay(
-                    Image(systemName: "play.rectangle.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(Color.piumsOrange)
-                )
+        NavigationStack {
+            Group {
+                if let embedUrl = item.youtubeEmbedUrl {
+                    YouTubeWebView(url: embedUrl)
+                        .ignoresSafeArea(edges: .bottom)
+                } else {
+                    ContentUnavailableView(
+                        "Video no disponible",
+                        systemImage: "play.slash",
+                        description: Text("No se pudo cargar el video.")
+                    )
+                }
+            }
+            .navigationTitle(item.title ?? "Video")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Cerrar") { dismiss() }
+                }
             }
         }
-        .task(id: url?.absoluteString) {
-            guard let url, thumbnail == nil else { return }
-            thumbnail = await generateThumbnail(url: url)
-        }
-    }
-
-    private func generateThumbnail(url: URL) async -> UIImage? {
-        let asset = AVURLAsset(url: url)
-        let gen = AVAssetImageGenerator(asset: asset)
-        gen.appliesPreferredTrackTransform = true
-        gen.maximumSize = CGSize(width: 280, height: 280)
-        return try? await withCheckedThrowingContinuation { cont in
-            gen.generateCGImageAsynchronously(for: .zero) { cgImg, _, err in
-                if let cgImg { cont.resume(returning: UIImage(cgImage: cgImg)) }
-                else { cont.resume(throwing: err ?? NSError()) }
-            }
-        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 
-// MARK: - Visor fullscreen
+private struct YouTubeWebView: UIViewRepresentable {
+    let url: URL
 
-private struct PortfolioFullscreenView: View {
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.scrollView.isScrollEnabled = false
+        wv.backgroundColor = .black
+        wv.isOpaque = false
+        return wv
+    }
+
+    func updateUIView(_ wv: WKWebView, context: Context) {
+        wv.load(URLRequest(url: url))
+    }
+}
+
+// MARK: - Fullscreen image gallery
+
+private struct ImageGalleryView: View {
     let item: PortfolioItem
-    let items: [PortfolioItem]
+    let items: [PortfolioItem]   // solo imágenes
     @Environment(\.dismiss) private var dismiss
     @State private var currentIndex: Int
+    @State private var scale: CGFloat = 1
+    @State private var offset: CGSize = .zero
 
     init(item: PortfolioItem, items: [PortfolioItem]) {
         self.item = item
@@ -891,16 +925,21 @@ private struct PortfolioFullscreenView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
             TabView(selection: $currentIndex) {
                 ForEach(Array(items.enumerated()), id: \.1.id) { idx, it in
-                    Group {
-                        if it.type?.lowercased() == "video" {
-                            FullscreenVideoPlayer(url: URL(string: it.url))
-                        } else {
-                            FullscreenImageView(url: URL(string: it.url))
+                    AsyncImage(url: URL(string: it.resolvedImageUrl)) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable()
+                                .scaledToFit()
+                                .scaleEffect(idx == currentIndex ? scale : 1)
+                                .offset(idx == currentIndex ? offset : .zero)
+                                .gesture(zoomDrag)
+                        default:
+                            ProgressView().tint(.white)
                         }
                     }
                     .tag(idx)
@@ -908,83 +947,40 @@ private struct PortfolioFullscreenView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: items.count > 1 ? .always : .never))
             .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .onChange(of: currentIndex) { _, _ in scale = 1; offset = .zero }
 
-            // Botón cerrar
-            Button { dismiss() } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title)
-                    .foregroundStyle(.white)
-                    .shadow(radius: 4)
+            // Barra superior
+            HStack {
+                if items.count > 1 {
+                    Text("\(currentIndex + 1) / \(items.count)")
+                        .font(.caption.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Capsule().fill(Color.black.opacity(0.5)))
+                }
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .shadow(radius: 4)
+                }
             }
+            .padding(.horizontal, 20)
             .padding(.top, 56)
-            .padding(.trailing, 20)
-
-            // Contador
-            if items.count > 1 {
-                Text("\(currentIndex + 1) / \(items.count)")
-                    .font(.caption.bold())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Capsule().fill(Color.black.opacity(0.5)))
-                    .padding(.top, 60)
-                    .frame(maxWidth: .infinity)
-            }
         }
         .statusBarHidden()
     }
-}
 
-private struct FullscreenImageView: View {
-    let url: URL?
-    @State private var scale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-
-    var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let img):
-                img.resizable()
-                    .scaledToFit()
-                    .scaleEffect(scale)
-                    .offset(offset)
-                    .gesture(
-                        MagnificationGesture()
-                            .onChanged { scale = max(1, $0) }
-                            .onEnded { _ in withAnimation { if scale < 1.2 { scale = 1; offset = .zero } } }
-                            .simultaneously(with:
-                                DragGesture()
-                                    .onChanged { offset = scale > 1 ? $0.translation : .zero }
-                                    .onEnded { _ in withAnimation { if scale <= 1 { offset = .zero } } }
-                            )
-                    )
-            default:
-                ProgressView().tint(.white)
-            }
-        }
-    }
-}
-
-private struct FullscreenVideoPlayer: View {
-    let url: URL?
-    @State private var player: AVPlayer?
-
-    var body: some View {
-        Group {
-            if let player {
-                VideoPlayer(player: player)
-            } else {
-                ProgressView().tint(.white)
-            }
-        }
-        .onAppear {
-            guard let url else { return }
-            player = AVPlayer(url: url)
-            player?.play()
-        }
-        .onDisappear {
-            player?.pause()
-            player = nil
-        }
+    private var zoomDrag: some Gesture {
+        MagnificationGesture()
+            .onChanged { scale = max(1, $0) }
+            .onEnded { _ in withAnimation { if scale < 1.2 { scale = 1; offset = .zero } } }
+            .simultaneously(with:
+                DragGesture()
+                    .onChanged { if scale > 1 { offset = $0.translation } }
+                    .onEnded { _ in withAnimation { if scale <= 1 { offset = .zero } } }
+            )
     }
 }
 
