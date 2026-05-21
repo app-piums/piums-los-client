@@ -809,8 +809,10 @@ private struct PortfolioSectionView: View {
             }
         }
         .sheet(isPresented: Binding(get: { videoUrl != nil }, set: { if !$0 { videoUrl = nil } })) {
-            if let url = videoUrl {
-                YouTubeModalView(url: url, onClose: { videoUrl = nil })
+            if let vid = videoUrl?.absoluteString
+                .components(separatedBy: "v=").last?
+                .components(separatedBy: "&").first {
+                YouTubeModalView(videoId: vid, onClose: { videoUrl = nil })
             }
         }
         .fullScreenCover(item: $selectedImage) { item in
@@ -822,7 +824,7 @@ private struct PortfolioSectionView: View {
 // Modal limpio con WKWebView cargando m.youtube.com — sin chrome de browser,
 // sin Error 153 (carga el sitio móvil real, no el iframe embed).
 private struct YouTubeModalView: View {
-    let url: URL
+    let videoId: String
     let onClose: () -> Void
     @State private var isLoading = true
 
@@ -830,7 +832,7 @@ private struct YouTubeModalView: View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
-            YouTubeMobileWebView(url: url, isLoading: $isLoading)
+            YouTubeMobileWebView(videoId: videoId, isLoading: $isLoading)
                 .ignoresSafeArea()
 
             // Barra superior minimalista
@@ -858,7 +860,7 @@ private struct YouTubeModalView: View {
 }
 
 private struct YouTubeMobileWebView: UIViewRepresentable {
-    let url: URL
+    let videoId: String
     @Binding var isLoading: Bool
 
     func makeCoordinator() -> Coordinator { Coordinator(isLoading: $isLoading) }
@@ -874,16 +876,59 @@ private struct YouTubeMobileWebView: UIViewRepresentable {
         wv.backgroundColor = .black
         wv.isOpaque = false
         wv.scrollView.backgroundColor = .black
-        // User-agent de Safari móvil para que YouTube sirva la versión móvil completa
-        wv.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        wv.scrollView.isScrollEnabled = false
 
-        var req = URLRequest(url: url)
-        req.setValue("https://www.youtube.com", forHTTPHeaderField: "Referer")
-        wv.load(req)
+        // Mismo enfoque que YouTubeiOSPlayerHelper: HTML local con IFrame API JS
+        // La API de JS tiene políticas más permisivas que un embed directo
+        let html = Self.playerHTML(for: videoId)
+        // baseURL nil → YouTube trata el iframe como "mismo origen" a través de postMessage
+        wv.loadHTMLString(html, baseURL: nil)
         return wv
     }
 
     func updateUIView(_ wv: WKWebView, context: Context) {}
+
+    private static func playerHTML(for videoId: String) -> String {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+          <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            html, body { width:100%; height:100%; background:#000; overflow:hidden; }
+            #player { width:100%; height:100%; }
+          </style>
+        </head>
+        <body>
+          <div id="player"></div>
+          <script>
+            var tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(tag);
+
+            var player;
+            function onYouTubeIframeAPIReady() {
+              player = new YT.Player('player', {
+                videoId: '\(videoId)',
+                playerVars: {
+                  autoplay: 1,
+                  playsinline: 1,
+                  controls: 1,
+                  rel: 0,
+                  modestbranding: 1,
+                  fs: 1
+                },
+                events: {
+                  onReady: function(e) { e.target.playVideo(); }
+                }
+              });
+            }
+          </script>
+        </body>
+        </html>
+        """
+    }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         @Binding var isLoading: Bool
@@ -893,23 +938,16 @@ private struct YouTubeMobileWebView: UIViewRepresentable {
             isLoading = false
         }
 
-        // Intercepta intentos de abrir la app de YouTube y los mantiene en el WebView
         func webView(_ wv: WKWebView,
                      decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let scheme = action.request.url?.scheme,
-               ["youtube", "vnd.youtube"].contains(scheme) {
-                // Redirigir a la URL web equivalente en vez de salir de la app
-                if let videoUrl = action.request.url,
-                   let components = URLComponents(url: videoUrl, resolvingAgainstBaseURL: false),
-                   let vid = components.queryItems?.first(where: { $0.name == "v" })?.value {
-                    let webUrl = URL(string: "https://m.youtube.com/watch?v=\(vid)")!
-                    wv.load(URLRequest(url: webUrl))
-                }
+            guard let scheme = action.request.url?.scheme else { decisionHandler(.allow); return }
+            // Bloquea salida a app de YouTube — el player ya se maneja internamente
+            if ["youtube", "vnd.youtube"].contains(scheme) {
                 decisionHandler(.cancel)
-                return
+            } else {
+                decisionHandler(.allow)
             }
-            decisionHandler(.allow)
         }
     }
 }
