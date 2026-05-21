@@ -26,6 +26,18 @@
 
 	<key>CFBundleURLTypes</key>
 	<array>
+		<!-- Esquema propio de Piums: deep links de pago, calendario y notificaciones push -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Piums</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>piums</string>
+			</array>
+		</dict>
+		<!-- Google Sign-In / Firebase OAuth callback -->
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
