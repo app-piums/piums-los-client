@@ -329,7 +329,7 @@ struct BookingRowView: View {
             createdAt: nil,
             baseLocationLat: nil, baseLocationLng: nil,
             avatar: info.avatar,
-            coverUrl: nil, instagram: nil, website: nil
+            coverUrl: nil, instagram: nil, website: nil, certifications: nil
         )
     }
 
@@ -873,7 +873,7 @@ struct BookingDetailView: View {
             serviceIds: nil, serviceTitles: nil, specialties: nil,
             createdAt: nil, baseLocationLat: nil, baseLocationLng: nil,
             avatar: loadedArtistAvatar ?? participant?.avatar, coverUrl: nil,
-            instagram: nil, website: nil
+            instagram: nil, website: nil, certifications: nil
         )
     }
 
@@ -1138,9 +1138,14 @@ struct PiumsSegmentedPicker<T: Hashable & CaseIterable>: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { selected = tab }
                 } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: icon(tab)).font(.system(size: 12))
-                        Text(label(tab)).font(.subheadline.weight(.medium))
+                    HStack(spacing: 4) {
+                        Image(systemName: icon(tab)).font(.system(size: 13))
+                        if selected == tab {
+                            Text(label(tab))
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                        }
                         if let b = badge?(tab), b > 0 {
                             Text("\(b)")
                                 .font(.caption2.bold())
@@ -1155,8 +1160,9 @@ struct PiumsSegmentedPicker<T: Hashable & CaseIterable>: View {
                                 )
                         }
                     }
-                    .foregroundStyle(selected == tab ? .white : .primary)
-                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(selected == tab ? .white : .secondary)
+                    .frame(maxWidth: selected == tab ? .infinity : nil)
+                    .padding(.horizontal, selected == tab ? 0 : 10)
                     .padding(.vertical, 8)
                     .background(selected == tab ? Color.piumsOrange : Color.clear)
                     .clipShape(Capsule())

@@ -61,13 +61,22 @@ enum PaymentStatusDetail: String, Codable {
     }
 }
 
+fileprivate struct PaymentsPagination: Codable {
+    let page: Int
+    let limit: Int?
+    let total: Int?
+    let pages: Int       // backend devuelve "pages", no "totalPages"
+    var hasMore: Bool { page < pages }
+}
+
 struct PaymentsResponse: Codable {
     let payments: [Payment]?
     let data: [Payment]?
-    let pagination: SearchPagination?
+    fileprivate let pagination: PaymentsPagination?
     let total: Int?
 
     var allPayments: [Payment] { payments ?? data ?? [] }
+    var hasMore: Bool { pagination?.hasMore ?? false }
 }
 
 // PaymentIntentResponse movido a Models.swift como PaymentIntentWrapper (soporta Tilopay + Stripe)
@@ -111,7 +120,7 @@ final class PaymentsViewModel {
         do {
             let res: PaymentsResponse = try await APIClient.request(.listPayments(page: currentPage))
             payments.append(contentsOf: res.allPayments)
-            hasMore = res.pagination?.hasMore ?? false
+            hasMore = res.hasMore
             currentPage += 1
         } catch {
             errorMessage = AppError(from: error).errorDescription
