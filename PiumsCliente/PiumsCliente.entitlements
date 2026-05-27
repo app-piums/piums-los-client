@@ -6,8 +6,5 @@
 	<key>aps-environment</key>
 	<string>production</string>
 
-	<!-- Sign in with Apple — implementado en AuthManager.loginWithApple() -->
-	<key>com.apple.developer.sign-in-with-apple</key>
-	<string>Default</string>
 </dict>
 </plist>
