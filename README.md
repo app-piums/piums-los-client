@@ -81,13 +81,13 @@ Crear los archivos de configuración (**no se incluyen en el repo por seguridad*
 ```bash
 # PiumsCliente/Resources/Debug.xcconfig
 API_BASE_URL = http://localhost:3000
-FIREBASE_PROJECT_ID = piums-dev
-STRIPE_PUBLISHABLE_KEY = pk_test_REPLACE_ME
+FIREBASE_PROJECT_ID = <your-firebase-project-id-dev>
+STRIPE_PUBLISHABLE_KEY = <your-stripe-publishable-key-test>
 
 # PiumsCliente/Resources/Release.xcconfig
-API_BASE_URL = https://piums.com
-FIREBASE_PROJECT_ID = piums-prod
-STRIPE_PUBLISHABLE_KEY = pk_live_REPLACE_ME
+API_BASE_URL = <your-production-api-url>
+FIREBASE_PROJECT_ID = <your-firebase-project-id-prod>
+STRIPE_PUBLISHABLE_KEY = <your-stripe-publishable-key-live>
 ```
 
 Asignarlos en Xcode: **Project → Info → Configurations → Debug / Release**.
