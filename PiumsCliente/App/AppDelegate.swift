@@ -101,6 +101,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 object: nil,
                 userInfo: ["disputeId": disputeId]
             )
+        } else if type == "PAYMENT_CAPTURE_FAILED", let bookingId = userInfo["bookingId"] as? String {
+            // El hold de la tarjeta venció y la captura automática falló. Navegar al detalle
+            // de la reserva donde el usuario puede iniciar el pago manualmente.
+            NotificationCenter.default.post(
+                name: .navigateToBooking,
+                object: nil,
+                userInfo: ["bookingId": bookingId, "requiresPayment": true]
+            )
         } else if let bookingId = userInfo["bookingId"] as? String {
             NotificationCenter.default.post(
                 name: .navigateToBooking,

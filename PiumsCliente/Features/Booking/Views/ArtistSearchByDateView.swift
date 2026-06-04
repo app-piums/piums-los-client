@@ -322,7 +322,7 @@ struct ArtistSearchByDateView: View {
     private var nextDays: [Date] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        return (0..<14).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
+        return (0..<60).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
     }
 
     private var monthYearLabel: String {
@@ -676,18 +676,78 @@ private struct ArtistSearchResultCard: View {
     let item: ArtistWithAvailability
     var matchedService: MatchedService? = nil
 
-    // ...existing code...
+    private var coverGradient: LinearGradient {
+        let spec = item.artist.specialties?.first?.lowercased() ?? ""
+        let colors: [Color]
+        switch true {
+        case spec.contains("músic") || spec.contains("music") || spec.contains("cant"):
+            colors = [Color(hex: "#FF6A00"), Color(hex: "#F59E0B")]
+        case spec.contains("dj"):
+            colors = [Color(hex: "#FF6A00"), Color(hex: "#E91E8C")]
+        case spec.contains("fotogr"):
+            colors = [Color(hex: "#00AEEF"), Color(hex: "#1E3A8A")]
+        case spec.contains("video"):
+            colors = [Color(hex: "#4F46E5"), Color(hex: "#E91E8C")]
+        case spec.contains("bail") || spec.contains("danza"):
+            colors = [Color(hex: "#FF6A00"), Color(hex: "#EF4444")]
+        default:
+            colors = [Color(hex: "#FF6B35"), Color(hex: "#F59E0B")]
+        }
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // ...existing code... (Cover, badges, avatar)
 
-            // Info
+            // ── Cover photo + badges ──────────────────────────────────────────
+            ZStack(alignment: .top) {
+                // Cover image or gradient fallback
+                Group {
+                    let coverURL = item.artist.coverUrl ?? item.artist.avatar
+                    if let urlStr = coverURL, let url = URL(string: urlStr) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let img):
+                                img.resizable().scaledToFill()
+                            default:
+                                gradientFallback
+                            }
+                        }
+                    } else {
+                        gradientFallback
+                    }
+                }
+                .frame(height: 130)
+                .clipped()
+
+                // Badges row
+                HStack(alignment: .top) {
+                    // Verified badge (top-left)
+                    if item.artist.isVerified {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.white)
+                            .padding(5)
+                            .background(Color.piumsOrange, in: Circle())
+                            .padding(6)
+                    }
+                    Spacer()
+                    // Availability badge (top-right)
+                    Text(item.available ? "Disponible" : "Ocupado")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7).padding(.vertical, 4)
+                        .background(item.available ? Color.green : Color(.systemGray))
+                        .clipShape(Capsule())
+                        .padding(6)
+                }
+            }
+
+            // ── Info section ──────────────────────────────────────────────────
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.artist.artistName)
                     .font(.subheadline.bold())
                     .lineLimit(1)
-                    .padding(.top, 24)
 
                 if let spec = item.artist.specialties?.first {
                     Text(spec)
@@ -697,14 +757,25 @@ private struct ArtistSearchResultCard: View {
                         .lineLimit(1)
                 }
 
-                if let rating = item.artist.averageRating, rating > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "star.fill")
-                            .font(.caption2).foregroundStyle(.yellow)
-                        Text(String(format: "%.1f", rating))
-                            .font(.caption.bold())
-                        Text("(\(item.artist.totalReviews))")
-                            .font(.caption2).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    if let rating = item.artist.averageRating, rating > 0 {
+                        HStack(spacing: 3) {
+                            Image(systemName: "star.fill")
+                                .font(.caption2).foregroundStyle(.yellow)
+                            Text(String(format: "%.1f", rating))
+                                .font(.caption.bold())
+                            Text("(\(item.artist.totalReviews))")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let dist = item.distance, dist > 0 {
+                        Spacer()
+                        HStack(spacing: 2) {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 9)).foregroundStyle(.secondary)
+                            Text(String(format: "%.1f km", dist))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -738,16 +809,26 @@ private struct ArtistSearchResultCard: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(item.available ? Color.piumsOrange : Color.gray)
+                    .background(item.available ? Color.piumsOrange : Color(.systemGray))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .padding(.horizontal, 12)
+            .padding(.top, 8)
             .padding(.bottom, 12)
         }
         .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
         .opacity(item.available ? 1.0 : 0.65)
+    }
+
+    private var gradientFallback: some View {
+        ZStack {
+            coverGradient
+            Text(String(item.artist.artistName.prefix(1)).uppercased())
+                .font(.system(size: 40, weight: .bold))
+                .foregroundStyle(.white.opacity(0.6))
+        }
     }
 }
 

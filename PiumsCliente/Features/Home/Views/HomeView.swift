@@ -286,6 +286,22 @@ struct HomeCalendarView: View {
                 }
             }
 
+            // Contador de reservas del mes
+            let monthPrefix: String = {
+                let f = DateFormatter(); f.dateFormat = "yyyy-MM"
+                return f.string(from: displayMonth)
+            }()
+            let monthCount = bookingDates.filter { $0.hasPrefix(monthPrefix) }.count
+            if monthCount > 0 {
+                HStack(spacing: 6) {
+                    Circle().fill(Color.piumsOrange).frame(width: 7, height: 7)
+                    Text("\(monthCount) reserva\(monthCount == 1 ? "" : "s") este mes")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.piumsOrange)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+
             // Próxima reserva
             if let next = nextBookingLabel {
                 Divider()
@@ -366,8 +382,19 @@ struct HomeCalendarView: View {
     private var nextBookingLabel: (title: String, subtitle: String)? {
         guard let b = nextBooking else { return nil }
         let title = b.code ?? "Reserva confirmada"
-        let time = b.scheduledTime.map { "\(b.scheduledDate) · \($0)" } ?? b.scheduledDate
-        return (title, time)
+        let dateOnly = String(b.scheduledDate.prefix(10))
+        let parseFmt = DateFormatter()
+        parseFmt.dateFormat = "yyyy-MM-dd"
+        parseFmt.locale = Locale(identifier: "es_ES")
+        var dateLabel = dateOnly
+        if let date = parseFmt.date(from: dateOnly) {
+            let outFmt = DateFormatter()
+            outFmt.dateFormat = "EEE, d MMM"
+            outFmt.locale = Locale(identifier: "es_ES")
+            dateLabel = outFmt.string(from: date).capitalized
+        }
+        let subtitle = b.scheduledTime.map { "\(dateLabel) · \($0)" } ?? dateLabel
+        return (title, subtitle)
     }
 }
 

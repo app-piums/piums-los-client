@@ -40,6 +40,9 @@ enum APIEndpoint {
     case getAvailableSlots(artistId: String, date: String)
     case getArtistCalendar(artistId: String, year: Int, month: Int)
     case calculatePrice(payload: [String: Any])
+    case getReplacementSearch(bookingId: String)
+    case acceptReplacement(bookingId: String)
+    case declineReplacement(bookingId: String)
 
     // ── Reviews ───────────────────────────────────────────
     case listReviews(artistId: String, page: Int)
@@ -146,7 +149,8 @@ extension APIEndpoint {
              .confirmTilopayRedirect, .reportNoShow, .uploadDocument,
              .validateCoupon, .addPaymentMethod, .chargeWithSavedCard:
             return "POST"
-        case .cancelBooking, .rescheduleBooking, .purchaseTicket, .googleCalendarDisconnect:
+        case .cancelBooking, .rescheduleBooking, .purchaseTicket, .googleCalendarDisconnect,
+             .acceptReplacement, .declineReplacement:
             return "POST"
         case .updateMyProfile, .completeOnboarding, .updateEvent, .markConversationRead,
              .setDefaultPaymentMethod:
@@ -311,6 +315,9 @@ extension APIEndpoint {
         case .getAvailableSlots(let a, let d): return "/api/availability/time-slots?artistId=\(a)&date=\(d)"
         case .getArtistCalendar(let a, let yr, let mo): return "/api/availability/calendar?artistId=\(a)&year=\(yr)&month=\(mo)"
         case .calculatePrice:                  return "/api/catalog/pricing/calculate"
+        case .getReplacementSearch(let id):    return "/api/bookings/\(id)/replacement"
+        case .acceptReplacement(let id):       return "/api/bookings/\(id)/replacement/accept"
+        case .declineReplacement(let id):      return "/api/bookings/\(id)/replacement/decline"
 
         // Reviews — path directo (el service monta en /api/reviews internamente)
         case .listReviews(let a, let pg):      return "/api/reviews?artistId=\(a)&page=\(pg)&limit=10"

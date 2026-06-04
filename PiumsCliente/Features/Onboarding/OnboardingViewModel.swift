@@ -145,13 +145,22 @@ final class OnboardingViewModel {
         isFinishing = true
         defer { isFinishing = false }
 
-        // 1 — Guardar preferencias localmente
+        // 1 — Guardar preferencias localmente y sincronizar con el backend
         if !skip {
             let interests = UserInterests(
                 categories: Array(selectedCategories),
                 tags: selectedTags.mapValues { Array($0) }
             )
             interests.save()
+            // Sync to backend so preferences survive reinstalls/device changes
+            let tagsPayload = selectedTags.mapValues { Array($0) }
+            let prefsPayload: [String: Any] = [
+                "onboardingCategories": Array(selectedCategories),
+                "onboardingTags": tagsPayload,
+            ]
+            do {
+                let _: AuthUser = try await APIClient.request(.updateMyProfile(payload: prefsPayload))
+            } catch {}
         }
 
         // 2 — Marcar onboarding completado

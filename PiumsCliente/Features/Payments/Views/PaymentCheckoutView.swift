@@ -16,6 +16,7 @@ final class PaymentCheckoutViewModel {
 
     private(set) var amountToPay: Int = 0
     private(set) var currency: String = "USD"
+    private var isPayingRemaining = false
 
     var savedCard: PaymentMethod? = nil
     var useSavedCard: Bool = true
@@ -56,13 +57,15 @@ final class PaymentCheckoutViewModel {
     // MARK: - Setup
 
     func setup(booking: Booking, overrideAmount: Int? = nil) {
-        currency    = "USD"
+        currency = "USD"
         if let override = overrideAmount {
-            amountToPay = override
+            amountToPay       = override
+            isPayingRemaining = true
         } else {
             amountToPay = (booking.anticipoRequired == true)
                 ? (booking.anticipoAmount ?? booking.totalPrice)
                 : booking.totalPrice
+            isPayingRemaining = false
         }
         Task { await loadDefaultCard() }
     }
@@ -164,9 +167,9 @@ final class PaymentCheckoutViewModel {
         try? await Task.sleep(for: .seconds(3))
         do {
             let booking: Booking = try await APIClient.request(.getBooking(id: bookingId))
-            let paid = booking.paymentStatus == .anticipoPaid
-                    || booking.paymentStatus == .fullyPaid
-                    || booking.paymentStatus == .completed
+            let paid = isPayingRemaining
+                ? (booking.paymentStatus == .fullyPaid || booking.paymentStatus == .completed)
+                : (booking.paymentStatus == .anticipoPaid || booking.paymentStatus == .fullyPaid || booking.paymentStatus == .completed || booking.paymentStatus == .cardAuthorized)
             if paid {
                 confirmedBooking = booking
                 phase = .confirmed
@@ -227,9 +230,9 @@ final class PaymentCheckoutViewModel {
         do {
             try await Task.sleep(for: .seconds(3))
             let booking: Booking = try await APIClient.request(.getBooking(id: bookingId))
-            let paid = booking.paymentStatus == .anticipoPaid
-                    || booking.paymentStatus == .fullyPaid
-                    || booking.paymentStatus == .completed
+            let paid = isPayingRemaining
+                ? (booking.paymentStatus == .fullyPaid || booking.paymentStatus == .completed)
+                : (booking.paymentStatus == .anticipoPaid || booking.paymentStatus == .fullyPaid || booking.paymentStatus == .completed || booking.paymentStatus == .cardAuthorized)
             if paid {
                 confirmedBooking = booking
                 phase = .confirmed

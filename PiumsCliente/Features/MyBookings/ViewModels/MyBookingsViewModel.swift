@@ -73,9 +73,22 @@ final class MyBookingsViewModel {
     var hasMore = true
     private var currentPage = 1
 
+    var filteredBookings: [Booking] {
+        guard let selected = selectedStatus else { return bookings }
+        let group = filterGroups[selected] ?? [selected.rawValue]
+        return bookings.filter { group.contains($0.status.rawValue) }
+    }
+
     let statusFilters: [BookingStatus?] = [
-        nil, .pending, .confirmed, .paymentPending, .inProgress,
-        .reschedulePendingClient, .delivered, .completed, .disputeOpen, .cancelledClient
+        nil, .pending, .confirmed, .completed, .cancelledClient
+    ]
+
+    // Grupos de statuses que cubre cada tab
+    private let filterGroups: [BookingStatus: [String]] = [
+        .pending:        ["PENDING", "CARD_AUTHORIZED"],
+        .confirmed:      ["CONFIRMED", "ANTICIPO_PAID", "IN_PROGRESS"],
+        .completed:      ["COMPLETED", "DELIVERED"],
+        .cancelledClient:["CANCELLED_CLIENT", "CANCELLED_ARTIST", "REJECTED", "NO_SHOW"],
     ]
 
     func statusLabel(_ s: BookingStatus?) -> String {
@@ -114,19 +127,10 @@ final class MyBookingsViewModel {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            // .paymentPending filtra por paymentStatus=PENDING para capturar
-            // reservas en cualquier BookingStatus que aún no han pagado.
-            let statusParam: String?
-            let paymentStatusParam: String?
-            if selectedStatus == .paymentPending {
-                statusParam = nil
-                paymentStatusParam = "PENDING"
-            } else {
-                statusParam = selectedStatus?.rawValue
-                paymentStatusParam = nil
-            }
+            // Los tabs agrupan múltiples statuses. Se carga sin filtro de status
+            // y se filtra localmente en filteredBookings para soportar grupos.
             let res: BookingsResponse = try await APIClient.request(
-                .listMyBookings(status: statusParam, paymentStatus: paymentStatusParam, page: currentPage)
+                .listMyBookings(status: nil, paymentStatus: nil, page: currentPage)
             )
             print("📋 Bookings cargadas: \(res.allBookings.count) — bookings:\(res.bookings?.count ?? -1) data:\(res.data?.count ?? -1) items:\(res.items?.count ?? -1)")
             let newBookings = res.allBookings

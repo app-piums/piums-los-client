@@ -692,19 +692,19 @@ enum BookingStatus: String, Codable {
 
     var displayName: String {
         switch self {
-        case .pending:          return "Pendiente"
-        case .confirmed:        return "Confirmada"
+        case .pending:          return "Pendientes"
+        case .confirmed:        return "Confirmadas"
         case .paymentPending:   return "Pago pendiente"
         case .paymentCompleted: return "Pago completado"
         case .inProgress:       return "En progreso"
         case .delivered:        return "Entregado"
         case .disputeOpen:      return "Disputa abierta"
         case .disputeResolved:  return "Disputa resuelta"
-        case .completed:        return "Completada"
+        case .completed:        return "Completadas"
         case .rescheduled:                  return "Reprogramada"
         case .reschedulePendingArtist:      return "Cambio pendiente"
         case .reschedulePendingClient:      return "Confirmar cambio"
-        case .cancelledClient:  return "Cancelada por ti"
+        case .cancelledClient:  return "Canceladas"
         case .cancelledArtist:  return "Cancelada por artista"
         case .rejected:         return "Rechazada"
         case .noShow:           return "No se presentó"
@@ -715,9 +715,10 @@ enum BookingStatus: String, Codable {
 
 enum PaymentStatus: String, Codable {
     case pending           = "PENDING"
-    case completed         = "COMPLETED"       // legacy
+    case cardAuthorized    = "CARD_AUTHORIZED"  // tarjeta pre-autorizada, esperando confirmación del artista
+    case completed         = "COMPLETED"        // legacy
     case anticipoPaid      = "ANTICIPO_PAID"
-    case depositPaid       = "DEPOSIT_PAID"    // legacy alias para ANTICIPO_PAID
+    case depositPaid       = "DEPOSIT_PAID"     // legacy alias para ANTICIPO_PAID
     case chargingRemaining = "CHARGING_REMAINING"
     case fullyPaid         = "FULLY_PAID"
     case frozen            = "FROZEN"
@@ -734,6 +735,7 @@ enum PaymentStatus: String, Codable {
     var displayName: String {
         switch self {
         case .pending:           return "Pago pendiente"
+        case .cardAuthorized:    return "Tarjeta pre-autorizada"
         case .completed:         return "Pagado"
         case .anticipoPaid:      return "Anticipo pagado"
         case .depositPaid:       return "Anticipo pagado"

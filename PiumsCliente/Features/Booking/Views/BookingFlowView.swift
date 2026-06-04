@@ -971,15 +971,40 @@ struct BookingFlowView: View {
             .padding(14).background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
 
             if q.hasTravel {
-                HStack(spacing: 8) {
-                    Image(systemName: "info.circle.fill").foregroundStyle(.orange)
-                    Text(vm.context.isMultiDay
-                         ? "Los viáticos cubren transporte, hospedaje y alimentación del artista por los \(vm.context.numDays) días del evento."
-                         : "Los viáticos cubren transporte, alimentación y hospedaje del artista.")
-                        .font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle.fill").foregroundStyle(.orange)
+                        Text(vm.context.isMultiDay
+                             ? "Los viáticos cubren transporte, hospedaje y alimentación del artista por los \(vm.context.numDays) días del evento."
+                             : "Los viáticos cubren transporte, alimentación y hospedaje del artista.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange.opacity(0.7))
+                        Text("El costo de desplazamiento es estimado según la ubicación ingresada y puede variar ligeramente.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 .padding(12).background(Color.orange.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 12))
             }
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.yellow)
+                    .font(.footnote)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Política de Cancelación")
+                        .font(.caption.bold()).foregroundStyle(Color(red: 0.6, green: 0.45, blue: 0.0))
+                    Text("Dentro de las primeras 48h desde la creación de la reserva: cancelación gratuita.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Link("Ver política completa", destination: URL(string: "https://client.piums.io/terminos#cancelacion")!)
+                        .font(.caption.bold()).foregroundStyle(Color(red: 0.6, green: 0.45, blue: 0.0))
+                }
+            }
+            .padding(12)
+            .background(Color.yellow.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
             if let pe = vm.priceError { Text(pe).font(.caption).foregroundStyle(.secondary) }
         }
     }
@@ -1151,8 +1176,15 @@ private struct BFCalendarView: View {
     let disabled: [Date]
     @Binding var selected: Date?
     let onSelect: (Date) -> Void
-    @State private var display = Date()
+    @State private var display: Date
     private let cal = Calendar.current
+
+    init(disabled: [Date], selected: Binding<Date?>, onSelect: @escaping (Date) -> Void) {
+        self.disabled = disabled
+        self._selected = selected
+        self.onSelect = onSelect
+        self._display = State(initialValue: selected.wrappedValue ?? Date())
+    }
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
     private let wdays = ["L","M","X","J","V","S","D"]
 

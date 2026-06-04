@@ -49,13 +49,43 @@ struct RegisterView: View {
     @ViewBuilder
     private func backgroundLayer(geo: GeometryProxy) -> some View {
         ZStack(alignment: .top) {
-            Color.piumsBackground.ignoresSafeArea()
+            Color.black.ignoresSafeArea()
 
-            Circle()
-                .fill(Color.piumsOrange.opacity(glowPulse ? 0.28 : 0.15))
-                .frame(width: 280, height: 280)
-                .blur(radius: 55)
-                .offset(y: geo.safeAreaInsets.top + 60)
+            // Smokey animated blobs — high-opacity, large displacement to match web SmokeyBackground
+            TimelineView(.animation) { ctx in
+                let t = ctx.date.timeIntervalSince1970
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.28, blue: 0.04))
+                        .frame(width: 300)
+                        .blur(radius: 52)
+                        .opacity(0.38)
+                        .offset(x: CGFloat(sin(t * 0.5)) * 70,
+                                y: CGFloat(cos(t * 0.4)) * 60 - 60)
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.22, blue: 0.02))
+                        .frame(width: 260)
+                        .blur(radius: 46)
+                        .opacity(0.32)
+                        .offset(x: CGFloat(cos(t * 0.6 + 1.0)) * 65,
+                                y: CGFloat(sin(t * 0.5 + 0.5)) * 70 + 130)
+                    Circle()
+                        .fill(Color(red: 0.95, green: 0.25, blue: 0.0))
+                        .frame(width: 280)
+                        .blur(radius: 44)
+                        .opacity(0.30)
+                        .offset(x: CGFloat(sin(t * 0.7 + 2.0)) * 60,
+                                y: CGFloat(cos(t * 0.45 + 1.0)) * 65 + 280)
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.35, blue: 0.05))
+                        .frame(width: 220)
+                        .blur(radius: 38)
+                        .opacity(0.26)
+                        .offset(x: CGFloat(cos(t * 0.4 + 0.7)) * 72,
+                                y: CGFloat(sin(t * 0.65 + 1.5)) * 75 + 420)
+                }
+            }
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer().frame(height: geo.safeAreaInsets.top + 20)
@@ -241,7 +271,15 @@ struct RegisterView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 28)
-                .fill(Color.piumsBackgroundSecondary)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28)
+                        .fill(Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28)
+                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+                )
                 .ignoresSafeArea(edges: .bottom)
         )
     }

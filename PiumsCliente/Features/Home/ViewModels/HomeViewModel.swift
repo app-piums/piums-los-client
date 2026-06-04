@@ -72,16 +72,23 @@ final class HomeViewModel {
     }
 
     private func loadUpcomingBookings() async {
+        let activeStatuses: Set<BookingStatus> = [.confirmed, .pending, .inProgress, .rescheduled]
         do {
+            // Sin filtro de status — igual que Android, filtramos localmente para incluir PENDING/RESCHEDULED
             let res: BookingsResponse = try await APIClient.request(
-                .listMyBookings(status: BookingStatus.confirmed.rawValue, paymentStatus: nil, page: 1)
+                .listMyBookings(status: nil, paymentStatus: nil, page: 1)
             )
-            upcomingBookingDates = Set(res.allBookings.map { $0.scheduledDate })
+            let active = res.allBookings.filter { activeStatuses.contains($0.status) }
+            // Recortar a "yyyy-MM-dd" — el backend devuelve datetime ISO completo ("2026-06-07T09:00:00Z")
+            upcomingBookingDates = Set(active.map { String($0.scheduledDate.prefix(10)) })
             // Próxima reserva = la más cercana en el futuro
             let today = Date()
             let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-            nextBooking = res.allBookings
-                .filter { fmt.date(from: $0.scheduledDate).map { $0 >= today } ?? false }
+            nextBooking = active
+                .filter { b in
+                    guard let d = fmt.date(from: String(b.scheduledDate.prefix(10))) else { return false }
+                    return d >= today
+                }
                 .sorted { $0.scheduledDate < $1.scheduledDate }
                 .first
         } catch {

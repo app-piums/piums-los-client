@@ -31,12 +31,14 @@ struct RootView: View {
                         withAnimation(.easeInOut(duration: 0.5)) { showSplash = false }
                     }
                 }
-            } else if !hasSeenOnboarding {
-                OnboardingView {
-                    withAnimation { hasSeenOnboarding = true }
-                }
             } else if auth.isAuthenticated {
-                MainTabView(deepLinkBookingId: $deepLinkBookingId, deepLinkDisputeId: $deepLinkDisputeId)
+                if !hasSeenOnboarding {
+                    OnboardingView {
+                        withAnimation { hasSeenOnboarding = true }
+                    }
+                } else {
+                    MainTabView(deepLinkBookingId: $deepLinkBookingId, deepLinkDisputeId: $deepLinkDisputeId)
+                }
             } else {
                 AuthFlowView()
             }

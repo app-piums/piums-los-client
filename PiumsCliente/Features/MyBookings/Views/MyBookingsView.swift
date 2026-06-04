@@ -10,7 +10,7 @@ struct MyBookingsView: View {
         Group {
             if viewModel.isLoading && viewModel.bookings.isEmpty {
                 LoadingView()
-            } else if viewModel.bookings.isEmpty {
+            } else if viewModel.filteredBookings.isEmpty {
                 EmptyStateView(
                     systemImage: "calendar.badge.minus",
                     title: "Sin reservas",
@@ -22,7 +22,7 @@ struct MyBookingsView: View {
                         if let msg = viewModel.errorMessage {
                             ErrorBannerView(message: msg).padding(.horizontal)
                         }
-                        ForEach(viewModel.bookings) { booking in
+                        ForEach(viewModel.filteredBookings) { booking in
                             BookingRowView(
                                 booking: booking,
                                 cachedArtist: viewModel.artistCache[booking.artistId],
@@ -97,6 +97,17 @@ struct MyBookingsView: View {
                 bookingToCancel = nil
             }
             Button("No", role: .cancel) { bookingToCancel = nil }
+        } message: {
+            if let booking = bookingToCancel {
+                if booking.paymentStatus == .cardAuthorized {
+                    Text("Tu reserva será cancelada. No se realizará ningún cobro.")
+                } else if booking.paymentStatus == .anticipoPaid, let anticipo = booking.anticipoAmount {
+                    let refund = String(format: "%.2f", Double(anticipo) * 0.5 / 100.0)
+                    Text("Se aplicará una penalidad del 50%. Recibirás un reembolso de $\(refund).")
+                } else {
+                    Text("Esta acción no se puede deshacer.")
+                }
+            }
         }
     }
 }
@@ -404,8 +415,17 @@ private struct StatusFilterChip: View {
 
 // MARK: - BookingDetailView
 
+struct ReplacementSearchData {
+    var status: String
+    let expiresAt: String
+    let matchedArtistIds: [String]
+    let category: String?
+    let city: String?
+    let scheduledDate: String?
+}
+
 struct BookingDetailView: View {
-    let booking: Booking
+    @State private var booking: Booking
     @State private var showReview = false
     @State private var showQueja  = false
     @State private var showShareSheet = false
@@ -414,6 +434,8 @@ struct BookingDetailView: View {
     @State private var showPayRemaining = false
     @State private var showNoShowAlert = false
     @State private var noShowReason = ""
+    @State private var replacementSearch: ReplacementSearchData? = nil
+    @State private var replacementAction: String = "idle"
     @Environment(\.dismiss) private var dismiss
 
     @State private var loadedArtistName: String?
@@ -424,7 +446,7 @@ struct BookingDetailView: View {
     @State private var collaborators: [BookingCollaborator] = []
 
     init(booking: Booking, preloadedArtist: BookingArtistInfo? = nil) {
-        self.booking = booking
+        _booking = State(initialValue: booking)
         // Prioridad: cache pre-cargado → campos del booking → nil
         _loadedArtistName      = State(initialValue: preloadedArtist?.name      ?? booking.resolvedArtistName)
         _loadedArtistAvatar    = State(initialValue: preloadedArtist?.avatar    ?? booking.resolvedArtistAvatar)
@@ -678,6 +700,90 @@ struct BookingDetailView: View {
                     }
                 }
 
+                // ── Reemplazo de artista (si fue cancelada por artista) ────
+                if booking.status == .cancelledArtist, let rep = replacementSearch {
+                    DetailCard(title: "Buscar Reemplazo") {
+                        VStack(spacing: 12) {
+                            if rep.status == "AWAITING_CLIENT" {
+                                VStack(spacing: 12) {
+                                    Text("Encontramos que el artista se retractó de esta reserva. ¿Deseas buscar un artista de reemplazo?")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    HStack(spacing: 10) {
+                                        Button {
+                                            Task { await handleAcceptReplacement() }
+                                        } label: {
+                                            Text("Sí, buscar")
+                                                .font(.subheadline.weight(.semibold))
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 10)
+                                                .background(Color.piumsOrange)
+                                                .foregroundStyle(.white)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        }
+                                        .disabled(replacementAction != "idle")
+
+                                        Button {
+                                            Task { await handleDeclineReplacement() }
+                                        } label: {
+                                            Text("No, cancelar")
+                                                .font(.subheadline.weight(.semibold))
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 10)
+                                                .background(Color(.tertiarySystemGroupedBackground))
+                                                .foregroundStyle(.primary)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        }
+                                        .disabled(replacementAction != "idle")
+                                    }
+                                }
+                            } else if rep.status == "SEARCHING" {
+                                HStack(spacing: 10) {
+                                    ProgressView().tint(Color.piumsOrange)
+                                    Text("Buscando artistas disponibles…")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } else if rep.status == "NOTIFIED", !rep.matchedArtistIds.isEmpty {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Encontramos \(rep.matchedArtistIds.count) artista(s) disponible(s)")
+                                        .font(.subheadline.weight(.semibold))
+                                    Button {
+                                        let searchUrl = buildSearchUrl(from: rep)
+                                        if let url = URL(string: searchUrl) {
+                                            UIApplication.shared.open(url)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text("Ver artistas")
+                                                .font(.subheadline.weight(.semibold))
+                                            Image(systemName: "arrow.right")
+                                                .font(.system(size: 12, weight: .semibold))
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(Color.piumsOrange)
+                                        .foregroundStyle(.white)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                }
+                            } else if rep.status == "EXPIRED" {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "exclamationmark.circle.fill")
+                                        .foregroundStyle(.orange)
+                                    Text("La búsqueda de reemplazo ha expirado.")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } else if rep.status == "OPTED_OUT" {
+                                Text("Rechazaste la búsqueda de reemplazo.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
                 // ── Acciones ────────────────────────────────
                 DetailCard(title: "Acciones") {
                     VStack(spacing: 10) {
@@ -745,7 +851,9 @@ struct BookingDetailView: View {
         .task {
             async let a: () = loadArtist()
             async let c: () = loadCollaborators()
-            _ = await (a, c)
+            async let r: () = loadReplacementSearch()
+            async let b: () = reloadBooking()
+            _ = await (a, c, r, b)
         }
         .sheet(isPresented: $showReview) { ReviewView(booking: booking) }
         .sheet(isPresented: $showQueja)  { CreateQuejaView(booking: booking) }
@@ -763,6 +871,7 @@ struct BookingDetailView: View {
         .fullScreenCover(isPresented: $showPayCheckout) {
             PaymentCheckoutView(booking: booking, artist: artistForPayment) {
                 showPayCheckout = false
+                Task { await reloadBooking() }
             }
         }
         .fullScreenCover(isPresented: $showPayRemaining) {
@@ -774,6 +883,7 @@ struct BookingDetailView: View {
                 overrideAmount: remaining
             ) {
                 showPayRemaining = false
+                Task { await reloadBooking() }
             }
         }
         .alert("Reportar no presentación", isPresented: $showNoShowAlert) {
@@ -797,6 +907,12 @@ struct BookingDetailView: View {
         }
         if let res: CollaboratorsResponse = try? await APIClient.request(.getBookingCollaborators(bookingId: booking.id)) {
             collaborators = res.all
+        }
+    }
+
+    private func reloadBooking() async {
+        if let updated: Booking = try? await APIClient.request(.getBooking(id: booking.id)) {
+            booking = updated
         }
     }
 
@@ -905,6 +1021,56 @@ struct BookingDetailView: View {
                 .reportNoShow(bookingId: booking.id, reason: reason.isEmpty ? "No especificado" : reason)
             )
         } catch {}
+    }
+
+    private func loadReplacementSearch() async {
+        guard booking.status == .cancelledArtist else { return }
+        do {
+            struct ReplacementDTO: Decodable {
+                let status: String
+                let expiresAt: String
+                let matchedArtistIds: [String]
+                let category: String?
+                let city: String?
+                let scheduledDate: String?
+            }
+            if let dto: ReplacementDTO = try? await APIClient.request(.getReplacementSearch(bookingId: booking.id)) {
+                replacementSearch = ReplacementSearchData(
+                    status: dto.status,
+                    expiresAt: dto.expiresAt,
+                    matchedArtistIds: dto.matchedArtistIds,
+                    category: dto.category,
+                    city: dto.city,
+                    scheduledDate: dto.scheduledDate
+                )
+            }
+        } catch {}
+    }
+
+    private func handleAcceptReplacement() async {
+        replacementAction = "accepting"
+        do {
+            let _: VoidResponse = try await APIClient.request(.acceptReplacement(bookingId: booking.id))
+            replacementSearch?.status = "SEARCHING"
+        } catch {}
+        replacementAction = "idle"
+    }
+
+    private func handleDeclineReplacement() async {
+        replacementAction = "declining"
+        do {
+            let _: VoidResponse = try await APIClient.request(.declineReplacement(bookingId: booking.id))
+            replacementSearch?.status = "OPTED_OUT"
+        } catch {}
+        replacementAction = "idle"
+    }
+
+    private func buildSearchUrl(from rep: ReplacementSearchData) -> String {
+        var url = "/search?"
+        if let cat = rep.category { url += "category=\(cat)&" }
+        if let city = rep.city { url += "city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)&" }
+        if let date = rep.scheduledDate { url += "date=\(String(date.prefix(10)))" }
+        return url
     }
 
     @ViewBuilder
