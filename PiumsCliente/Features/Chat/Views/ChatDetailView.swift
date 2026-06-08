@@ -50,6 +50,27 @@ struct ChatDetailView: View {
                 .background(.bar)
             }
         }
+        .background {
+            let symbols = ["music.note","camera","film","party.popper","headphones","paintpalette","sparkles","figure.dance"]
+            let tileSize: CGFloat = 80
+            GeometryReader { geo in
+                let cols = max(1, Int(geo.size.width / tileSize) + 2)
+                let rows = max(1, Int(geo.size.height / tileSize) + 2)
+                ForEach(0..<(rows * cols), id: \.self) { i in
+                    let row = i / cols
+                    let col = i % cols
+                    Image(systemName: symbols[(row * cols + col) % symbols.count])
+                        .font(.system(size: 22, weight: .ultraLight))
+                        .foregroundStyle(Color.primary.opacity(0.06))
+                        .rotationEffect(.degrees(-15))
+                        .position(
+                            x: CGFloat(col) * tileSize + (row % 2 == 0 ? 0 : tileSize / 2) + tileSize / 2,
+                            y: CGFloat(row) * tileSize + tileSize / 2
+                        )
+                }
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle(conversation.otherParticipantName)
         .navigationBarTitleDisplayMode(.inline)
         .task {
