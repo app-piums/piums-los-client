@@ -334,7 +334,7 @@ struct ArtistSearchByDateView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            VStack(spacing: 0) {
                 // Results header
                 if !viewModel.isLoading {
                     HStack {
@@ -381,7 +381,7 @@ struct ArtistSearchByDateView: View {
                     .padding(.horizontal, 16).padding(.top, 4)
                 }
 
-                Color.clear.frame(height: 20)
+                Color.clear.frame(height: 100)
             }
         }
         .scrollIndicators(.hidden)
@@ -702,23 +702,24 @@ private struct ArtistSearchResultCard: View {
             // ── Cover photo + badges ──────────────────────────────────────────
             ZStack(alignment: .top) {
                 // Cover image or gradient fallback
-                Group {
-                    let coverURL = item.artist.coverUrl ?? item.artist.avatar
-                    if let urlStr = coverURL, let url = URL(string: urlStr) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let img):
-                                img.resizable().scaledToFill()
-                            default:
-                                gradientFallback
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+                    .overlay {
+                        let coverURL = item.artist.coverUrl ?? item.artist.avatar
+                        if let urlStr = coverURL, let url = URL(string: urlStr) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let img):
+                                    img.resizable().scaledToFill()
+                                default:
+                                    gradientFallback
+                                }
                             }
+                        } else {
+                            gradientFallback
                         }
-                    } else {
-                        gradientFallback
                     }
-                }
-                .frame(height: 130)
-                .clipped()
+                    .clipped()
 
                 // Badges row
                 HStack(alignment: .top) {
@@ -816,6 +817,7 @@ private struct ArtistSearchResultCard: View {
             .padding(.top, 8)
             .padding(.bottom, 12)
         }
+        .frame(maxWidth: .infinity)
         .background(Color(.tertiarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.07), radius: 5, y: 2)

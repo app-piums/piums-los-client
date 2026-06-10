@@ -2,9 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Push Notifications: "production" para App Store / TestFlight; Xcode cambia a "development" en Debug automáticamente si el perfil lo soporta -->
-	<key>aps-environment</key>
-	<string>production</string>
-
+	<!-- Push Notifications disabled for personal development account -->
+	<!-- Re-enable when using a Developer account -->
 </dict>
 </plist>

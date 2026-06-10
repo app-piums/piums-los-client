@@ -96,6 +96,26 @@ final class BookingFlowViewModel {
         } catch {}
     }
 
+    func createEvent(name: String, date: Date?, location: String?, notes: String?, description: String?) async -> EventSummary? {
+        var payload: [String: Any] = ["name": name]
+        if let date {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            payload["eventDate"] = f.string(from: date)
+        }
+        if let location, !location.isEmpty { payload["location"] = location }
+        if let notes, !notes.isEmpty { payload["notes"] = notes }
+        if let description, !description.isEmpty { payload["description"] = description }
+        do {
+            let res: EventResponse = try await APIClient.request(.createEvent(payload: payload))
+            events.insert(res.data, at: 0)
+            return res.data
+        } catch {
+            errorMessage = AppError(from: error).errorDescription
+            return nil
+        }
+    }
+
     func loadCalendar() async {
         guard let date = context.selectedDate else { return }
         let cal = Calendar.current
@@ -274,6 +294,7 @@ struct BookingFlowView: View {
     var context: BookingFlowContext
     @State private var vm: BookingFlowViewModel
     @State private var showConfirmModal = false
+    @State private var showCreateEventSheet = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locationStore) private var locationStore
 
@@ -745,6 +766,23 @@ struct BookingFlowView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
+            }
+
+            Button {
+                showCreateEventSheet = true
+            } label: {
+                Label("Crear nuevo evento", systemImage: "plus.circle")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.piumsOrange)
+            }
+        }
+        .sheet(isPresented: $showCreateEventSheet) {
+            EventFormView { name, date, location, notes, description in
+                Task {
+                    if let newEvent = await vm.createEvent(name: name, date: date, location: location, notes: notes, description: description) {
+                        vm.context.eventId = newEvent.id
+                    }
+                }
             }
         }
     }
