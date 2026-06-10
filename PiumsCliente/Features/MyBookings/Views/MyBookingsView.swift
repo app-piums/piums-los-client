@@ -576,6 +576,38 @@ struct BookingDetailView: View {
                     .padding(.horizontal, 20)
                 }
 
+                // ── Código de asistencia ─────────────────────
+                if (booking.status == .confirmed || booking.status == .inProgress),
+                   let attCode = booking.attendanceCode, !attCode.isEmpty {
+                    VStack(spacing: 10) {
+                        Text("CÓDIGO DE ASISTENCIA")
+                            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary).tracking(1.2)
+                        HStack(spacing: 8) {
+                            ForEach(Array(attCode.enumerated()), id: \.offset) { _, digit in
+                                Text(String(digit))
+                                    .font(.title2.bold().monospaced())
+                                    .frame(width: 36, height: 44)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+                        Text("Dáselo al artista cuando llegue")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button {
+                            UIPasteboard.general.string = attCode
+                        } label: {
+                            Label("Copiar código", systemImage: "doc.on.doc")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 18)
+                    .background(Color.blue.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.blue.opacity(0.25)))
+                    .padding(.horizontal, 20)
+                }
+
                 // ── Información del evento ──────────────────
                 DetailCard(title: "Información del Evento") {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
@@ -618,37 +650,33 @@ struct BookingDetailView: View {
                 // ── Resumen de pago ─────────────────────────
                 DetailCard(title: "Resumen de Pago") {
                     VStack(spacing: 12) {
-                        let baseTotal = booking.totalPrice + (booking.couponDiscountAmount ?? 0)
+                        let serviceBase = booking.servicePrice ?? booking.totalPrice
+                        let discount = booking.couponDiscountAmount ?? 0
+                        let baseTotal = serviceBase + (booking.travelPrice ?? 0) + (booking.addonsPrice ?? 0)
+                        payRow(label: "Servicio base", value: serviceBase.piumsFormatted, bold: false)
+                        if let travel = booking.travelPrice, travel > 0 {
+                            payRow(label: "Viáticos / traslado", value: travel.piumsFormatted, bold: false)
+                        }
+                        if let addons = booking.addonsPrice, addons > 0 {
+                            payRow(label: "Add-ons", value: addons.piumsFormatted, bold: false)
+                        }
+                        if discount > 0, let code = booking.couponCode {
+                            HStack {
+                                Label(code, systemImage: "tag.fill")
+                                    .font(.caption).foregroundStyle(.green)
+                                Spacer()
+                                Text("-\(discount.piumsFormatted)")
+                                    .font(.subheadline).foregroundStyle(.green)
+                            }
+                        }
                         if booking.anticipoRequired == true, let anticipo = booking.anticipoAmount {
                             let rest = booking.totalPrice - anticipo
-                            payRow(label: "Total del servicio", value: baseTotal.piumsFormatted, bold: false)
-                            if let discount = booking.couponDiscountAmount, discount > 0,
-                               let code = booking.couponCode {
-                                HStack {
-                                    Label(code, systemImage: "tag.fill")
-                                        .font(.caption).foregroundStyle(.green)
-                                    Spacer()
-                                    Text("-\(discount.piumsFormatted)")
-                                        .font(.subheadline).foregroundStyle(.green)
-                                }
-                            }
+                            Divider()
                             payRow(label: "Anticipo (50%)", value: anticipo.piumsFormatted, bold: false)
                             payRow(label: "Saldo restante", value: rest.piumsFormatted, bold: false)
                             if booking.paymentStatus == .anticipoPaid {
                                 Text("Saldo se cobra automáticamente 72h antes del evento")
                                     .font(.caption2).foregroundStyle(.secondary)
-                            }
-                        } else {
-                            payRow(label: "Total del servicio", value: baseTotal.piumsFormatted, bold: false)
-                            if let discount = booking.couponDiscountAmount, discount > 0,
-                               let code = booking.couponCode {
-                                HStack {
-                                    Label(code, systemImage: "tag.fill")
-                                        .font(.caption).foregroundStyle(.green)
-                                    Spacer()
-                                    Text("-\(discount.piumsFormatted)")
-                                        .font(.subheadline).foregroundStyle(.green)
-                                }
                             }
                         }
                         Divider()

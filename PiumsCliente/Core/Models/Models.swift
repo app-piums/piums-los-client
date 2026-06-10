@@ -653,6 +653,12 @@ struct Booking: Codable, Identifiable, Hashable {
     let artistName: String?
     let clientName: String?
 
+    // Código de asistencia (flujo Uber-style)
+    let attendanceCode: String?
+    let attendanceCodeUsedAt: String?
+    let requiresProductDelivery: Bool?
+    let productDeliveryUrl: String?
+
     // Helpers resolviendo nested > flat
     var resolvedArtistName: String? { artist?.resolvedName ?? artistName }
     var resolvedClientName: String? { client?.resolvedName ?? clientName }
@@ -1144,7 +1150,9 @@ extension Booking {
                 anticipoRequired: nil, anticipoAmount: nil, paidAmount: nil, currency: "USD",
                 couponCode: nil, couponDiscountAmount: nil,
                 servicePrice: nil, addonsPrice: nil, travelPrice: nil, selectedAddons: nil,
-                artist: nil, client: nil, artistName: nil, clientName: nil)
+                artist: nil, client: nil, artistName: nil, clientName: nil,
+                attendanceCode: nil, attendanceCodeUsedAt: nil,
+                requiresProductDelivery: nil, productDeliveryUrl: nil)
     }
 }
 

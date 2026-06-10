@@ -332,12 +332,24 @@ struct PaymentCheckoutView: View {
 
                 if booking.anticipoRequired == true, let anticipo = booking.anticipoAmount {
                     let rest = booking.totalPrice - anticipo
-                    CKPriceRow(label: "Servicio", value: formatCents(booking.totalPrice))
+                    CKPriceRow(label: "Servicio base", value: formatCents(booking.servicePrice ?? booking.totalPrice))
+                    if let travel = booking.travelPrice, travel > 0 {
+                        CKPriceRow(label: "Viáticos / traslado", value: formatCents(travel))
+                    }
+                    if let addons = booking.addonsPrice, addons > 0 {
+                        CKPriceRow(label: "Add-ons", value: formatCents(addons))
+                    }
                     CKPriceRow(label: "Anticipo (50%)", value: formatCents(anticipo), highlight: true)
                     CKPriceRow(label: "Saldo restante", value: formatCents(rest),
                                note: "Se cobra automáticamente 72h antes", dimmed: true)
                 } else {
-                    CKPriceRow(label: "Servicio", value: formatCents(booking.totalPrice))
+                    CKPriceRow(label: "Servicio base", value: formatCents(booking.servicePrice ?? booking.totalPrice))
+                    if let travel = booking.travelPrice, travel > 0 {
+                        CKPriceRow(label: "Viáticos / traslado", value: formatCents(travel))
+                    }
+                    if let addons = booking.addonsPrice, addons > 0 {
+                        CKPriceRow(label: "Add-ons", value: formatCents(addons))
+                    }
                 }
 
                 Divider()
