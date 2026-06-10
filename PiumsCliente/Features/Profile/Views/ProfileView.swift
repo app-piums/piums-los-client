@@ -919,7 +919,7 @@ private struct GoogleCalendarRow: View {
         guard let token = TokenStorage.shared.accessToken else { return }
         let apiBase = Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://client.piums.io"
         let base = "\(apiBase)/api/auth/google/calendar-connect"
-        let returnUrl = "piums://calendar-connected"
+        let returnUrl = "piums://calendar-connected?calendarConnected=true"
         guard
             let encodedToken = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
             let encodedReturn = returnUrl.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
