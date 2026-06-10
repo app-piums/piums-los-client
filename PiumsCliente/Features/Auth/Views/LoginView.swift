@@ -264,8 +264,6 @@ struct LoginView: View {
                     Task { await viewModel.loginWithGoogle() }
                 }
                 .disabled(viewModel.isLoading)
-                FacebookSignInRow()
-                TikTokSignInRow()
             }
 
             if let msg = viewModel.errorMessage {
@@ -576,74 +574,6 @@ private struct GoogleSignInButton: View {
                     .strokeBorder(Color(.separator), lineWidth: 1)
             )
         }
-    }
-}
-
-private struct FacebookSignInRow: View {
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(Color(red: 0.094, green: 0.463, blue: 0.949))
-                    .frame(width: 26, height: 26)
-                Text("f")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            Text("Continuar con Facebook")
-                .font(.body.weight(.medium))
-                .foregroundStyle(Color.piumsLabel)
-                .lineLimit(1)
-            Spacer()
-            Text("Próximamente")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.piumsLabelSecondary)
-                .fixedSize()
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .padding(.horizontal, 16)
-        .background(Color.piumsBackgroundElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color(.separator), lineWidth: 1)
-        )
-        .opacity(0.6)
-    }
-}
-
-private struct TikTokSignInRow: View {
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.black)
-                    .frame(width: 26, height: 26)
-                Image(systemName: "music.note")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            Text("Continuar con TikTok")
-                .font(.body.weight(.medium))
-                .foregroundStyle(Color.piumsLabel)
-                .lineLimit(1)
-            Spacer()
-            Text("Próximamente")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.piumsLabelSecondary)
-                .fixedSize()
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .padding(.horizontal, 16)
-        .background(Color.piumsBackgroundElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color(.separator), lineWidth: 1)
-        )
-        .opacity(0.6)
     }
 }
 

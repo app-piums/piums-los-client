@@ -57,7 +57,9 @@ struct APIClient {
         let errorBody = try? JSONDecoder().decode(APIErrorBody.self, from: data)
         let backendMessage = errorBody?.fullMessage
 
+        #if DEBUG
         if http.statusCode >= 400 {
+            // Solo en debug: response/request body pueden contener PII y credenciales
             let raw = String(data: data, encoding: .utf8) ?? "(binary)"
             print("❌ APIClient [\(http.statusCode)] \(endpoint.url.path):\n\(raw)")
             if let body = urlRequest.httpBody,
@@ -65,6 +67,7 @@ struct APIClient {
                 print("   ↑ Request body: \(bodyStr)")
             }
         }
+        #endif
 
         switch http.statusCode {
         case 200..<300:

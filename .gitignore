@@ -31,3 +31,7 @@ GoogleService-Info.plist
 
 # Xcode workspace user data
 *.xcworkspace/xcuserdata/
+
+# macOS AppleDouble (disco ExFAT)
+._*
+.DS_Store
