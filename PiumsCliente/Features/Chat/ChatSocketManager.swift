@@ -22,6 +22,7 @@ final class ChatSocketManager {
 
     var isConnected = false
     private(set) var activeConversationId: String?
+    private(set) var typingConversationId: String?
 
     func connect() {
         let token = TokenStorage.shared.accessToken ?? ""
@@ -90,6 +91,14 @@ final class ChatSocketManager {
                 NotificationCenter.default.post(name: .chatMessageError, object: msg)
             }
         }
+        socket.on("typing:start") { [weak self] data, _ in
+            guard let dict = data.first as? [String: Any],
+                  let convId = dict["conversationId"] as? String else { return }
+            Task { @MainActor [weak self] in self?.typingConversationId = convId }
+        }
+        socket.on("typing:stop") { [weak self] _, _ in
+            Task { @MainActor [weak self] in self?.typingConversationId = nil }
+        }
 
         // Autenticación via handshake auth.token
         socket.connect(withPayload: ["token": token])
@@ -114,6 +123,14 @@ final class ChatSocketManager {
 
     func markConversationRead(_ id: String) {
         socket?.emit("conversation:read", ["conversationId": id])
+    }
+
+    func emitTypingStart(conversationId: String) {
+        socket?.emit("typing:start", ["conversationId": conversationId])
+    }
+
+    func emitTypingStop(conversationId: String) {
+        socket?.emit("typing:stop", ["conversationId": conversationId])
     }
 
     func send(conversationId: String, content: String) {

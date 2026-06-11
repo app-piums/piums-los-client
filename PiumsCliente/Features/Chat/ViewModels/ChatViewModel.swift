@@ -15,6 +15,7 @@ final class ChatViewModel {
     private let socket = ChatSocketManager.shared
     private let unreadStore = ChatRealtimeStore.shared
     nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
+    private var typingDebounceTask: Task<Void, Never>?
 
     init() {
         socket.connect()
@@ -120,8 +121,20 @@ final class ChatViewModel {
         await unreadStore.refreshUnread()
     }
 
+    func onInputChange(conversationId: String) {
+        socket.emitTypingStart(conversationId: conversationId)
+        typingDebounceTask?.cancel()
+        typingDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled else { return }
+            socket.emitTypingStop(conversationId: conversationId)
+        }
+    }
+
     func sendMessage(conversationId: String, content: String) async {
         guard !content.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        typingDebounceTask?.cancel()
+        socket.emitTypingStop(conversationId: conversationId)
         if socket.isConnected {
             socket.send(conversationId: conversationId, content: content)
             return

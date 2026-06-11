@@ -28,26 +28,38 @@ struct ChatDetailView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                HStack(spacing: 12) {
-                    TextField("Escribe un mensaje...", text: $newMessage, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
-                        .lineLimit(1...4)
-                    Button {
-                        Task {
-                            let text = newMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !text.isEmpty else { return }
-                            newMessage = ""
-                            await viewModel.sendMessage(conversationId: conversation.id, content: text)
+                VStack(spacing: 0) {
+                    if ChatSocketManager.shared.typingConversationId == conversation.id {
+                        HStack {
+                            TypingIndicator()
+                            Spacer()
                         }
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundStyle(newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.piumsOrange)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
-                    .disabled(newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    HStack(spacing: 12) {
+                        TextField("Escribe un mensaje...", text: $newMessage, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                            .lineLimit(1...4)
+                        Button {
+                            Task {
+                                let text = newMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !text.isEmpty else { return }
+                                newMessage = ""
+                                await viewModel.sendMessage(conversationId: conversation.id, content: text)
+                            }
+                        } label: {
+                            Image(systemName: "paperplane.fill")
+                                .foregroundStyle(newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.piumsOrange)
+                        }
+                        .disabled(newMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
                 .background(.bar)
+                .animation(.easeInOut(duration: 0.2), value: ChatSocketManager.shared.typingConversationId)
             }
         }
         .background {
@@ -73,6 +85,10 @@ struct ChatDetailView: View {
         }
         .navigationTitle(conversation.otherParticipantName)
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: newMessage) { _, text in
+            guard !text.isEmpty else { return }
+            viewModel.onInputChange(conversationId: conversation.id)
+        }
         .task {
             ChatSocketManager.shared.joinConversation(conversation.id)
             await viewModel.loadMessages(conversationId: conversation.id)
@@ -80,6 +96,28 @@ struct ChatDetailView: View {
         .onDisappear {
             ChatSocketManager.shared.leaveConversation(conversation.id)
         }
+    }
+}
+
+private struct TypingIndicator: View {
+    @State private var phase = 0
+    private let timer = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(Color.secondary)
+                    .frame(width: 7, height: 7)
+                    .offset(y: phase == i ? -4 : 0)
+                    .animation(.easeInOut(duration: 0.3), value: phase)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.tertiarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .onReceive(timer) { _ in phase = (phase + 1) % 3 }
     }
 }
 
