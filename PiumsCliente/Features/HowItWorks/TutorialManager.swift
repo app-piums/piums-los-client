@@ -51,7 +51,7 @@ final class TutorialManager: ObservableObject {
         TourStep(
             tab: 3, icon: "bubble.left.and.bubble.right.fill", color: Color(hex: "#3B82F6"),
             title: "Mensajes",
-            description: "Comunícate directamente con los artistas. Las conversaciones con mensajes no leídos muestran un badge en el ícono.",
+            description: "Comunícate directamente con los artistas en tiempo real. Sabrás cuando el artista está escribiendo. Las conversaciones no leídas muestran un badge.",
             tip: "Escribe antes del evento para coordinar los detalles finales sin sorpresas."
         ),
         TourStep(

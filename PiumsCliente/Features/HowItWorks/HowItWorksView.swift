@@ -20,14 +20,11 @@ struct HowItWorksView: View {
     }
 
     private let features: [Feature] = [
-        Feature(icon: "house.fill",                       label: "Panel principal",   color: Color(hex: "#FF6A00"), tab: 0),
-        Feature(icon: "calendar.badge.checkmark",         label: "Reservas",          color: Color(hex: "#F59E0B"), tab: 2),
-        Feature(icon: "mappin.and.ellipse",               label: "Buscar por fecha",  color: Color(hex: "#10B981"), tab: 1),
-        Feature(icon: "magnifyingglass",                  label: "Explorar artistas", color: Color(hex: "#6366F1"), tab: 1),
-        Feature(icon: "sparkles",                         label: "Eventos",           color: Color(hex: "#EC4899"), tab: 2),
-        Feature(icon: "heart.fill",                       label: "Favoritos",         color: Color(hex: "#EF4444"), tab: 2),
-        Feature(icon: "bubble.left.and.bubble.right.fill",label: "Mensajes",          color: Color(hex: "#3B82F6"), tab: 3),
-        Feature(icon: "gearshape.fill",                   label: "Configuración",     color: Color(hex: "#8B5CF6"), tab: 4),
+        Feature(icon: "house.fill",                        label: "Inicio",      color: Color(hex: "#FF6A00"), tab: 0),
+        Feature(icon: "magnifyingglass",                   label: "Explorar",    color: Color(hex: "#6366F1"), tab: 1),
+        Feature(icon: "square.grid.2x2.fill",              label: "Mi Espacio",  color: Color(hex: "#EC4899"), tab: 2),
+        Feature(icon: "bubble.left.and.bubble.right.fill", label: "Mensajes",    color: Color(hex: "#3B82F6"), tab: 3),
+        Feature(icon: "person.fill",                       label: "Perfil",      color: Color(hex: "#8B5CF6"), tab: 4),
     ]
 
     private let steps: [HowItWorksStep] = [
