@@ -1,5 +1,6 @@
 // ChatDetailView.swift — detalle de conversación
 import SwiftUI
+import Combine
 
 struct ChatDetailView: View {
     let conversation: Conversation
