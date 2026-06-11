@@ -469,6 +469,8 @@ struct RecommendedArtistCard: View {
             colors = [Color(hex: "#06B6D4"), Color(hex: "#10B981")]
         case spec.contains("mag"):
             colors = [Color(hex: "#7C3AED"), Color(hex: "#4F46E5")]
+        case spec.contains("creador") || spec.contains("contenido"):
+            colors = [Color(hex: "#06B6D4"), Color(hex: "#0EA5E9")]
         default:
             colors = [Color(hex: "#FF6A00"), Color(hex: "#00AEEF")]
         }

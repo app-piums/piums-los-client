@@ -397,6 +397,7 @@ enum ArtistCategory: String, Codable, CaseIterable {
     case dj           = "DJ"
     case chef         = "CHEF"
     case yoga         = "YOGA"
+    case creadorContenido = "CREADOR_CONTENIDO"
 
     var displayName: String {
         switch self {
@@ -415,6 +416,7 @@ enum ArtistCategory: String, Codable, CaseIterable {
         case .dj:           return "DJ"
         case .chef:         return "Chef"
         case .yoga:         return "Yoga"
+        case .creadorContenido: return "Creador de Contenido"
         }
     }
 
@@ -435,6 +437,7 @@ enum ArtistCategory: String, Codable, CaseIterable {
         case .dj:           return "headphones"
         case .chef:         return "fork.knife"
         case .yoga:         return "figure.mind.and.body"
+        case .creadorContenido: return "play.rectangle.fill"
         }
     }
 }

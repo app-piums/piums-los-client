@@ -28,6 +28,7 @@ enum SpecialtyOption: String, CaseIterable, Identifiable {
     case fotografo = "FOTOGRAFO"
     case videografo = "VIDEOGRAFO"
     case animador  = "ANIMADOR"
+    case creadorContenido = "CREADOR_CONTENIDO"
 
     var displayName: String {
         switch self {
@@ -35,6 +36,7 @@ enum SpecialtyOption: String, CaseIterable, Identifiable {
         case .fotografo: return "Fotografía"
         case .videografo: return "Video"
         case .animador:  return "Animador"
+        case .creadorContenido: return "Creadores"
         }
     }
 
@@ -44,6 +46,7 @@ enum SpecialtyOption: String, CaseIterable, Identifiable {
         case .fotografo: return "camera.fill"
         case .videografo: return "film.fill"
         case .animador:  return "party.popper.fill"
+        case .creadorContenido: return "play.rectangle.fill"
         }
     }
 
@@ -53,6 +56,7 @@ enum SpecialtyOption: String, CaseIterable, Identifiable {
         case .fotografo: return ["fotografía", "fotografia", "fotógrafo", "fotografo", "foto"]
         case .videografo: return ["video", "videógrafo", "videografo"]
         case .animador:  return ["animador", "animación", "animacion", "payaso", "entretenimiento"]
+        case .creadorContenido: return ["creador", "contenido", "tiktoker", "youtuber", "influencer", "streamer", "reels", "shorts"]
         }
     }
 }

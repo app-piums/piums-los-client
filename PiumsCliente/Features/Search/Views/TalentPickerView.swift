@@ -139,8 +139,8 @@ let TALENT_GROUPS: [TalentGroup] = [
             Talent(id: "storyteller",   label: "Storyteller",      category: "ESCRITOR"),
         ]),
         TalentSubCategory(id: "social_media", label: "Social Media", talents: [
-            Talent(id: "creador_contenido", label: "Creador de Contenido", category: "OTRO"),
-            Talent(id: "tiktoker",          label: "TikToker / Reels",     category: "OTRO"),
+            Talent(id: "creador_contenido", label: "Creador de Contenido", category: "CREADOR_CONTENIDO"),
+            Talent(id: "tiktoker",          label: "TikToker / Reels",     category: "CREADOR_CONTENIDO"),
             Talent(id: "youtuber",          label: "YouTuber",             category: "VIDEOGRAFO"),
         ]),
     ]),

@@ -87,8 +87,7 @@ final class ArtistSearchByDateViewModel {
                 let specialties = item.artist.specialties?.joined(separator: " ").lowercased() ?? ""
                 if !specialties.contains(sp.rawValue.lowercased()) { return false }
             }
-            if minPrice > 0, let price = item.mainServicePrice, price < Int(minPrice) { return false }
-            if maxPrice < 50000, let price = item.mainServicePrice, price > Int(maxPrice) { return false }
+            // El rango de precio ya no excluye: ordena por cercanía al presupuesto (abajo)
             if minRating > 0, let rating = item.artist.averageRating, rating < minRating { return false }
             if let city = selectedCity {
                 let artistCity = (item.artist.city ?? "").lowercased()
@@ -115,7 +114,25 @@ final class ArtistSearchByDateViewModel {
         case .newest:
             break // keep server order
         case .relevance:
-            break // keep distance/availability sort
+            // Con rango de precio activo: dentro del rango primero (más cercano
+            // al máximo), luego fuera del rango por distancia, sin precio al final.
+            if minPrice > 0 || maxPrice < 50000 {
+                let lo = Int(minPrice)
+                let hi = maxPrice < 50000 ? Int(maxPrice) : Int.max
+                func rank(_ p: Int?) -> (Int, Int) {
+                    guard let p else { return (2, 0) }
+                    if p >= lo && p <= hi { return (0, hi == Int.max ? p - lo : -p) }
+                    return (1, p > hi ? p - hi : lo - p)
+                }
+                // sort estable (el sort de Swift no lo garantiza)
+                result = result.enumerated()
+                    .sorted { a, b in
+                        let ra = rank(a.element.mainServicePrice)
+                        let rb = rank(b.element.mainServicePrice)
+                        return ra == rb ? a.offset < b.offset : ra < rb
+                    }
+                    .map(\.element)
+            }
         }
         return result
     }
@@ -564,8 +581,9 @@ private struct SearchByDateFiltersSheet: View {
                                 Text("Máximo: \(viewModel.maxPrice >= 50000 ? "Sin límite" : Int(viewModel.maxPrice).piumsFormatted)")
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }
-                            Slider(value: $viewModel.minPrice, in: 0...49000, step: 100).tint(.piumsOrange)
-                            Slider(value: $viewModel.maxPrice, in: 1000...50000, step: 100).tint(.piumsOrange)
+                            PiumsRangeSlider(lowerValue: $viewModel.minPrice,
+                                             upperValue: $viewModel.maxPrice,
+                                             range: 0...50000, step: 100)
                         }
                     }
 

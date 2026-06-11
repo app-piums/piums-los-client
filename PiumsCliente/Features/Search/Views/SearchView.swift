@@ -16,6 +16,7 @@ private let CLIENT_CATEGORIES: [ClientCategory] = [
     ClientCategory(id: "fotografo",         label: "Fotografía",           icon: "camera.fill",       categoryId: "FOTOGRAFO"),
     ClientCategory(id: "videografo",        label: "Video",                icon: "film.fill",         categoryId: "VIDEOGRAFO"),
     ClientCategory(id: "animador",           label: "Animador",             icon: "party.popper.fill", categoryId: "ANIMADOR"),
+    ClientCategory(id: "creador_contenido",  label: "Creadores",            icon: "play.rectangle.fill", categoryId: "CREADOR_CONTENIDO"),
 ]
 
 private let POPULAR_SEARCHES = ["música en vivo", "fotógrafo bodas", "video boda", "payaso fiesta", "maestro ceremonias"]
@@ -381,8 +382,9 @@ struct SearchFiltersSheet: View {
                                 Text("Máximo: \(viewModel.maxPrice >= 50000 ? "Sin límite" : Int(viewModel.maxPrice).piumsFormatted)")
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }
-                            Slider(value: $viewModel.minPrice, in: 0...49000, step: 100).tint(.piumsOrange)
-                            Slider(value: $viewModel.maxPrice, in: 1000...50000, step: 100).tint(.piumsOrange)
+                            PiumsRangeSlider(lowerValue: $viewModel.minPrice,
+                                             upperValue: $viewModel.maxPrice,
+                                             range: 0...50000, step: 100)
                         }
                     }
                     Divider()
