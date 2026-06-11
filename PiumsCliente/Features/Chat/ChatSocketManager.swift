@@ -33,7 +33,7 @@ final class ChatSocketManager {
         let manager = SocketManager(socketURL: url, config: [
             .log(false),
             .compress,
-            .forceWebsockets(true),
+            .path("/socket.io/"),
             .forcePolling(false),
             .reconnects(true),
             .reconnectAttempts(10),
