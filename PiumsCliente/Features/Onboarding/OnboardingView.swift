@@ -366,6 +366,9 @@ private struct OnboardingIdentityStep: View {
         }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 10) {
+                if let err = vm.errorMessage {
+                    ErrorBannerView(message: err)
+                }
                 Button {
                     Task { await vm.finish() }
                 } label: {

@@ -302,8 +302,7 @@ struct ProfileView: View {
 
     private func uploadPhoto(_ item: PhotosPickerItem) async {
         guard let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data),
-              let jpeg = resizedJPEG(from: image, maxDimension: 800, quality: 0.7) else {
+              let jpeg = UIImage.normalizedJPEG(from: data, maxDimension: 800, quality: 0.7) else {
             photoItem = nil; return
         }
         isUploadingPhoto = true
@@ -353,15 +352,6 @@ struct ProfileView: View {
         } catch {
             viewModel.errorMessage = "Error al subir la foto: \(error.localizedDescription)"
         }
-    }
-
-    private func resizedJPEG(from image: UIImage, maxDimension: CGFloat, quality: CGFloat) -> Data? {
-        let size = image.size
-        let ratio = min(maxDimension / size.width, maxDimension / size.height, 1)
-        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
-        let renderer = UIGraphicsImageRenderer(size: newSize)
-        let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
-        return resized.jpegData(compressionQuality: quality)
     }
 
     private func extractAvatarURL(from data: Data) -> String? {
@@ -600,12 +590,21 @@ private struct VerifyIdentitySheet: View {
             isUploadingBack = false
             isUploadingSelfie = false
         }
+        // Normalizar a JPEG: el picker entrega el asset original (HEIC en
+        // iPhones modernos, a menudo >5MB) y el backend solo acepta JPG/PNG/WebP
+        guard let jpeg = UIImage.normalizedJPEG(from: data) else {
+            errorMessage = "No se pudo procesar la imagen. Intenta con otra foto."
+            return
+        }
         do {
+            errorMessage = nil
             let resp: AvatarUploadResponseDTO = try await APIClient.uploadMultipart(
-                .uploadDocument(folder: folder), imageData: data
+                .uploadDocument(folder: folder), imageData: jpeg
             )
             if let url = resp.resolvedURL { assign(url) }
-        } catch {}
+        } catch {
+            errorMessage = AppError(from: error).errorDescription ?? "No se pudo subir la foto. Intenta de nuevo."
+        }
     }
 
     private func save() async {

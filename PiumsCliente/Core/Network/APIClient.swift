@@ -8,7 +8,8 @@ struct APIClient {
     static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 30
-        config.timeoutIntervalForResource = 60
+        // Tope total por recurso: debe cubrir uploads multipart en redes lentas
+        config.timeoutIntervalForResource = 300
         return URLSession(configuration: config, delegate: pinningDelegate, delegateQueue: nil)
     }()
 
@@ -125,9 +126,10 @@ extension APIClient {
         _ endpoint: APIEndpoint,
         imageData: Data,
         filename: String = "photo.jpg",
-        mimeType: String = "image/jpeg"
+        mimeType: String = "image/jpeg",
+        retryOnUnauthorized: Bool = true
     ) async throws -> T {
-        if endpoint.requiresAuth && TokenStorage.shared.isAccessTokenExpired {
+        if endpoint.requiresAuth && retryOnUnauthorized && TokenStorage.shared.isAccessTokenExpired {
             try? await AuthManager.shared.refreshIfNeeded()
         }
 
@@ -141,6 +143,7 @@ extension APIClient {
 
         var urlRequest = URLRequest(url: endpoint.url)
         urlRequest.httpMethod = "POST"
+        urlRequest.timeoutInterval = 120 // uploads necesitan más que los 30s globales
         urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
         urlRequest.httpBody = body
@@ -161,8 +164,21 @@ extension APIClient {
             } catch {
                 throw AppError.decoding(error)
             }
-        case 401:
+        case 401 where retryOnUnauthorized && endpoint.requiresAuth:
+            // Igual que rawRequest: refrescar token y reintentar una vez antes
+            // de desloguear (un upload largo puede expirar el access token)
+            try await AuthManager.shared.refreshIfNeeded()
+            return try await uploadMultipart(
+                endpoint,
+                imageData: imageData,
+                filename: filename,
+                mimeType: mimeType,
+                retryOnUnauthorized: false
+            )
+        case 401 where endpoint.requiresAuth:
             await AuthManager.shared.logout()
+            throw AppError.unauthorized
+        case 401:
             throw AppError.unauthorized
         default:
             let msg = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message

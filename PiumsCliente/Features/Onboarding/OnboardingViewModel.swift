@@ -126,12 +126,20 @@ final class OnboardingViewModel {
     }
 
     private func uploadDoc(_ data: Data, folder: String) async -> String? {
+        // Normalizar a JPEG: el picker entrega el asset original (HEIC en
+        // iPhones modernos, a menudo >5MB) y el backend solo acepta JPG/PNG/WebP
+        guard let jpeg = UIImage.normalizedJPEG(from: data) else {
+            errorMessage = "No se pudo procesar la imagen. Intenta con otra foto."
+            return nil
+        }
         do {
+            errorMessage = nil
             let resp: AvatarUploadResponseDTO = try await APIClient.uploadMultipart(
-                .uploadDocument(folder: folder), imageData: data
+                .uploadDocument(folder: folder), imageData: jpeg
             )
             return resp.resolvedURL
         } catch {
+            errorMessage = AppError(from: error).errorDescription ?? "No se pudo subir la foto. Intenta de nuevo."
             return nil
         }
     }
@@ -183,7 +191,14 @@ final class OnboardingViewModel {
             do {
                 let _: AuthUser = try await APIClient.request(.updateMyProfile(payload: payload))
                 UserDefaults.standard.set(true, forKey: "identityVerificationSubmitted")
-            } catch {}
+            } catch {
+                // No cerrar el onboarding con un fallo silencioso: mostrar el
+                // error para que el usuario reintente. Si fue 401 definitivo,
+                // el logout ya ocurrió y RootView mostrará el login.
+                errorMessage = AppError(from: error).errorDescription
+                    ?? "No se pudo enviar la verificación. Intenta de nuevo."
+                return
+            }
         }
 
         // 4 — Notificar al backend (no bloquea si falla)
