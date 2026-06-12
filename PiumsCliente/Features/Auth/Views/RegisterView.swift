@@ -22,6 +22,26 @@ struct RegisterView: View {
                 registerCard
                     .frame(height: geo.size.height * 0.78)
                     .offset(y: animateIn ? -min(keyboardHeight, geo.size.height * 0.22 - 20) : geo.size.height * 0.8)
+
+                // Botón regresar a inicio de sesión
+                VStack {
+                    HStack {
+                        Button {
+                            viewModel.clearMessages()
+                            viewModel.activeScreen = .login
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 38, height: 38)
+                                .background(Color.white.opacity(0.12), in: Circle())
+                        }
+                        Spacer()
+                    }
+                    .padding(.leading, 20)
+                    .padding(.top, geo.safeAreaInsets.top + 12)
+                    Spacer()
+                }
             }
             .ignoresSafeArea()
         }

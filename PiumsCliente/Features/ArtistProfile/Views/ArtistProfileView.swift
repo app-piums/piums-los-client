@@ -6,6 +6,12 @@ import SafariServices
 
 struct ArtistProfileView: View {
     let artist: Artist
+    // Contexto opcional del flujo "buscar por fecha" (calendario): preserva
+    // fecha y ubicación elegidas al continuar hacia la reserva.
+    var preselectedDate: Date? = nil
+    var presetLocation: String? = nil
+    var presetLat: Double? = nil
+    var presetLng: Double? = nil
     @State private var viewModel: ArtistProfileViewModel
     @State private var bookingService: ArtistService?
     @State private var detailService: ArtistService?
@@ -14,8 +20,16 @@ struct ArtistProfileView: View {
     @State private var showFavError = false
     @Environment(\.locationStore) private var locationStore
 
-    init(artist: Artist) {
+    init(artist: Artist,
+         preselectedDate: Date? = nil,
+         presetLocation: String? = nil,
+         presetLat: Double? = nil,
+         presetLng: Double? = nil) {
         self.artist = artist
+        self.preselectedDate = preselectedDate
+        self.presetLocation = presetLocation
+        self.presetLat = presetLat
+        self.presetLng = presetLng
         _viewModel = State(initialValue: ArtistProfileViewModel(artist: artist))
     }
 
@@ -177,9 +191,10 @@ struct ArtistProfileView: View {
                 BookingFlowView(context: BookingFlowContext(
                     artist: artist,
                     service: service,
-                    location: locationStore.cityName,
-                    locationLat: lat,
-                    locationLng: lng
+                    selectedDate: preselectedDate,
+                    location: presetLocation ?? locationStore.cityName,
+                    locationLat: presetLat ?? lat,
+                    locationLng: presetLng ?? lng
                 ))
             }
         }

@@ -1333,10 +1333,10 @@ struct PiumsSegmentedPicker<T: Hashable & CaseIterable>: View {
                     withAnimation(.easeInOut(duration: 0.2)) { selected = tab }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: icon(tab)).font(.system(size: 13))
+                        Image(systemName: icon(tab)).font(.system(size: 17))
                         if selected == tab {
                             Text(label(tab))
-                                .font(.caption.weight(.semibold))
+                                .font(.footnote.weight(.semibold))
                                 .lineLimit(1)
                                 .transition(.opacity.combined(with: .scale(scale: 0.85)))
                         }
@@ -1356,8 +1356,8 @@ struct PiumsSegmentedPicker<T: Hashable & CaseIterable>: View {
                     }
                     .foregroundStyle(selected == tab ? .white : .secondary)
                     .frame(maxWidth: selected == tab ? .infinity : nil)
-                    .padding(.horizontal, selected == tab ? 0 : 10)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, selected == tab ? 0 : 12)
+                    .padding(.vertical, 12)
                     .background(selected == tab ? Color.piumsOrange : Color.clear)
                     .clipShape(Capsule())
                 }

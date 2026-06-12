@@ -331,7 +331,7 @@ struct ArtistSearchByDateView: View {
 
     @State private var viewModel = ArtistSearchByDateViewModel()
     @State private var selectedArtist: Artist?
-    @State private var bookingContext: BookingFlowContext?
+    @State private var profileArtist: Artist?
     @State private var showFilters = false
     @Environment(\.locationStore) private var locationStore
 
@@ -384,15 +384,7 @@ struct ArtistSearchByDateView: View {
                     ) {
                         ForEach(viewModel.displayed) { item in
                             ArtistSearchResultCard(item: item, matchedService: nil)
-                                .onTapGesture {
-                                    bookingContext = BookingFlowContext(
-                                        artist: item.artist,
-                                        selectedDate: selectedDate,
-                                        location: locationName,
-                                        locationLat: userLocation?.latitude,
-                                        locationLng: userLocation?.longitude
-                                    )
-                                }
+                                .onTapGesture { profileArtist = item.artist }
                         }
                     }
                     .padding(.horizontal, 16).padding(.top, 4)
@@ -513,8 +505,14 @@ struct ArtistSearchByDateView: View {
         .onChange(of: userLocation?.latitude) { _, _ in
             viewModel.updateLocation(userLocation)
         }
-        .navigationDestination(item: $bookingContext) { ctx in
-            BookingFlowView(context: ctx)
+        .navigationDestination(item: $profileArtist) { artist in
+            ArtistProfileView(
+                artist: artist,
+                preselectedDate: selectedDate,
+                presetLocation: locationName,
+                presetLat: userLocation?.latitude,
+                presetLng: userLocation?.longitude
+            )
         }
     }
 

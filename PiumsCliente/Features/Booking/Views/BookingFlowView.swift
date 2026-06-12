@@ -269,6 +269,7 @@ final class BookingFlowViewModel {
         if let lat = context.locationLat      { payload["locationLat"] = lat }
         if let lng = context.locationLng      { payload["locationLng"] = lng }
         if !context.clientNotes.isEmpty       { payload["clientNotes"] = context.clientNotes }
+        if !context.dressCode.isEmpty         { payload["dressCode"] = context.dressCode }
         if let eventId = context.eventId      { payload["eventId"] = eventId }
         if let et = context.eventType         { payload["eventType"] = et.rawValue }
         if !context.selectedAddons.isEmpty    { payload["selectedAddons"] = context.selectedAddons }
@@ -636,6 +637,18 @@ struct BookingFlowView: View {
                     .frame(minHeight: 90).padding(10)
                     .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 4) {
+                    Label("Código de vestimenta", systemImage: "tshirt").font(.headline)
+                    Text("(Opcional)").font(.subheadline).foregroundStyle(.secondary)
+                }
+                TextField("Formal, casual, temática años 80...", text: $vm.context.dressCode)
+                    .padding(10)
+                    .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12))
+                    .onChange(of: vm.context.dressCode) { _, v in
+                        if v.count > 100 { vm.context.dressCode = String(v.prefix(100)) }
+                    }
+            }
             eventTypeSection
             eventPickerSection
         }
@@ -903,6 +916,7 @@ struct BookingFlowView: View {
             if vm.context.isMultiDay { reviewRow("calendar.badge.plus", "Días", "\(vm.context.numDays) días") }
             if !vm.context.location.isEmpty { reviewRow("mappin.circle", "Lugar", vm.context.location) }
             if !vm.context.clientNotes.isEmpty { reviewRow("note.text", "Notas", vm.context.clientNotes) }
+            if !vm.context.dressCode.isEmpty { reviewRow("tshirt", "Vestimenta", vm.context.dressCode) }
         }
         .background(Color(.tertiarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 14))
     }

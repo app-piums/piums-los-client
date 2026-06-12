@@ -1362,6 +1362,7 @@ struct BookingFlowContext {
     var locationLat: Double?
     var locationLng: Double?
     var clientNotes: String = ""
+    var dressCode: String = ""
     var priceQuote: PriceQuote?
     var eventId: String? = nil
     var eventType: EventType? = nil
