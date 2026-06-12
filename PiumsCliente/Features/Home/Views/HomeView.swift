@@ -240,6 +240,7 @@ struct HomeCalendarView: View {
     var onDayTap: ((Date) -> Void)? = nil
 
     @State private var displayMonth = Date()
+    @State private var showMonthPicker = false
     private let calendar = Calendar.current
     private let dayColumns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
     private let weekdays = ["MON","TUE","WED","THU","FRI","SAT","SUN"]
@@ -248,8 +249,16 @@ struct HomeCalendarView: View {
         VStack(spacing: 12) {
             // Header mes
             HStack {
-                Text(monthTitle)
-                    .font(.headline.bold())
+                Button { showMonthPicker = true } label: {
+                    HStack(spacing: 5) {
+                        Text(monthTitle)
+                            .font(.headline.bold())
+                            .foregroundStyle(.primary)
+                        Image(systemName: "chevron.down")
+                            .font(.caption.bold())
+                            .foregroundStyle(Color.piumsOrange)
+                    }
+                }
                 Spacer()
                 Button { changeMonth(-1) } label: {
                     Image(systemName: "chevron.left")
@@ -333,6 +342,9 @@ struct HomeCalendarView: View {
             RoundedRectangle(cornerRadius: 18)
                 .fill(Color(.tertiarySystemGroupedBackground))
         )
+        .sheet(isPresented: $showMonthPicker) {
+            MonthYearPickerSheet(selection: $displayMonth).presentationDetents([.medium])
+        }
     }
 
     // Helpers
