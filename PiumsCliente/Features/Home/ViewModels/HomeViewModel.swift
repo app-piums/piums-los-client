@@ -1,6 +1,23 @@
 // HomeViewModel.swift
 import Foundation
 
+private let interestToSpecialty: [String: String] = [
+    "live-music":       "MUSICO",
+    "dj":               "MUSICO",
+    "photography":      "FOTOGRAFO",
+    "video":            "VIDEOGRAFO",
+    "music-production": "MUSICO",
+    "dance":            "ANIMADOR",
+    "magic":            "ANIMADOR",
+]
+
+let categoryLabels: [String: String] = [
+    "MUSICO":     "Músicos para ti",
+    "FOTOGRAFO":  "Fotógrafos para ti",
+    "VIDEOGRAFO": "Videógrafos para ti",
+    "ANIMADOR":   "Animadores para ti",
+]
+
 @Observable
 @MainActor
 final class HomeViewModel {
@@ -10,6 +27,8 @@ final class HomeViewModel {
     var hasMore = true
     private var currentPage = 1
     private var lastLoadedAt: Date?
+
+    var personalizedSections: [(category: String, label: String, artists: [Artist])] = []
 
     // ── Datos del usuario ─────────────────────────────────
     var firstName: String {
@@ -34,6 +53,7 @@ final class HomeViewModel {
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadArtists() }
             group.addTask { await self.loadUpcomingBookings() }
+            group.addTask { await self.loadPersonalized() }
         }
     }
 
@@ -69,6 +89,27 @@ final class HomeViewModel {
         } catch {
             errorMessage = AppError(from: error).errorDescription
         }
+    }
+
+    private func loadPersonalized() async {
+        guard let interests = UserInterests.load(), !interests.categories.isEmpty else { return }
+        let categories = Array(Set(interests.categories.compactMap { interestToSpecialty[$0] }))
+        var sections: [(category: String, label: String, artists: [Artist])] = []
+        for cat in categories {
+            guard let label = categoryLabels[cat] else { continue }
+            if let res: SearchArtistsResponse = try? await APIClient.request(
+                .searchArtists(q: nil, page: 1, limit: 8,
+                               specialty: cat, city: nil,
+                               minPrice: nil, maxPrice: nil, minRating: nil,
+                               isVerified: nil, sortBy: nil, sortOrder: nil)
+            ) {
+                let filtered = res.artists.filter { $0.servicesCount > 0 }
+                if !filtered.isEmpty {
+                    sections.append((category: cat, label: label, artists: filtered))
+                }
+            }
+        }
+        personalizedSections = sections
     }
 
     private func loadUpcomingBookings() async {

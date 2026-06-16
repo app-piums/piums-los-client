@@ -56,6 +56,12 @@ struct HomeView: View {
                 recommendedSection
                     .padding(.bottom, 28)
 
+                // ── Secciones personalizadas ─────────────────
+                ForEach(viewModel.personalizedSections, id: \.category) { section in
+                    personalizedSection(section)
+                        .padding(.bottom, 28)
+                }
+
                 // ── Banner promocional ──────────────────────
                 PromoBannerView(showArtistSearch: $showArtistSearch)
                     .padding(.horizontal, 20)
@@ -188,6 +194,36 @@ struct HomeView: View {
             Text("¿Qué artista necesitas para tu próximo evento?")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Personalized section
+
+    @ViewBuilder
+    private func personalizedSection(_ section: (category: String, label: String, artists: [Artist])) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(section.label)
+                    .font(.title3.bold())
+                Spacer()
+                Button("Ver todos") {
+                    selectedDate = selectedDate ?? Calendar.current.startOfDay(for: Date())
+                    showArtistSearch = true
+                }
+                .font(.subheadline.bold())
+                .foregroundStyle(Color.piumsOrange)
+            }
+            .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(section.artists) { artist in
+                        RecommendedArtistCard(artist: artist)
+                            .onTapGesture { selectedArtist = artist }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
         }
     }
 
