@@ -64,7 +64,10 @@ struct ArtistCardView: View {
 
                         AsyncImage(url: imageURL) { phase in
                             if case .success(let img) = phase {
-                                img.resizable().scaledToFill()
+                                img.resizable()
+                                    .scaledToFill()
+                                    .frame(maxWidth: .infinity, maxHeight: 130)
+                                    .clipped()
                             }
                         }
                         .frame(height: 130)

@@ -31,7 +31,7 @@ struct SearchView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            VStack(spacing: 16) {
                 if viewModel.isLoading && viewModel.results.isEmpty {
                     LoadingView().frame(maxWidth: .infinity, minHeight: 300)
 
