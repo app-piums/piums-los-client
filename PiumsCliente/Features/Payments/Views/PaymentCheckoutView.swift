@@ -20,6 +20,7 @@ final class PaymentCheckoutViewModel {
 
     var savedCard: PaymentMethod? = nil
     var useSavedCard: Bool = true
+    var usedSavedCardDeferred: Bool = false
 
     // Helpers para el switch en la vista
     var isBusy: Bool {
@@ -79,29 +80,12 @@ final class PaymentCheckoutViewModel {
         }
     }
 
-    // MARK: - Pago con tarjeta guardada
+    // MARK: - Tarjeta guardada: diferir cobro al confirmar el artista
 
-    func chargeWithSavedCard(booking: Booking) async {
-        guard let card = savedCard else { return }
-        phase = .processing
-        pollingMessage = "Procesando pago..."
-        do {
-            let result: SavedCardChargeResponse = try await APIClient.request(
-                .chargeWithSavedCard(
-                    methodId:  card.id,
-                    bookingId: booking.id,
-                    amount:    amountToPay,
-                    currency:  currency
-                )
-            )
-            if result.success {
-                await pollUntilPaid(bookingId: booking.id)
-            } else {
-                phase = .declined
-            }
-        } catch {
-            phase = .error(AppError(from: error).errorDescription ?? "Error al procesar el pago.")
-        }
+    func confirmPendingWithSavedCard(booking: Booking) {
+        confirmedBooking = booking
+        usedSavedCardDeferred = true
+        phase = .confirmed
     }
 
     // MARK: - Iniciar pago (Tilopay WebView)
@@ -451,7 +435,7 @@ struct PaymentCheckoutView: View {
                 // Botón de pago
                 Button {
                     if vm.savedCard != nil && vm.useSavedCard {
-                        Task { await vm.chargeWithSavedCard(booking: booking) }
+                        vm.confirmPendingWithSavedCard(booking: booking)
                     } else {
                         Task { await vm.startPayment(booking: booking, artist: artist) }
                     }
@@ -461,8 +445,8 @@ struct PaymentCheckoutView: View {
                             ProgressView().tint(.white).scaleEffect(0.85)
                             Text("Procesando...").font(.headline)
                         } else if let card = vm.savedCard, vm.useSavedCard {
-                            Image(systemName: "bolt.fill")
-                            Text("Pagar \(formatCents(vm.amountToPay)) con \(card.brandLabel) ••••\(card.cardLast4 ?? "")")
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Reservar con \(card.brandLabel) ••••\(card.cardLast4 ?? "")")
                                 .font(.headline)
                         } else {
                             Image(systemName: "creditcard.fill")
@@ -488,12 +472,14 @@ struct PaymentCheckoutView: View {
             VStack(spacing: 16) {
                 ZStack {
                     Circle().fill(Color.green.opacity(0.12)).frame(width: 90, height: 90)
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: vm.usedSavedCardDeferred ? "clock.badge.checkmark.fill" : "checkmark.circle.fill")
                         .font(.system(size: 52)).foregroundStyle(.green)
                 }
                 VStack(spacing: 6) {
-                    Text("¡Pago exitoso!").font(.title.bold())
-                    Text("Tu reserva está confirmada. El artista ha sido notificado.")
+                    Text(vm.usedSavedCardDeferred ? "¡Reserva enviada!" : "¡Pago exitoso!").font(.title.bold())
+                    Text(vm.usedSavedCardDeferred
+                         ? "El artista revisará tu solicitud. Tu tarjeta será cobrada automáticamente cuando confirme."
+                         : "Tu reserva está confirmada. El artista ha sido notificado.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center).padding(.horizontal, 20)
                 }
@@ -613,8 +599,3 @@ private struct TilopayConfirmResponse: Decodable {
     let responseCode: String?
 }
 
-private struct SavedCardChargeResponse: Decodable {
-    let success: Bool
-    let orderNumber: String?
-    let provider: String?
-}
