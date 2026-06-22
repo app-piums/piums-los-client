@@ -10,13 +10,13 @@ import CryptoKit
 ///       | openssl x509 -outform der | openssl dgst -sha256 -binary | base64
 ///
 /// Hashes actuales (client.piums.io y backend.piums.io comparten el mismo certificado):
-///   Leaf cert:    vence 2026-07-21  →  bXcinqCEgWfTR8vYpEctiYO9Tq7YLAfUtvWLZJKvNhI=
-///   Intermediate: Let's Encrypt E8  →  g2JP0zjI2bAjwYpny3qcBRnaQ9EXdbTGy9rUXD2ZfFI=
+///   Leaf cert:    vence 2026-09-18  →  foek3yKATmvB8w73MVbHM4NWFAgsES6ztw+EUveBk/I=
+///   Intermediate: Let's Encrypt E8  →  l2WN6MaN+pis4eUCimPVShqukRs+IUcQdsaFDNCMurQ=
 final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
 
     private static let pinnedHashes: Set<String> = [
-        "bXcinqCEgWfTR8vYpEctiYO9Tq7YLAfUtvWLZJKvNhI=",  // leaf — vence 2026-07-21
-        "g2JP0zjI2bAjwYpny3qcBRnaQ9EXdbTGy9rUXD2ZfFI="   // Let's Encrypt E8 intermediate
+        "foek3yKATmvB8w73MVbHM4NWFAgsES6ztw+EUveBk/I=",  // leaf — vence 2026-09-18
+        "l2WN6MaN+pis4eUCimPVShqukRs+IUcQdsaFDNCMurQ="   // Let's Encrypt E8 intermediate
     ]
 
     // Solo aplicar pinning a nuestros propios hosts; CDN / Firebase / Stripe pasan normal
