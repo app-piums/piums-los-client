@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Face ID: para bloquear la app al pasar a background y requerir autenticación al volver -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Piums usa Face ID para proteger tu cuenta cuando la app pasa a segundo plano.</string>
+
 	<!-- Ubicación: usada para búsqueda de artistas cercanos y autocompletar ubicación de eventos -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Piums usa tu ubicación para mostrarte artistas disponibles cerca de ti y autocompletar la dirección de tus eventos.</string>
