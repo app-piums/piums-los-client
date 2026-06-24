@@ -77,6 +77,10 @@ final class BookingFlowViewModel {
     var sonidistaMatches: [SonidistaMatch] = []
     var sonidistaLoading = false
     var sonidistaDismissed = false
+    var selectedSonidista: SonidistaMatch? = nil
+
+    func selectSonidista(_ match: SonidistaMatch) { selectedSonidista = match }
+    func deselectSonidista() { selectedSonidista = nil }
 
     var appliedDiscount: Int { couponResult?.valid == true ? (couponResult?.discount ?? 0) : 0 }
     var finalTotal: Int { (priceQuote?.totalCents ?? 0) - appliedDiscount }
@@ -300,6 +304,7 @@ final class BookingFlowViewModel {
             let trimmed = couponCode.trimmingCharacters(in: .whitespaces).uppercased()
             if !trimmed.isEmpty { payload["couponCode"] = trimmed }
         }
+        if let s = selectedSonidista { payload["sonidistaServiceId"] = s.serviceId }
         do {
             bookingResult = try await APIClient.request(.createBooking(payload: payload))
             didComplete = true
@@ -1085,7 +1090,10 @@ struct BookingFlowView: View {
                 SonidistaOfferView(
                     matches: vm.sonidistaMatches,
                     loading: vm.sonidistaLoading,
-                    onDismiss: { vm.sonidistaDismissed = true }
+                    selectedSonidista: vm.selectedSonidista,
+                    onSelect: { vm.selectSonidista($0) },
+                    onDeselect: { vm.deselectSonidista() },
+                    onDismiss: { vm.sonidistaDismissed = true; vm.deselectSonidista() }
                 )
             }
 
@@ -1259,6 +1267,9 @@ private struct BFSvcCard: View {
 private struct SonidistaOfferView: View {
     let matches: [SonidistaMatch]
     let loading: Bool
+    let selectedSonidista: SonidistaMatch?
+    let onSelect: (SonidistaMatch) -> Void
+    let onDeselect: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
@@ -1274,44 +1285,83 @@ private struct SonidistaOfferView: View {
                 }
             }
 
-            if loading {
-                HStack { Spacer(); ProgressView(); Spacer() }
-            } else if matches.isEmpty {
-                Text("No encontramos sonidistas disponibles para este dia.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else {
-                ForEach(matches.prefix(3)) { match in
-                    HStack(spacing: 10) {
-                        AsyncImage(url: match.avatar.flatMap(URL.init)) { img in
-                            img.resizable().scaledToFill()
-                        } placeholder: {
-                            Color.blue.opacity(0.15)
-                        }
-                        .frame(width: 36, height: 36)
-                        .clipShape(Circle())
+            if let sel = selectedSonidista {
+                // Estado: sonidista seleccionado
+                HStack(spacing: 10) {
+                    AsyncImage(url: sel.avatar.flatMap(URL.init)) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        Color.green.opacity(0.15)
+                    }
+                    .frame(width: 36, height: 36)
+                    .clipShape(Circle())
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(match.artistName).font(.subheadline.bold()).lineLimit(1)
-                            Text("$\(String(format: "%.2f", match.price / 100.0))")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        HStack(spacing: 2) {
-                            Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
-                            Text(String(format: "%.1f", match.artistRating)).font(.caption)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(sel.artistName).font(.subheadline.bold()).lineLimit(1)
+                        Text("Q\(String(format: "%.0f", sel.price))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.green)
+                    Button("Cambiar") { onDeselect() }
+                        .font(.caption).foregroundStyle(Color.blue)
+                }
+                .padding(10)
+                .background(Color.green.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                Text("El pago al sonidista se coordina por separado cuando confirme.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            } else {
+                // Estado: lista de candidatos
+                if loading {
+                    HStack { Spacer(); ProgressView(); Spacer() }
+                } else if matches.isEmpty {
+                    Text("No encontramos sonidistas disponibles para este dia.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(matches.prefix(3)) { match in
+                        HStack(spacing: 10) {
+                            AsyncImage(url: match.avatar.flatMap(URL.init)) { img in
+                                img.resizable().scaledToFill()
+                            } placeholder: {
+                                Color.blue.opacity(0.15)
+                            }
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(match.artistName).font(.subheadline.bold()).lineLimit(1)
+                                Text("Q\(String(format: "%.0f", match.price))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                HStack(spacing: 2) {
+                                    Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
+                                    Text(String(format: "%.1f", match.artistRating)).font(.caption)
+                                }
+                            }
+                            Spacer()
+                            Button("Agregar") { onSelect(match) }
+                                .font(.caption.bold())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.blue)
+                                .clipShape(Capsule())
                         }
                     }
                 }
-            }
 
-            Button(role: .cancel) { onDismiss() } label: {
-                Text("No, gracias").font(.caption).foregroundStyle(.secondary)
+                Button(role: .cancel) { onDismiss() } label: {
+                    Text("No, gracias").font(.caption).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(14)
         .background(Color.blue.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .animation(.easeInOut(duration: 0.2), value: selectedSonidista?.artistId)
     }
 }
 
