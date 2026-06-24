@@ -337,6 +337,11 @@ private struct ArtistHeaderView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                if artist.hasSoundSystem == false {
+                    Label("Sin equipo de sonido propio", systemImage: "speaker.slash")
+                        .font(.caption)
+                        .foregroundStyle(Color.orange)
+                }
             }
         }
         .padding()

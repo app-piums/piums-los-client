@@ -43,6 +43,7 @@ enum APIEndpoint {
     case getReplacementSearch(bookingId: String)
     case acceptReplacement(bookingId: String)
     case declineReplacement(bookingId: String)
+    case sonidistaCheck(city: String, date: String, durationMinutes: Int, excludeArtistId: String?)
 
     // ── Reviews ───────────────────────────────────────────
     case listReviews(artistId: String, page: Int)
@@ -318,6 +319,10 @@ extension APIEndpoint {
         case .getReplacementSearch(let id):    return "/api/bookings/\(id)/replacement"
         case .acceptReplacement(let id):       return "/api/bookings/\(id)/replacement/accept"
         case .declineReplacement(let id):      return "/api/bookings/\(id)/replacement/decline"
+        case .sonidistaCheck(let city, let date, let dur, let excl):
+            var p = "/api/bookings/sonidista-check?city=\(city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city)&date=\(date)&durationMinutes=\(dur)"
+            if let excl = excl { p += "&excludeArtistId=\(excl)" }
+            return p
 
         // Reviews — path directo (el service monta en /api/reviews internamente)
         case .listReviews(let a, let pg):      return "/api/reviews?artistId=\(a)&page=\(pg)&limit=10"

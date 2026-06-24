@@ -118,6 +118,7 @@ struct Artist: Codable, Identifiable, Hashable {
     let instagram: String?
     let website: String?
     let certifications: [Certification]?
+    let hasSoundSystem: Bool? = nil
 
     // Computed helpers para la UI
     var artistName: String { name }
@@ -129,6 +130,21 @@ struct Artist: Codable, Identifiable, Hashable {
     // Hashable
     static func == (lhs: Artist, rhs: Artist) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct SonidistaMatch: Codable, Identifiable {
+    let serviceId: String
+    let artistId: String
+    let artistName: String
+    let artistRating: Double
+    let price: Double
+    let city: String?
+    let avatar: String?
+    var id: String { artistId }
+}
+
+struct SonidistaCheckResponse: Codable {
+    let matches: [SonidistaMatch]
 }
 
 struct ArtistDetailResponse: Decodable {
