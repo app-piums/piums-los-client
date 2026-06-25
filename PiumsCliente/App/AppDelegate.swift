@@ -109,6 +109,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 object: nil,
                 userInfo: ["bookingId": bookingId, "requiresPayment": true]
             )
+        } else if (type == "SONIDISTA_PAYMENT_REQUIRED" || type == "SONIDISTA_REJECTED"),
+                  let bookingId = userInfo["bookingId"] as? String {
+            NotificationCenter.default.post(
+                name: .navigateToBooking,
+                object: nil,
+                userInfo: ["bookingId": bookingId]
+            )
         } else if let bookingId = userInfo["bookingId"] as? String {
             NotificationCenter.default.post(
                 name: .navigateToBooking,

@@ -432,6 +432,7 @@ struct BookingDetailView: View {
     @State private var showReschedule = false
     @State private var showPayCheckout = false
     @State private var showPayRemaining = false
+    @State private var showPaySonidista = false
     @State private var showNoShowAlert = false
     @State private var noShowReason = ""
     @State private var replacementSearch: ReplacementSearchData? = nil
@@ -815,6 +816,35 @@ struct BookingDetailView: View {
                 // ── Acciones ────────────────────────────────
                 DetailCard(title: "Acciones") {
                     VStack(spacing: 10) {
+                        if let snd = booking.sonidistaBooking {
+                            if snd.status == "CONFIRMED" && snd.paymentStatus == "PENDING" {
+                                actionButton(icon: "creditcard.fill", label: "Pagar sonidista (\(snd.totalPrice.piumsFormatted))", color: Color.piumsOrange) {
+                                    showPaySonidista = true
+                                }
+                                Divider()
+                            } else if snd.status == "CONFIRMED" && snd.paymentStatus == "CARD_AUTHORIZED" {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                                    Text("Sonidista — pago reservado").font(.subheadline)
+                                    Spacer()
+                                }
+                                Divider()
+                            } else if snd.status == "PENDING" {
+                                HStack {
+                                    Image(systemName: "clock").foregroundColor(.orange)
+                                    Text("Sonidista — esperando respuesta").font(.subheadline)
+                                    Spacer()
+                                }
+                                Divider()
+                            } else if snd.status == "REJECTED" {
+                                HStack {
+                                    Image(systemName: "xmark.circle").foregroundColor(.red)
+                                    Text("Sonidista no disponible").font(.subheadline)
+                                    Spacer()
+                                }
+                                Divider()
+                            }
+                        }
                         if booking.paymentStatus == .pending {
                             actionButton(icon: "creditcard.fill", label: "Pagar ahora", color: Color.piumsOrange) {
                                 showPayCheckout = true
@@ -912,6 +942,19 @@ struct BookingDetailView: View {
             ) {
                 showPayRemaining = false
                 Task { await reloadBooking() }
+            }
+        }
+        .fullScreenCover(isPresented: $showPaySonidista) {
+            if let snd = booking.sonidistaBooking {
+                PaymentCheckoutView(
+                    booking: booking,
+                    artist: artistForPayment,
+                    overrideAmount: snd.totalPrice,
+                    bookingIdOverride: snd.id
+                ) {
+                    showPaySonidista = false
+                    Task { await reloadBooking() }
+                }
             }
         }
         .alert("Reportar no presentación", isPresented: $showNoShowAlert) {

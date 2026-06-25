@@ -90,7 +90,7 @@ final class PaymentCheckoutViewModel {
 
     // MARK: - Iniciar pago (Tilopay WebView)
 
-    func startPayment(booking: Booking, artist: Artist) async {
+    func startPayment(booking: Booking, artist: Artist, bookingIdOverride: String? = nil) async {
         phase = .loading
         // Refrescar token antes de abrir el WebView — el pago puede tardar varios minutos
         try? await AuthManager.shared.refreshIfNeeded()
@@ -99,7 +99,7 @@ final class PaymentCheckoutViewModel {
         do {
             let wrapper: PaymentIntentWrapper = try await APIClient.request(
                 .createPaymentIntent(
-                    bookingId:    booking.id,
+                    bookingId:    bookingIdOverride ?? booking.id,
                     amount:       amountToPay,
                     currency:     currency,
                     countryCode:  artist.country,
@@ -239,6 +239,7 @@ struct PaymentCheckoutView: View {
     let booking: Booking
     let artist: Artist
     var overrideAmount: Int? = nil
+    var bookingIdOverride: String? = nil
     let onDone: () -> Void
 
     @State private var vm = PaymentCheckoutViewModel()
@@ -437,7 +438,7 @@ struct PaymentCheckoutView: View {
                     if vm.savedCard != nil && vm.useSavedCard {
                         vm.confirmPendingWithSavedCard(booking: booking)
                     } else {
-                        Task { await vm.startPayment(booking: booking, artist: artist) }
+                        Task { await vm.startPayment(booking: booking, artist: artist, bookingIdOverride: bookingIdOverride) }
                     }
                 } label: {
                     HStack(spacing: 8) {

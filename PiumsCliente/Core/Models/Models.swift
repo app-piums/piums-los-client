@@ -665,6 +665,11 @@ struct Booking: Codable, Identifiable, Hashable {
     let travelPrice: Int?
     let selectedAddons: [String]?
 
+    // Sonidista addon — booking secundario vinculado
+    let bookingRole: String?
+    let linkedBookingId: String?
+    let sonidistaBooking: SonidistaBookingInfo?
+
     // Participantes — pueden venir anidados del backend
     let artist: BookingParticipant?
     let client: BookingParticipant?
@@ -687,6 +692,13 @@ struct Booking: Codable, Identifiable, Hashable {
     // Hashable
     static func == (lhs: Booking, rhs: Booking) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct SonidistaBookingInfo: Codable {
+    let id: String
+    let status: String
+    let paymentStatus: String
+    let totalPrice: Int
 }
 
 // MARK: - BookingStatus / PaymentStatus
@@ -1169,6 +1181,7 @@ extension Booking {
                 anticipoRequired: nil, anticipoAmount: nil, paidAmount: nil, currency: "USD",
                 couponCode: nil, couponDiscountAmount: nil,
                 servicePrice: nil, addonsPrice: nil, travelPrice: nil, selectedAddons: nil,
+                bookingRole: nil, linkedBookingId: nil, sonidistaBooking: nil,
                 artist: nil, client: nil, artistName: nil, clientName: nil,
                 attendanceCode: nil, attendanceCodeUsedAt: nil,
                 requiresProductDelivery: nil, productDeliveryUrl: nil)
