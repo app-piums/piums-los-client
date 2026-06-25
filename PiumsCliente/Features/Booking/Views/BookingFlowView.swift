@@ -1298,7 +1298,7 @@ private struct SonidistaOfferView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(sel.artistName).font(.subheadline.bold()).lineLimit(1)
-                        Text("Q\(String(format: "%.0f", sel.price))")
+                        Text(Int(sel.price).piumsFormatted)
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -1333,7 +1333,7 @@ private struct SonidistaOfferView: View {
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(match.artistName).font(.subheadline.bold()).lineLimit(1)
-                                Text("Q\(String(format: "%.0f", match.price))")
+                                Text(Int(match.price).piumsFormatted)
                                     .font(.caption).foregroundStyle(.secondary)
                                 HStack(spacing: 2) {
                                     Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
